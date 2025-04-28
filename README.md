@@ -26,7 +26,7 @@ This application is a backend service for handling GitLab merge request (MR) eve
 
 ### Prerequisites
 
-- Go 1.20 or later
+- Go 1.23 or later
 - GitLab instance with API access
 - GitLab personal access token
 
@@ -34,7 +34,68 @@ This application is a backend service for handling GitLab merge request (MR) eve
 
 This project works as backend for the bot. It implements the web server required to handle the webhook events. So that the implementations can focus on the business logic.
 
-More details here soon.
+Create a new go project. `main.go` would look like this -
+
+```go
+package main
+
+import (
+	"log"
+
+	backendApp "github.com/redhat-data-and-ai/gitlab-bot-backend/app"
+	"<your-go-module>/handlers"
+)
+
+func main() {
+	// Create a new Fiber app
+	handlerRegistry := map[string][]backendApp.Handler{
+		"merge_request": {
+			&handlers.MRCreatedHandler{},
+		},
+	}
+
+	app := backendApp.SetupApp(handlerRegistry)
+
+	// Start the server
+	log.Fatal(app.Listen(":3000"))
+}
+```
+
+And create a folder called `handlers` and create as many handlers you need. E.g. `mr_created_handler.go` can look like this -
+
+```go
+package handlers
+
+import (
+	"log"
+
+	backendApp "github.com/redhat-data-and-ai/gitlab-bot-backend/app"
+	"github.com/redhat-data-and-ai/gitlab-bot-backend/library"
+)
+
+type MRCreatedHandler struct {
+	backendApp.Handler
+}
+
+func (h *MRCreatedHandler) Handle(event backendApp.MergeRequestEvent, gitLabClient library.GitLabClient) error {
+	// Handle the merge request created event
+	// You can access the event data and perform actions here
+	// For example, you can log the event or send a notification
+
+	// Example: Log the event
+	log.Printf("Merge request created by %s with action %s", event.User.Name, event.ObjectAttributes["action"])
+
+	// Perform any other actions you need to do for this event
+
+	return nil
+}
+```
+
+And run the server -
+
+```bash
+go run main.go
+```
 
 ## License
 
