@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: naysayer
+  namespace: ddis-asteroid--naysayer
+spec:
+  selector:
+    matchLabels:
+      paas.redhat.com/appcode: SNOW-008
+      app: naysayer
+  template:
+    metadata:
+      labels:
+        paas.redhat.com/appcode: SNOW-008
+        app: naysayer
+    spec:
+      containers:
+      - name: naysayer
+        image: quay.io/redhat-data-and-ai/naysayer:concaf-201216
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
