@@ -2,105 +2,47 @@ package main
 
 import (
 	"log"
-	"math/rand"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/redhat-data-and-ai/naysayer/api/routes"
-	"github.com/redhat-data-and-ai/naysayer/pkg/config"
+
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
+	"github.com/redhat-data-and-ai/naysayer/internal/handler"
 )
 
 func main() {
 	// Load configuration
-	cfg := config.LoadConfig()
-	
-	// Seed random for naysayer responses
-	rand.Seed(time.Now().UnixNano())
-	
-	// Create Fiber app with configuration
+	cfg := config.Load()
+
+	if !cfg.HasGitLabToken() {
+		log.Printf("⚠️  Warning: GITLAB_TOKEN not set - file analysis will be limited")
+	}
+
+	// Create handlers
+	webhookHandler := handler.NewWebhookHandler(cfg)
+	healthHandler := handler.NewHealthHandler(cfg)
+
+	// Create Fiber app
 	app := fiber.New(fiber.Config{
-		AppName: "NAYSAYER v1.0.0-phase1",
+		AppName: "NAYSAYER Dataproduct Config",
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			code := fiber.StatusInternalServerError
-			if e, ok := err.(*fiber.Error); ok {
-				code = e.Code
-			}
 			log.Printf("Error: %v", err)
-			return c.Status(code).JSON(fiber.Map{
-				"error": err.Error(),
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Internal server error",
 			})
 		},
 	})
 
-	// Middleware
-	app.Use(recover.New())
-	app.Use(logger.New(logger.Config{
-		Format: "${time} ${status} - ${method} ${path} - ${latency}\n",
-	}))
+	// Basic middleware
+	app.Use(logger.New())
 	app.Use(cors.New())
 
-	// Naysayer responses (legacy endpoint)
-	nayList := []string{
-		"no",
-		"nope",
-		"nah",
-		"not",
-		"nay",
-		"not at all",
-		"nada",
-		"don't even think about it",
-		"nothing doing",
-		"actually... no",
-		"platform approval required 🚫",
-		"TOC approval needed 📋",
+	// Routes
+	app.Get("/health", healthHandler.HandleHealth)
+	app.Post("/webhook", webhookHandler.HandleWebhook)
 
-		"warehouse increase detected 📊",
-		"warehouse decrease only = auto-merge ✅",
-		"mixed changes = platform approval 🚫",
-		"separate your warehouse decreases! 📦",
-	}
-
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString(nayList[rand.Intn(len(nayList))])
-	})
-
-	// Health check at root level
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":      "healthy",
-			"service":     "naysayer",
-			"version":     "1.0.0-phase1",
-			"description": "Self-service approval bot for dataproduct-config",
-			"config": fiber.Map{
-				"gitlab_base_url":          cfg.GitLabBaseURL,
-				"dataproduct_repo":         cfg.DataProductRepo,
-				"gitlab_api_enabled":       cfg.EnableActualGitLabAPI,
-				"log_level":                cfg.LogLevel,
-				
-			},
-			"features": []string{
-				"Warehouse decrease auto-merge policy",
-				"Warehouse size change detection (XSMALL→XXLARGE)",
-				"Mock diff analysis (Phase 1)",
-			},
-		})
-	})
-
-	// Data Product Config routes
-	dataProductConfig := app.Group("/dataproductconfig")
-	routes.DataProductConfigRouterWithConfig(dataProductConfig, cfg)
-
-	// Also create backward compatible routes
-	routes.DataProductConfigRouter(dataProductConfig)
-
-	log.Printf("🚀 NAYSAYER starting on port %s", cfg.Port)
-	log.Printf("📊 Monitoring repository: %s", cfg.DataProductRepo)
-	log.Printf("🔧 GitLab API enabled: %t", cfg.EnableActualGitLabAPI)
-	log.Printf("📝 Log level: %s", cfg.LogLevel)
-	log.Printf("📦 Focus: Warehouse field changes only")
-	
-	log.Fatal(app.Listen(":" + cfg.Port))
+	log.Printf("🚀 NAYSAYER Dataproduct Config starting on port %s", cfg.Server.Port)
+	log.Printf("📁 Analysis mode: %s", cfg.AnalysisMode())
+	log.Fatal(app.Listen(":" + cfg.Server.Port))
 }
