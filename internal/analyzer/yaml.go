@@ -42,10 +42,10 @@ func NewYAMLAnalyzer(gitlabClient *gitlab.Client) *YAMLAnalyzer {
 }
 
 // AnalyzeChanges analyzes GitLab MR changes for warehouse modifications using proper YAML parsing
-func (a *YAMLAnalyzer) AnalyzeChanges(projectID, mrIID int, changes *gitlab.MRChanges) ([]decision.WarehouseChange, error) {
+func (a *YAMLAnalyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileChange) ([]decision.WarehouseChange, error) {
 	var warehouseChanges []decision.WarehouseChange
 
-	for _, change := range changes.Changes {
+	for _, change := range changes {
 		// Skip deleted files
 		if change.DeletedFile {
 			continue

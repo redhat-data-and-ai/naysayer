@@ -26,7 +26,7 @@ func NewClient(cfg config.GitLabConfig) *Client {
 }
 
 // FetchMRChanges fetches merge request changes from GitLab API
-func (c *Client) FetchMRChanges(projectID, mrIID int) (*MRChanges, error) {
+func (c *Client) FetchMRChanges(projectID, mrIID int) ([]FileChange, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/changes",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
@@ -49,12 +49,27 @@ func (c *Client) FetchMRChanges(projectID, mrIID int) (*MRChanges, error) {
 		return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
 	}
 
-	var changes MRChanges
-	if err := json.NewDecoder(resp.Body).Decode(&changes); err != nil {
+	var response MRChanges
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, err
 	}
 
-	return &changes, nil
+	// Convert to FileChange slice
+	fileChanges := make([]FileChange, len(response.Changes))
+	for i, change := range response.Changes {
+		fileChanges[i] = FileChange{
+			OldPath:     change.OldPath,
+			NewPath:     change.NewPath,
+			AMode:       change.AMode,
+			BMode:       change.BMode,
+			NewFile:     change.NewFile,
+			RenamedFile: change.RenamedFile,
+			DeletedFile: change.DeletedFile,
+			Diff:        change.Diff,
+		}
+	}
+
+	return fileChanges, nil
 }
 
 // ExtractMRInfo extracts merge request information from webhook payload

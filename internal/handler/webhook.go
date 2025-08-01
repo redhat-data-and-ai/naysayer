@@ -1,31 +1,40 @@
 package handler
 
 import (
+	"context"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/redhat-data-and-ai/naysayer/internal/analyzer"
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules"
 )
 
 // WebhookHandler handles GitLab webhook requests
 type WebhookHandler struct {
-	gitlabClient  *gitlab.Client
-	analyzer      *analyzer.YAMLAnalyzer
-	decisionMaker *decision.Maker
-	config        *config.Config
+	gitlabClient *gitlab.Client
+	ruleEngine   rules.RuleEngine
+	config       *config.Config
 }
 
 // NewWebhookHandler creates a new webhook handler
 func NewWebhookHandler(cfg *config.Config) *WebhookHandler {
 	gitlabClient := gitlab.NewClient(cfg.GitLab)
+	
+	// Create rule engine and register rules
+	engine := rules.NewUnanimousRuleEngine()
+	
+	// Register built-in rules
+	warehouseRule := rules.NewWarehouseRule(gitlabClient)
+	securityRule := rules.NewSecurityRule()
+	
+	engine.RegisterRule(warehouseRule)
+	engine.RegisterRule(securityRule)
+	
 	return &WebhookHandler{
-		gitlabClient:  gitlabClient,
-		analyzer:      analyzer.NewYAMLAnalyzer(gitlabClient),
-		decisionMaker: decision.NewMaker(),
-		config:        cfg,
+		gitlabClient: gitlabClient,
+		ruleEngine:   engine,
+		config:       cfg,
 	}
 }
 
@@ -51,35 +60,38 @@ func (h *WebhookHandler) HandleWebhook(c *fiber.Ctx) error {
 
 	log.Printf("Processing MR: Project=%d, MR=%d", mrInfo.ProjectID, mrInfo.MRIID)
 
-	// Analyze file changes
-	decision := h.analyzeFileChanges(mrInfo.ProjectID, mrInfo.MRIID)
-
-	// Log decision
-	log.Printf("Decision: auto_approve=%t, reason=%s", decision.AutoApprove, decision.Reason)
-
-	return c.JSON(decision)
-}
-
-// analyzeFileChanges analyzes file changes and makes approval decision
-func (h *WebhookHandler) analyzeFileChanges(projectID, mrIID int) decision.Decision {
-	if !h.config.HasGitLabToken() {
-		return h.decisionMaker.NoTokenDecision()
+	// Evaluate using rule engine
+	result, err := h.evaluateRules(mrInfo.ProjectID, mrInfo.MRIID, mrInfo)
+	if err != nil {
+		log.Printf("Rule evaluation failed: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Rule evaluation failed: " + err.Error(),
+		})
 	}
 
+	// Log decision
+	log.Printf("Decision: auto_approve=%t, reason=%s", result.FinalDecision.AutoApprove, result.FinalDecision.Reason)
+
+	return c.JSON(result)
+}
+
+// evaluateRules evaluates all rules and returns unanimous decision
+func (h *WebhookHandler) evaluateRules(projectID, mrIID int, mrInfo *gitlab.MRInfo) (*rules.UnanimousResult, error) {
 	// Fetch MR changes from GitLab API
 	changes, err := h.gitlabClient.FetchMRChanges(projectID, mrIID)
 	if err != nil {
 		log.Printf("Failed to fetch MR changes: %v", err)
-		return h.decisionMaker.APIErrorDecision(err)
+		changes = []gitlab.FileChange{} // Continue with empty changes
 	}
 
-	// Analyze warehouse changes using proper YAML parsing
-	warehouseChanges, err := h.analyzer.AnalyzeChanges(projectID, mrIID, changes)
-	if err != nil {
-		log.Printf("YAML analysis failed: %v", err)
-		return h.decisionMaker.AnalysisErrorDecision(err)
+	// Create MR context for rule evaluation
+	mrContext := &rules.MRContext{
+		ProjectID: projectID,
+		MRIID:     mrIID,
+		Changes:   changes,
+		MRInfo:    mrInfo,
 	}
 
-	// Make decision based on changes
-	return h.decisionMaker.Decide(warehouseChanges)
+	// Evaluate all rules
+	return h.ruleEngine.EvaluateAll(context.Background(), mrContext)
 }
