@@ -3,11 +3,8 @@ package rules
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
-
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
 )
 
 // UnanimousRuleEngine implements unanimous-only rule evaluation
@@ -49,7 +46,7 @@ func (e *UnanimousRuleEngine) UnregisterRule(name string) error {
 	return nil
 }
 
-// ListRules returns all registered rules sorted by priority
+// ListRules returns all registered rules in registration order
 func (e *UnanimousRuleEngine) ListRules() []Rule {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
@@ -58,10 +55,6 @@ func (e *UnanimousRuleEngine) ListRules() []Rule {
 	for _, rule := range e.rules {
 		rules = append(rules, rule)
 	}
-	
-	sort.Slice(rules, func(i, j int) bool {
-		return rules[i].Priority() > rules[j].Priority()
-	})
 	
 	return rules
 }
@@ -84,7 +77,7 @@ func (e *UnanimousRuleEngine) EvaluateAll(ctx context.Context, mrCtx *MRContext)
 		result, err := rule.Evaluate(ctx, mrCtx)
 		if err != nil {
 			result = &RuleResult{
-				Decision: decision.Decision{
+				Decision: Decision{
 					AutoApprove: false,
 					Reason:      fmt.Sprintf("Rule %s failed: %v", rule.Name(), err),
 					Summary:     "🚫 Rule evaluation error",
@@ -126,7 +119,7 @@ func (e *UnanimousRuleEngine) EvaluateRule(ctx context.Context, ruleName string,
 	
 	if !rule.Applies(ctx, mrCtx) {
 		return &RuleResult{
-			Decision: decision.Decision{
+			Decision: Decision{
 				AutoApprove: false,
 				Reason:      "Rule not applicable",
 				Summary:     "Rule conditions not met",
@@ -140,9 +133,9 @@ func (e *UnanimousRuleEngine) EvaluateRule(ctx context.Context, ruleName string,
 }
 
 // createUnanimousDecision builds the final decision based on unanimous approval
-func (e *UnanimousRuleEngine) createUnanimousDecision(results []*RuleResult, allApproved bool, applicableCount int) decision.Decision {
+func (e *UnanimousRuleEngine) createUnanimousDecision(results []*RuleResult, allApproved bool, applicableCount int) Decision {
 	if applicableCount == 0 {
-		return decision.Decision{
+		return Decision{
 			AutoApprove: false,
 			Reason:      "no applicable rules found",
 			Summary:     "🚫 No rules matched - requires manual review",
@@ -155,7 +148,7 @@ func (e *UnanimousRuleEngine) createUnanimousDecision(results []*RuleResult, all
 			reasons[i] = fmt.Sprintf("%s: %s", result.RuleName, result.Decision.Reason)
 		}
 		
-		return decision.Decision{
+		return Decision{
 			AutoApprove: true,
 			Reason:      fmt.Sprintf("all %d rules approve", len(results)),
 			Summary:     "✅ Unanimous approval",
@@ -170,7 +163,7 @@ func (e *UnanimousRuleEngine) createUnanimousDecision(results []*RuleResult, all
 		}
 	}
 	
-	return decision.Decision{
+	return Decision{
 		AutoApprove: false,
 		Reason:      fmt.Sprintf("%d rule(s) rejected", len(rejectionReasons)),
 		Summary:     "🚫 Unanimous approval required",

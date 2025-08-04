@@ -1,11 +1,11 @@
-package analyzer
+package yaml
 
 import (
 	"fmt"
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
@@ -42,8 +42,8 @@ func NewYAMLAnalyzer(gitlabClient *gitlab.Client) *YAMLAnalyzer {
 }
 
 // AnalyzeChanges analyzes GitLab MR changes for warehouse modifications using proper YAML parsing
-func (a *YAMLAnalyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileChange) ([]decision.WarehouseChange, error) {
-	var warehouseChanges []decision.WarehouseChange
+func (a *YAMLAnalyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileChange) ([]rules.WarehouseChange, error) {
+	var warehouseChanges []rules.WarehouseChange
 
 	for _, change := range changes {
 		// Skip deleted files
@@ -78,7 +78,7 @@ func (a *YAMLAnalyzer) isProductYAML(path string) bool {
 }
 
 // analyzeFileChange fetches complete file content and compares YAML structures
-func (a *YAMLAnalyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]decision.WarehouseChange, error) {
+func (a *YAMLAnalyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]rules.WarehouseChange, error) {
 	// Get target branch (usually 'main' or 'master')
 	targetBranch, err := a.gitlabClient.GetMRTargetBranch(projectID, mrIID)
 	if err != nil {
@@ -90,7 +90,7 @@ func (a *YAMLAnalyzer) analyzeFileChange(projectID, mrIID int, filePath string) 
 	if err != nil {
 		// File might be new, skip comparison
 		if strings.Contains(err.Error(), "file not found") {
-			return &[]decision.WarehouseChange{}, nil
+			return &[]rules.WarehouseChange{}, nil
 		}
 		return nil, fmt.Errorf("failed to fetch old file content: %v", err)
 	}
@@ -134,8 +134,8 @@ func (a *YAMLAnalyzer) parseDataProductFromContent(content string) (*DataProduct
 }
 
 // compareWarehouses compares warehouse configurations between old and new
-func (a *YAMLAnalyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct) []decision.WarehouseChange {
-	var changes []decision.WarehouseChange
+func (a *YAMLAnalyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct) []rules.WarehouseChange {
+	var changes []rules.WarehouseChange
 
 	// Create maps for easier comparison
 	oldWarehouses := make(map[string]string) // type -> size
@@ -154,11 +154,11 @@ func (a *YAMLAnalyzer) compareWarehouses(filePath string, oldDP, newDP *DataProd
 		if oldSize, exists := oldWarehouses[whType]; exists {
 			if oldSize != newSize {
 				// Warehouse size changed
-				oldValue, oldExists := decision.WarehouseSizes[oldSize]
-				newValue, newExists := decision.WarehouseSizes[newSize]
+				oldValue, oldExists := rules.WarehouseSizes[oldSize]
+				newValue, newExists := rules.WarehouseSizes[newSize]
 
 				if oldExists && newExists {
-					changes = append(changes, decision.WarehouseChange{
+					changes = append(changes, rules.WarehouseChange{
 						FilePath:   fmt.Sprintf("%s (type: %s)", filePath, whType),
 						FromSize:   oldSize,
 						ToSize:     newSize,

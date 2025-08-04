@@ -111,7 +111,7 @@ internal/
 
 ### 1. HTTP Handlers (`internal/handler/`)
 
-**`webhook.go`** - Processes GitLab webhook requests
+**`dataverse_product_config_review.go`** - Processes GitLab webhook requests for dataverse product config
 ```go
 // Main webhook flow
 func (h *WebhookHandler) HandleWebhook(c *fiber.Ctx) error {
@@ -472,7 +472,7 @@ func (a *YAMLAnalyzer) compareWarehouses(filePath string, oldDP, newDP *DataProd
 When YAML analysis fails, NAYSAYER explicitly returns an error requiring manual approval:
 
 ```go
-// webhook.go
+// dataverse_product_config_review.go
 warehouseChanges, err := h.analyzer.AnalyzeChanges(projectID, mrIID, changes)
 if err != nil {
     log.Printf("YAML analysis failed: %v", err)

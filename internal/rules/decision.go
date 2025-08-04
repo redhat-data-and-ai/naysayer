@@ -1,4 +1,4 @@
-package decision
+package rules
 
 // Decision represents an approval decision for a merge request
 type Decision struct {

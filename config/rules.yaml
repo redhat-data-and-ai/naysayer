@@ -4,7 +4,6 @@
 rules:
   - name: "warehouse_rule"
     enabled: true
-    priority: 100
     description: "Approves warehouse size decreases, rejects increases"
     conditions:
       - field: "project_id"
@@ -15,7 +14,6 @@ rules:
       
   # - name: "security_rule"
   #   enabled: true
-  #   priority: 200
   #   description: "Blocks changes to sensitive files and configurations"
   #   conditions:
   #     - field: "project_id"
@@ -33,7 +31,6 @@ rules:
 # Example of how to add project-specific rules
 # - name: "project_specific_rule"
 #   enabled: true
-#   priority: 50
 #   description: "Custom rules for specific projects"
 #   conditions:
 #     - field: "project_id"
@@ -46,7 +43,6 @@ rules:
 # Example of environment-specific rules  
 # - name: "production_rule"
 #   enabled: true
-#   priority: 300
 #   description: "Extra strict rules for production deployments"
 #   conditions:
 #     - field: "environment"

@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
 )
 
 // SecurityRule blocks changes to sensitive files and configurations
@@ -54,15 +52,6 @@ func (r *SecurityRule) Description() string {
 	return "Blocks changes to sensitive files and security configurations"
 }
 
-// Priority returns rule priority
-func (r *SecurityRule) Priority() int {
-	return 200 // Higher priority than warehouse rule
-}
-
-// Version returns rule version
-func (r *SecurityRule) Version() string {
-	return "1.0.0"
-}
 
 // Applies checks if this rule should evaluate the MR
 func (r *SecurityRule) Applies(ctx context.Context, mrCtx *MRContext) bool {
@@ -93,7 +82,7 @@ func (r *SecurityRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleRes
 	
 	if len(sensitiveFiles) > 0 {
 		return &RuleResult{
-			Decision: decision.Decision{
+			Decision: Decision{
 				AutoApprove: false,
 				Reason:      "sensitive file changes detected",
 				Summary:     "🚫 Security review required",
@@ -111,7 +100,7 @@ func (r *SecurityRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleRes
 	
 	// No sensitive files found - approve
 	return &RuleResult{
-		Decision: decision.Decision{
+		Decision: Decision{
 			AutoApprove: true,
 			Reason:      "no sensitive file changes detected",
 			Summary:     "✅ Security check passed",

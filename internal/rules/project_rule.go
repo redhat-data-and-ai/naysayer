@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
 )
 
 // ProjectRule implements project-specific approval logic
@@ -37,15 +35,6 @@ func (r *ProjectRule) Description() string {
 	return "Project-specific approval rules with file change limits"
 }
 
-// Priority returns rule priority
-func (r *ProjectRule) Priority() int {
-	return 50 // Lower priority than security and warehouse rules
-}
-
-// Version returns rule version
-func (r *ProjectRule) Version() string {
-	return "1.0.0"
-}
 
 // Applies checks if this rule should evaluate the MR
 func (r *ProjectRule) Applies(ctx context.Context, mrCtx *MRContext) bool {
@@ -60,7 +49,7 @@ func (r *ProjectRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleResu
 	// Check file change limit
 	if len(mrCtx.Changes) > r.maxFileChanges {
 		return &RuleResult{
-			Decision: decision.Decision{
+			Decision: Decision{
 				AutoApprove: false,
 				Reason:      fmt.Sprintf("too many file changes: %d > %d", len(mrCtx.Changes), r.maxFileChanges),
 				Summary:     "🚫 File change limit exceeded",
@@ -79,7 +68,7 @@ func (r *ProjectRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleResu
 	
 	// All checks passed
 	return &RuleResult{
-		Decision: decision.Decision{
+		Decision: Decision{
 			AutoApprove: true,
 			Reason:      fmt.Sprintf("project %d within limits", mrCtx.ProjectID),
 			Summary:     "✅ Project rules satisfied",

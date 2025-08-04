@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redhat-data-and-ai/naysayer/internal/analyzer"
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
+	"github.com/redhat-data-and-ai/naysayer/internal/yaml"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
 // WarehouseRule implements warehouse size change approval logic
 type WarehouseRule struct {
-	analyzer *analyzer.YAMLAnalyzer
+	analyzer *yaml.YAMLAnalyzer
 	client   *gitlab.Client
 }
 
 // NewWarehouseRule creates a new warehouse rule
 func NewWarehouseRule(client *gitlab.Client) *WarehouseRule {
 	return &WarehouseRule{
-		analyzer: analyzer.NewYAMLAnalyzer(client),
+		analyzer: yaml.NewYAMLAnalyzer(client),
 		client:   client,
 	}
 }
@@ -34,15 +33,6 @@ func (r *WarehouseRule) Description() string {
 	return "Approves warehouse size decreases, rejects increases"
 }
 
-// Priority returns rule priority
-func (r *WarehouseRule) Priority() int {
-	return 100 // High priority for warehouse changes
-}
-
-// Version returns rule version
-func (r *WarehouseRule) Version() string {
-	return "1.0.0"
-}
 
 //rename
 // Applies checks if this rule should evaluate the MR
@@ -57,7 +47,7 @@ func (r *WarehouseRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleRe
 	
 	if r.client == nil {
 		return &RuleResult{
-			Decision: decision.Decision{
+			Decision: Decision{
 				AutoApprove: false,
 				Reason:      "GitLab token not configured",
 				Summary:     "🚫 Cannot analyze YAML files - missing GitLab token",
@@ -74,7 +64,7 @@ func (r *WarehouseRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleRe
 	warehouseChanges, err := r.analyzer.AnalyzeChanges(mrCtx.ProjectID, mrCtx.MRIID, mrCtx.Changes)
 	if err != nil {
 		return &RuleResult{
-			Decision: decision.Decision{
+			Decision: Decision{
 				AutoApprove: false,
 				Reason:      "YAML analysis failed",
 				Summary:     "🚫 Analysis error - requires manual approval",
@@ -103,9 +93,9 @@ func (r *WarehouseRule) Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleRe
 }
 
 // evaluateWarehouseChanges applies the existing warehouse decision logic
-func (r *WarehouseRule) evaluateWarehouseChanges(changes []decision.WarehouseChange) decision.Decision {
+func (r *WarehouseRule) evaluateWarehouseChanges(changes []WarehouseChange) Decision {
 	if len(changes) == 0 {
-		return decision.Decision{
+		return Decision{
 			AutoApprove: false,
 			Reason:      "no warehouse changes detected in YAML files",
 			Summary:     "🚫 No warehouse changes in YAML - requires approval",
@@ -115,7 +105,7 @@ func (r *WarehouseRule) evaluateWarehouseChanges(changes []decision.WarehouseCha
 	// Check if all changes are decreases
 	for _, change := range changes {
 		if !change.IsDecrease {
-			return decision.Decision{
+			return Decision{
 				AutoApprove: false,
 				Reason:      fmt.Sprintf("warehouse increase detected: %s → %s", change.FromSize, change.ToSize),
 				Summary:     "🚫 Warehouse increase - platform approval required",
@@ -126,7 +116,7 @@ func (r *WarehouseRule) evaluateWarehouseChanges(changes []decision.WarehouseCha
 
 	// All changes are decreases - auto-approve
 	details := fmt.Sprintf("Found %d warehouse decrease(s)", len(changes))
-	return decision.Decision{
+	return Decision{
 		AutoApprove: true,
 		Reason:      "all warehouse changes are decreases",
 		Summary:     "✅ Warehouse decrease(s) - auto-approved",

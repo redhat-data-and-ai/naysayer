@@ -35,7 +35,7 @@ A visual walkthrough of how NAYSAYER processes GitLab webhook requests and makes
                                         │
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  internal/handler/webhook.go:32                                                    │
+│  internal/handler/dataverse_product_config_review.go:32                           │
 │  func (h *WebhookHandler) HandleWebhook(c *fiber.Ctx) error                       │
 │                                                                                     │
 │  Step 1: Parse JSON payload                                                        │
@@ -68,7 +68,7 @@ A visual walkthrough of how NAYSAYER processes GitLab webhook requests and makes
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  internal/handler/webhook.go:63                                                    │
+│  internal/handler/dataverse_product_config_review.go:63                           │
 │  func (h *WebhookHandler) analyzeFileChanges(projectID, mrIID int)                │
 │                                                                                     │
 │  Check GitLab Token:                                                               │
@@ -102,7 +102,7 @@ A visual walkthrough of how NAYSAYER processes GitLab webhook requests and makes
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  internal/handler/webhook.go:77                                                    │
+│  internal/handler/dataverse_product_config_review.go:77                           │
 │  Semantic YAML Analysis (Production Path)                                          │
 └─────────────────────────────────────────────────────────────────────────────────────┘
                                         │
@@ -221,7 +221,7 @@ A visual walkthrough of how NAYSAYER processes GitLab webhook requests and makes
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
-│  internal/handler/webhook.go:85                                                    │
+│  internal/handler/dataverse_product_config_review.go:85                           │
 │  return c.JSON(decision)                                                           │
 │                                                                                     │
 │  HTTP Response:                                                                     │

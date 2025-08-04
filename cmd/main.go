@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
-	"github.com/redhat-data-and-ai/naysayer/internal/handler"
+	"github.com/redhat-data-and-ai/naysayer/internal/webhook"
 )
 
 func main() {
@@ -20,8 +20,8 @@ func main() {
 	}
 
 	// Create handlers
-	webhookHandler := handler.NewWebhookHandler(cfg)
-	healthHandler := handler.NewHealthHandler(cfg)
+	webhookHandler := webhook.NewWebhookHandler(cfg)
+	healthHandler := webhook.NewHealthHandler(cfg)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{

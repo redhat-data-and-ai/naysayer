@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/redhat-data-and-ai/naysayer/internal/decision"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
 // RuleResult represents the result of a rule evaluation
 type RuleResult struct {
-	Decision      decision.Decision `json:"decision"`
+	Decision      Decision `json:"decision"`
 	RuleName      string           `json:"rule_name"`
 	Confidence    float64          `json:"confidence"`  // 0.0-1.0
 	Metadata      map[string]any   `json:"metadata,omitempty"`
@@ -36,19 +35,11 @@ type Rule interface {
 	// Description returns a human-readable description
 	Description() string
 	
-	// Priority returns the rule priority (higher = evaluated first)
-	Priority() int // not required
-	
-	//condition field 
-	// Use as exception as well
 	// Applies checks if this rule should be evaluated for the given context
 	Applies(ctx context.Context, mrCtx *MRContext) bool
 	
 	// Evaluate executes the rule logic and returns a decision
 	Evaluate(ctx context.Context, mrCtx *MRContext) (*RuleResult, error)
-	
-	// Version returns the rule version for compatibility
-	Version() string //skip
 }
 
 // RuleEngine manages and executes pluggable rules with unanimous strategy
@@ -71,7 +62,7 @@ type RuleEngine interface {
 
 // UnanimousResult combines results from all rules with unanimous strategy
 type UnanimousResult struct {
-	FinalDecision   decision.Decision `json:"final_decision"`
+	FinalDecision   Decision `json:"final_decision"`
 	RuleResults     []*RuleResult     `json:"rule_results"`
 	TotalRules      int              `json:"total_rules"`
 	ApplicableRules int              `json:"applicable_rules"`
@@ -83,7 +74,6 @@ type UnanimousResult struct {
 type RuleConfig struct {
 	Name        string         `yaml:"name" json:"name"`
 	Enabled     bool          `yaml:"enabled" json:"enabled"`
-	Priority    int           `yaml:"priority" json:"priority"`
 	Config      map[string]any `yaml:"config" json:"config"`
 	Conditions  []Condition   `yaml:"conditions" json:"conditions"`
 }
