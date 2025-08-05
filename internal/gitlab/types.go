@@ -28,6 +28,10 @@ type FileChange struct {
 
 // MRInfo represents merge request information extracted from webhook payload
 type MRInfo struct {
-	ProjectID int
-	MRIID     int
+	ProjectID    int
+	MRIID        int
+	Title        string
+	Author       string
+	SourceBranch string
+	TargetBranch string
 }

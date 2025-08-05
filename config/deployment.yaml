@@ -5,22 +5,42 @@ metadata:
   labels:
     app: naysayer
     component: webhook
+    version: v1.0.0
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "NAYSAYER GitLab webhook handler for automated MR reviews"
 spec:
-  replicas: 2
+  replicas: 3  # Increased for webhook availability
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
   selector:
     matchLabels:
       app: naysayer
+      component: webhook
   template:
     metadata:
       labels:
         app: naysayer
         component: webhook
+        version: v1.0.0
     spec:
+      serviceAccountName: naysayer
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
       - name: naysayer
         image: quay.io/ddis/naysayer:latest
+        imagePullPolicy: Always
         ports:
-        - containerPort: 3000
+        - name: http
+          containerPort: 3000
+          protocol: TCP
         env:
         - name: PORT
           value: "3000"
@@ -31,32 +51,162 @@ spec:
             secretKeyRef:
               name: naysayer-secrets
               key: gitlab-token
+        - name: WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: naysayer-secrets
+              key: webhook-secret
+        - name: WEBHOOK_VERIFY
+          value: "true"
+        - name: WEBHOOK_ALLOWED_IPS
+          valueFrom:
+            configMapKeyRef:
+              name: naysayer-config
+              key: allowed-ips
+              optional: true
+        - name: LOG_LEVEL
+          value: "info"
+        - name: ENVIRONMENT
+          value: "production"
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
             memory: "128Mi"
             cpu: "100m"
+            ephemeral-storage: "100Mi"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+            ephemeral-storage: "500Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
         livenessProbe:
           httpGet:
             path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
         readinessProbe:
           httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
             path: /health
-            port: 3000
-          initialDelaySeconds: 5
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+          successThreshold: 1
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 100Mi
+      - name: cache
+        emptyDir:
+          sizeLimit: 200Mi
+      terminationGracePeriodSeconds: 60
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - naysayer
+              topologyKey: kubernetes.io/hostname
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: naysayer-secrets
+  labels:
+    app: naysayer
+    component: webhook
 type: Opaque
 data:
   # Add your base64-encoded GitLab token here
   # echo -n "your-gitlab-token" | base64
   gitlab-token: ""
+  # Add your base64-encoded webhook secret here
+  # echo -n "your-webhook-secret" | base64
+  webhook-secret: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: naysayer-config
+  labels:
+    app: naysayer
+    component: webhook
+data:
+  # Optional: Comma-separated list of allowed IPs or CIDR ranges
+  # Example: "192.168.1.0/24,10.0.0.1"
+  allowed-ips: ""
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: naysayer
+  labels:
+    app: naysayer
+    component: webhook
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: naysayer-readonly
+  labels:
+    app: naysayer
+    component: webhook
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: naysayer-readonly
+  labels:
+    app: naysayer
+    component: webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: naysayer-readonly
+subjects:
+- kind: ServiceAccount
+  name: naysayer
+  namespace: default  # Update with your namespace

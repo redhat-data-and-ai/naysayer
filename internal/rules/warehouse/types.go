@@ -1,12 +1,4 @@
-package rules
-
-// Decision represents an approval decision for a merge request
-type Decision struct {
-	AutoApprove bool   `json:"auto_approve"`
-	Reason      string `json:"reason"`
-	Summary     string `json:"summary"`
-	Details     string `json:"details,omitempty"`
-}
+package warehouse
 
 // WarehouseChange represents a detected warehouse size change
 type WarehouseChange struct {

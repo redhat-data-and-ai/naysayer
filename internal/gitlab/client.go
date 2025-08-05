@@ -75,6 +75,7 @@ func (c *Client) FetchMRChanges(projectID, mrIID int) ([]FileChange, error) {
 // ExtractMRInfo extracts merge request information from webhook payload
 func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 	var projectID, mrIID int
+	var title, author, sourceBranch, targetBranch string
 
 	// Extract from object_attributes
 	if objectAttrs, ok := payload["object_attributes"].(map[string]interface{}); ok {
@@ -87,6 +88,18 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 			case string:
 				mrIID, _ = strconv.Atoi(v)
 			}
+		}
+		
+		if titleVal, ok := objectAttrs["title"].(string); ok {
+			title = titleVal
+		}
+		
+		if sourceVal, ok := objectAttrs["source_branch"].(string); ok {
+			sourceBranch = sourceVal
+		}
+		
+		if targetVal, ok := objectAttrs["target_branch"].(string); ok {
+			targetBranch = targetVal
 		}
 	}
 
@@ -103,13 +116,24 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 			}
 		}
 	}
+	
+	// Extract author from user
+	if user, ok := payload["user"].(map[string]interface{}); ok {
+		if username, ok := user["username"].(string); ok {
+			author = username
+		}
+	}
 
 	if projectID == 0 || mrIID == 0 {
 		return nil, fmt.Errorf("missing project ID (%d) or MR IID (%d)", projectID, mrIID)
 	}
 
 	return &MRInfo{
-		ProjectID: projectID,
-		MRIID:     mrIID,
+		ProjectID:    projectID,
+		MRIID:        mrIID,
+		Title:        title,
+		Author:       author,
+		SourceBranch: sourceBranch,
+		TargetBranch: targetBranch,
 	}, nil
 }
