@@ -22,7 +22,7 @@ func CreateCustomRuleManager(gitlabClient *gitlab.Client, ruleNames []string) (s
 func CreateRuleManagerByCategory(gitlabClient *gitlab.Client, category string) shared.RuleManager {
 	registry := GetGlobalRegistry()
 	manager := NewSimpleRuleManager()
-	
+
 	rules := registry.ListRulesByCategory(category)
 	for _, info := range rules {
 		if info.Enabled {
@@ -30,7 +30,7 @@ func CreateRuleManagerByCategory(gitlabClient *gitlab.Client, category string) s
 			manager.AddRule(rule)
 		}
 	}
-	
+
 	return manager
 }
 

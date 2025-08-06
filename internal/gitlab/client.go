@@ -89,15 +89,15 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 				mrIID, _ = strconv.Atoi(v)
 			}
 		}
-		
+
 		if titleVal, ok := objectAttrs["title"].(string); ok {
 			title = titleVal
 		}
-		
+
 		if sourceVal, ok := objectAttrs["source_branch"].(string); ok {
 			sourceBranch = sourceVal
 		}
-		
+
 		if targetVal, ok := objectAttrs["target_branch"].(string); ok {
 			targetBranch = targetVal
 		}
@@ -116,7 +116,7 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 			}
 		}
 	}
-	
+
 	// Extract author from user
 	if user, ok := payload["user"].(map[string]interface{}); ok {
 		if username, ok := user["username"].(string); ok {

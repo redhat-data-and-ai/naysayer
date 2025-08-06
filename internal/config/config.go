@@ -25,8 +25,8 @@ type ServerConfig struct {
 
 // WebhookConfig holds webhook security configuration
 type WebhookConfig struct {
-	Secret             string // GitLab webhook secret token
-	EnableVerification bool   // Enable signature verification
+	Secret             string   // GitLab webhook secret token
+	EnableVerification bool     // Enable signature verification
 	AllowedIPs         []string // Optional: restrict webhook calls to specific IPs
 }
 
@@ -90,7 +90,7 @@ func parseIPList(ipString string) []string {
 		return []string{}
 	}
 	ips := strings.Split(ipString, ",")
-	var result []string
+	result := make([]string, 0) // Initialize to empty slice, not nil
 	for _, ip := range ips {
 		if trimmed := strings.TrimSpace(ip); trimmed != "" {
 			result = append(result, trimmed)

@@ -23,11 +23,10 @@ func (rm *SimpleRuleManager) AddRule(rule shared.Rule) {
 	rm.rules = append(rm.rules, rule)
 }
 
-
 // EvaluateAll runs all applicable rules and returns a final decision
 func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEvaluation {
 	start := time.Now()
-	
+
 	// Early filtering for common skip conditions
 	if shared.IsDraftMR(mrCtx) {
 		return &shared.RuleEvaluation{
@@ -41,7 +40,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 			ExecutionTime: time.Since(start),
 		}
 	}
-	
+
 	if shared.IsAutomatedUser(mrCtx) {
 		return &shared.RuleEvaluation{
 			FinalDecision: shared.Decision{
@@ -54,21 +53,21 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 			ExecutionTime: time.Since(start),
 		}
 	}
-	
+
 	var results []shared.RuleResult
 	var finalDecision shared.Decision
-	
+
 	// Check if any rules apply
 	applicableRules := 0
 	for _, rule := range rm.rules {
 		ruleStart := time.Now()
 		applies := rule.Applies(mrCtx)
-		
+
 		if applies {
 			applicableRules++
 			decisionType, reason := rule.ShouldApprove(mrCtx)
 			ruleExecutionTime := time.Since(ruleStart)
-			
+
 			result := shared.RuleResult{
 				Decision: shared.Decision{
 					Type:    decisionType,
@@ -80,7 +79,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				ExecutionTime: ruleExecutionTime,
 			}
 			results = append(results, result)
-			
+
 			// If any rule requires manual review, that's the final decision
 			if decisionType == shared.ManualReview {
 				finalDecision = shared.Decision{
@@ -93,7 +92,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 			}
 		}
 	}
-	
+
 	// If we reach here and haven't set a manual review decision, check what to do
 	if finalDecision.Type == "" {
 		if applicableRules == 0 {
@@ -114,7 +113,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 			}
 		}
 	}
-	
+
 	return &shared.RuleEvaluation{
 		FinalDecision: finalDecision,
 		RuleResults:   results,
@@ -139,11 +138,11 @@ func (rm *SimpleRuleManager) createDetailsFromResults(results []shared.RuleResul
 	if len(results) == 0 {
 		return ""
 	}
-	
+
 	details := "Rule evaluations:\n"
 	for _, result := range results {
 		details += "- " + result.RuleName + ": " + result.Decision.Reason + "\n"
 	}
-	
+
 	return details
 }

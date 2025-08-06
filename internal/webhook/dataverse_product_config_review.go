@@ -22,16 +22,16 @@ type WebhookHandler struct {
 // NewWebhookHandler creates a new webhook handler
 func NewWebhookHandler(cfg *config.Config) *WebhookHandler {
 	gitlabClient := gitlab.NewClient(cfg.GitLab)
-	
+
 	// Create rule manager for dataverse product config
 	manager := rules.CreateDataverseRuleManager(gitlabClient)
-	
+
 	// Log security configuration
 	log.Printf("Webhook security: %s", cfg.WebhookSecurityMode())
 	if len(cfg.Webhook.AllowedIPs) > 0 {
 		log.Printf("IP restrictions enabled: %v", cfg.Webhook.AllowedIPs)
 	}
-	
+
 	return &WebhookHandler{
 		gitlabClient: gitlabClient,
 		ruleManager:  manager,
@@ -39,12 +39,11 @@ func NewWebhookHandler(cfg *config.Config) *WebhookHandler {
 	}
 }
 
-
 // HandleWebhook processes GitLab webhook requests with security validation
 func (h *WebhookHandler) HandleWebhook(c *fiber.Ctx) error {
-	
+
 	c.Set("Content-Type", "application/json")
-	
+
 	// Quick validation of content type
 	contentType := c.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
@@ -95,7 +94,7 @@ func (h *WebhookHandler) HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	// Log decision with execution time
-	log.Printf("Decision: type=%s, reason=%s, execution_time=%v", 
+	log.Printf("Decision: type=%s, reason=%s, execution_time=%v",
 		result.FinalDecision.Type, result.FinalDecision.Reason, result.ExecutionTime)
 
 	// Return structured response for GitLab webhook

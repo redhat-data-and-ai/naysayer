@@ -21,11 +21,10 @@ func NewHealthHandler(cfg *config.Config) *HealthHandler {
 	}
 }
 
-
 // HandleHealth returns comprehensive health status
 func (h *HealthHandler) HandleHealth(c *fiber.Ctx) error {
 	uptime := time.Since(h.startTime)
-	
+
 	health := fiber.Map{
 		"status":         "healthy",
 		"service":        "naysayer-webhook",
@@ -37,7 +36,7 @@ func (h *HealthHandler) HandleHealth(c *fiber.Ctx) error {
 		"gitlab_token":   h.config.HasGitLabToken(),
 		"webhook_secret": h.config.HasWebhookSecret(),
 	}
-	
+
 	return c.JSON(health)
 }
 
@@ -45,26 +44,26 @@ func (h *HealthHandler) HandleHealth(c *fiber.Ctx) error {
 func (h *HealthHandler) HandleReady(c *fiber.Ctx) error {
 	// Check if service is ready to accept traffic
 	ready := fiber.Map{
-		"ready":           true,
-		"service":         "naysayer-webhook",
-		"timestamp":       time.Now().UTC().Format(time.RFC3339),
-		"gitlab_token":    h.config.HasGitLabToken(),
-		"webhook_verify":  h.config.Webhook.EnableVerification,
+		"ready":          true,
+		"service":        "naysayer-webhook",
+		"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		"gitlab_token":   h.config.HasGitLabToken(),
+		"webhook_verify": h.config.Webhook.EnableVerification,
 	}
-	
+
 	// Check GitLab token if verification is enabled
 	if h.config.Webhook.EnableVerification && !h.config.HasGitLabToken() {
 		ready["ready"] = false
 		ready["reason"] = "GitLab token not configured"
 		return c.Status(503).JSON(ready)
 	}
-	
+
 	// Check webhook secret if verification is enabled
 	if h.config.Webhook.EnableVerification && !h.config.HasWebhookSecret() {
 		ready["ready"] = false
 		ready["reason"] = "Webhook secret not configured"
 		return c.Status(503).JSON(ready)
 	}
-	
+
 	return c.JSON(ready)
 }

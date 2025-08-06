@@ -28,7 +28,7 @@ type FileContent struct {
 func (c *Client) FetchFileContent(projectID int, filePath, ref string) (*FileContent, error) {
 	// URL encode the file path
 	encodedPath := url.QueryEscape(filePath)
-	
+
 	url := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s?ref=%s",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, encodedPath, ref)
 

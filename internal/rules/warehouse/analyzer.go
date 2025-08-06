@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"gopkg.in/yaml.v3"
 )
 
 // DataProduct represents the structure of a dataproduct YAML
@@ -28,13 +28,25 @@ type Tags struct {
 	DataProduct string `yaml:"data_product"`
 }
 
+// GitLabClientInterface defines the interface for GitLab API operations needed by the analyzer
+type GitLabClientInterface interface {
+	GetMRTargetBranch(projectID, mrIID int) (string, error)
+	FetchFileContent(projectID int, filePath, ref string) (*gitlab.FileContent, error)
+	GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails, error)
+}
+
+// AnalyzerInterface defines the interface for warehouse analyzers
+type AnalyzerInterface interface {
+	AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileChange) ([]WarehouseChange, error)
+}
+
 // Analyzer analyzes YAML files for warehouse changes
 type Analyzer struct {
-	gitlabClient *gitlab.Client
+	gitlabClient GitLabClientInterface
 }
 
 // NewAnalyzer creates a new warehouse analyzer
-func NewAnalyzer(gitlabClient *gitlab.Client) *Analyzer {
+func NewAnalyzer(gitlabClient GitLabClientInterface) *Analyzer {
 	return &Analyzer{
 		gitlabClient: gitlabClient,
 	}
@@ -42,7 +54,7 @@ func NewAnalyzer(gitlabClient *gitlab.Client) *Analyzer {
 
 // AnalyzeChanges analyzes GitLab MR changes for warehouse modifications using proper YAML parsing
 func (a *Analyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileChange) ([]WarehouseChange, error) {
-	var warehouseChanges []WarehouseChange
+	warehouseChanges := make([]WarehouseChange, 0)
 
 	for _, change := range changes {
 		// Skip deleted files
@@ -74,7 +86,7 @@ func (a *Analyzer) isDataProductFile(path string) bool {
 	if path == "" {
 		return false
 	}
-	
+
 	lowerPath := strings.ToLower(path)
 	return strings.HasSuffix(lowerPath, "product.yaml") || strings.HasSuffix(lowerPath, "product.yml")
 }
@@ -137,7 +149,7 @@ func (a *Analyzer) parseDataProduct(content string) (*DataProduct, error) {
 
 // compareWarehouses compares warehouse configurations between old and new
 func (a *Analyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct) []WarehouseChange {
-	var changes []WarehouseChange
+	changes := make([]WarehouseChange, 0)
 
 	// Create maps for easier comparison
 	oldWarehouses := make(map[string]string) // type -> size

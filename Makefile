@@ -1,19 +1,30 @@
-# Simple Makefile for NAYSAYER
+# NAYSAYER Makefile
 
-.PHONY: build run test clean install help build-image push-image
+.PHONY: build run test test-unit test-integration test-coverage clean install help docker fmt vet lint
 
 # Default target
 help:
-	@echo "NAYSAYER Simple Build Commands:"
+	@echo "NAYSAYER Build Commands:"
 	@echo ""
-	@echo "  build     Build the naysayer binary"
-	@echo "  run       Build and run the server"
-	@echo "  test      Run the test script"
-	@echo "  clean      Remove built binaries"
-	@echo "  install    Install dependencies"
-	@echo "  docker     Build Docker image"
-	@echo "  build-image Build and tag for Quay"
-	@echo "  push-image Push image to Quay"
+	@echo "Build & Run:"
+	@echo "  build          Build the naysayer binary"
+	@echo "  run            Build and run the server"
+	@echo "  docker         Build Docker image"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test           Run all tests (unit + integration)"
+	@echo "  test-unit      Run unit tests only"
+	@echo "  test-integration Run integration tests only"
+	@echo "  test-coverage  Generate test coverage report"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  lint           Run golangci-lint"
+	@echo "  fmt            Format code with gofmt"
+	@echo "  vet            Run go vet"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  clean          Remove built binaries and coverage files"
+	@echo "  install        Install dependencies"
 	@echo ""
 
 # Build the binary
@@ -27,19 +38,60 @@ run: build
 	@echo "Starting naysayer server..."
 	./naysayer
 
-# Run tests (requires server to be running)
-test:
-	@echo "Running tests..."
+# Run unit tests
+test-unit:
+	@echo "Running unit tests..."
+	go test ./... -v -race -cover
+
+# Run integration tests
+test-integration:
+	@echo "Running integration tests..."
 	@if ! curl -s http://localhost:3000/health > /dev/null; then \
 		echo "❌ Server not running. Start with 'make run' first."; \
 		exit 1; \
 	fi
-	./test_simple.sh
+	./test_mr.sh
 
-# Clean built files
+# Run all tests
+test: test-unit test-integration
+
+# Generate test coverage report
+test-coverage:
+	@echo "Generating test coverage report..."
+	go test ./... -coverprofile=coverage.out
+	@echo "📊 Coverage Summary:"
+	go tool cover -func=coverage.out
+	@rm -f coverage.out
+	@echo "✅ Coverage report completed"
+
+# Format code
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
+	@echo "✅ Code formatted"
+
+# Run go vet
+vet:
+	@echo "Running go vet..."
+	go vet ./...
+	@echo "✅ go vet completed"
+
+# Run linter
+lint:
+	@echo "Running golangci-lint..."
+	@if command -v golangci-lint > /dev/null; then \
+		golangci-lint run ./...; \
+		echo "✅ Linting completed"; \
+	else \
+		echo "⚠️  golangci-lint not installed. Install with:"; \
+		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.54.2"; \
+	fi
+
+# Clean built files and coverage files
 clean:
 	@echo "Cleaning..."
-	rm -f naysayer
+	rm -f naysayer coverage.out
+	rm -rf coverage/
 	@echo "✅ Cleaned"
 
 # Install dependencies
@@ -54,25 +106,3 @@ docker:
 	@echo "Building Docker image..."
 	docker build -t naysayer:latest .
 	@echo "✅ Docker image built: naysayer:latest"
-
-# Quick development cycle
-dev: clean build
-	@echo "🚀 Development build complete"
-
-# Production build with optimizations
-build-prod:
-	@echo "Building production binary..."
-	CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o naysayer cmd/main.go
-	@echo "✅ Production binary built"
-
-# Build image for Quay
-build-image:
-	@echo "Building image for Quay..."
-	docker build -t quay.io/ddis/naysayer:latest .
-	@echo "✅ Image built: quay.io/ddis/naysayer:latest"
-
-# Push image to Quay
-push-image: build-image
-	@echo "Pushing to Quay..."
-	docker push quay.io/ddis/naysayer:latest
-	@echo "✅ Image pushed to quay.io/ddis/naysayer:latest"

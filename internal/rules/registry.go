@@ -33,10 +33,10 @@ func NewRuleRegistry() *RuleRegistry {
 	registry := &RuleRegistry{
 		rules: make(map[string]*RuleInfo),
 	}
-	
+
 	// Register built-in rules
 	registry.registerBuiltInRules()
-	
+
 	return registry
 }
 
@@ -45,7 +45,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 	// Warehouse rule
 	r.RegisterRule(&RuleInfo{
 		Name:        "warehouse_rule",
-		Description: "Evaluates warehouse size changes - Approves when warehouse size decreases, requires manual review when warehouse size increases",
+		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding), requires manual review for warehouse increases",
 		Version:     "1.0.0",
 		Factory: func(client *gitlab.Client) shared.Rule {
 			return warehouse.NewRule(client)
@@ -53,16 +53,16 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Enabled:  true,
 		Category: "warehouse",
 	})
-	
-	// Source binding rule (template - disabled by default)
+
+	// Source binding rule
 	r.RegisterRule(&RuleInfo{
 		Name:        "source_binding_rule",
-		Description: "Evaluates source binding configuration changes (sourceBinding.yaml) - Template rule for future implementation",
+		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding)",
 		Version:     "1.0.0",
 		Factory: func(client *gitlab.Client) shared.Rule {
 			return source.NewRule(client)
 		},
-		Enabled:  false, // Disabled until fully implemented
+		Enabled:  true, // Now fully implemented
 		Category: "source",
 	})
 }
@@ -72,18 +72,18 @@ func (r *RuleRegistry) RegisterRule(info *RuleInfo) error {
 	if info.Name == "" {
 		return fmt.Errorf("rule name cannot be empty")
 	}
-	
+
 	if info.Factory == nil {
 		return fmt.Errorf("rule factory cannot be nil")
 	}
-	
+
 	if _, exists := r.rules[info.Name]; exists {
 		return fmt.Errorf("rule '%s' is already registered", info.Name)
 	}
-	
+
 	r.rules[info.Name] = info
 	log.Printf("Registered rule: %s (category: %s, enabled: %t)", info.Name, info.Category, info.Enabled)
-	
+
 	return nil
 }
 
@@ -128,7 +128,7 @@ func (r *RuleRegistry) ListRulesByCategory(category string) map[string]*RuleInfo
 // CreateRuleManager creates a rule manager with specified rules
 func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []string) (shared.RuleManager, error) {
 	manager := NewSimpleRuleManager()
-	
+
 	// If no specific rules requested, use all enabled rules
 	if len(ruleNames) == 0 {
 		for _, info := range r.ListEnabledRules() {
@@ -143,13 +143,13 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 			if !exists {
 				return nil, fmt.Errorf("rule '%s' not found in registry", ruleName)
 			}
-			
+
 			rule := info.Factory(client)
 			manager.AddRule(rule)
 			log.Printf("Added requested rule: %s", info.Name)
 		}
 	}
-	
+
 	return manager, nil
 }
 
@@ -158,16 +158,17 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 	// For dataverse, we want specific rules
 	dataverseRules := []string{
 		"warehouse_rule",
+		"source_binding_rule",
 		// Add more dataverse-specific rules here as they're implemented
 	}
-	
+
 	manager, err := r.CreateRuleManager(client, dataverseRules)
 	if err != nil {
 		log.Printf("Error creating dataverse rule manager: %v", err)
 		// Fallback to empty manager
 		return NewSimpleRuleManager()
 	}
-	
+
 	return manager
 }
 

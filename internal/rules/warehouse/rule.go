@@ -10,7 +10,7 @@ import (
 
 // Rule implements warehouse size change approval logic
 type Rule struct {
-	analyzer *Analyzer
+	analyzer AnalyzerInterface
 	client   *gitlab.Client
 }
 
@@ -18,7 +18,7 @@ type Rule struct {
 func NewRule(client *gitlab.Client) *Rule {
 	// Create the analyzer internally - no external dependency injection needed
 	analyzer := NewAnalyzer(client)
-	
+
 	return &Rule{
 		analyzer: analyzer,
 		client:   client,
@@ -32,7 +32,7 @@ func (r *Rule) Name() string {
 
 // Description returns human-readable description
 func (r *Rule) Description() string {
-	return "Evaluates warehouse size changes - Approves when warehouse size decreases, skips approval when warehouse size increases"
+	return "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding), requires manual review for warehouse increases"
 }
 
 // Applies checks if this rule should evaluate the MR
@@ -51,7 +51,7 @@ func (r *Rule) isDataProductFile(path string) bool {
 	if path == "" {
 		return false
 	}
-	
+
 	lowerPath := strings.ToLower(path)
 	return strings.HasSuffix(lowerPath, "product.yaml") || strings.HasSuffix(lowerPath, "product.yml")
 }
@@ -61,15 +61,36 @@ func (r *Rule) ShouldApprove(mrCtx *shared.MRContext) (shared.DecisionType, stri
 	if r.client == nil {
 		return shared.ManualReview, "GitLab token not configured - cannot analyze dataproduct files"
 	}
-	
-	// Analyze warehouse changes using internal analyzer
-	warehouseChanges, err := r.analyzer.AnalyzeChanges(mrCtx.ProjectID, mrCtx.MRIID, mrCtx.Changes)
-	if err != nil {
-		return shared.ManualReview, fmt.Sprintf("Analysis failed: %v", err)
+
+	// First check if all changes are dataverse-safe files
+	fileTypes := shared.AnalyzeDataverseChanges(mrCtx.Changes)
+
+	// If no dataverse files, approve (this rule doesn't apply)
+	if len(fileTypes) == 0 {
+		return shared.Approve, "No dataverse file changes detected"
 	}
-	
-	// Apply warehouse logic
-	return r.evaluateWarehouseChanges(warehouseChanges)
+
+	// If all changes are dataverse-safe, check for breaking warehouse changes
+	if shared.AreAllDataverseSafe(mrCtx.Changes) {
+		// Only analyze warehouse changes if there are any warehouse files
+		if fileTypes[shared.WarehouseFile] > 0 {
+			warehouseChanges, err := r.analyzer.AnalyzeChanges(mrCtx.ProjectID, mrCtx.MRIID, mrCtx.Changes)
+			if err != nil {
+				return shared.ManualReview, fmt.Sprintf("Warehouse analysis failed: %v", err)
+			}
+
+			// Check for warehouse increases (breaking changes)
+			if decision, reason := r.evaluateWarehouseChanges(warehouseChanges); decision == shared.ManualReview {
+				return decision, reason
+			}
+		}
+
+		// All changes are safe dataverse files - auto-approve with dynamic message
+		return shared.Approve, shared.BuildDataverseApprovalMessage(fileTypes)
+	}
+
+	// Mixed changes - require manual review
+	return shared.ManualReview, "MR contains non-dataverse file changes"
 }
 
 // evaluateWarehouseChanges applies the warehouse decision logic
@@ -81,7 +102,7 @@ func (r *Rule) evaluateWarehouseChanges(changes []WarehouseChange) (shared.Decis
 	// Check if all changes are decreases
 	for _, change := range changes {
 		if !change.IsDecrease {
-			return shared.ManualReview, fmt.Sprintf("Warehouse increase detected: %s → %s in %s", 
+			return shared.ManualReview, fmt.Sprintf("Warehouse increase detected: %s → %s in %s",
 				change.FromSize, change.ToSize, change.FilePath)
 		}
 	}

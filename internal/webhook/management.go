@@ -22,14 +22,14 @@ func NewManagementHandler(cfg *config.Config) *ManagementHandler {
 func (h *ManagementHandler) HandleRules(c *fiber.Ctx) error {
 	allRules := rules.ListAvailableRules()
 	enabledRules := rules.ListEnabledRules()
-	
+
 	response := fiber.Map{
 		"total_rules":   len(allRules),
 		"enabled_rules": len(enabledRules),
 		"rules":         make([]fiber.Map, 0),
 		"categories":    make(map[string]int),
 	}
-	
+
 	// Collect rule information
 	for _, ruleInfo := range allRules {
 		rule := fiber.Map{
@@ -40,25 +40,25 @@ func (h *ManagementHandler) HandleRules(c *fiber.Ctx) error {
 			"category":    ruleInfo.Category,
 		}
 		response["rules"] = append(response["rules"].([]fiber.Map), rule)
-		
+
 		// Count by category
 		if categories, ok := response["categories"].(map[string]int); ok {
 			categories[ruleInfo.Category]++
 		}
 	}
-	
+
 	return c.JSON(response)
 }
 
 // HandleRulesEnabled returns only enabled rules
 func (h *ManagementHandler) HandleRulesEnabled(c *fiber.Ctx) error {
 	enabledRules := rules.ListEnabledRules()
-	
+
 	response := fiber.Map{
 		"enabled_rules": len(enabledRules),
 		"rules":         make([]fiber.Map, 0),
 	}
-	
+
 	for _, ruleInfo := range enabledRules {
 		rule := fiber.Map{
 			"name":        ruleInfo.Name,
@@ -68,7 +68,7 @@ func (h *ManagementHandler) HandleRulesEnabled(c *fiber.Ctx) error {
 		}
 		response["rules"] = append(response["rules"].([]fiber.Map), rule)
 	}
-	
+
 	return c.JSON(response)
 }
 
@@ -80,16 +80,16 @@ func (h *ManagementHandler) HandleRulesByCategory(c *fiber.Ctx) error {
 			"error": "Category parameter is required",
 		})
 	}
-	
+
 	registry := rules.GetGlobalRegistry()
 	categoryRules := registry.ListRulesByCategory(category)
-	
+
 	response := fiber.Map{
-		"category":    category,
-		"rule_count":  len(categoryRules),
-		"rules":       make([]fiber.Map, 0),
+		"category":   category,
+		"rule_count": len(categoryRules),
+		"rules":      make([]fiber.Map, 0),
 	}
-	
+
 	for _, ruleInfo := range categoryRules {
 		rule := fiber.Map{
 			"name":        ruleInfo.Name,
@@ -99,7 +99,7 @@ func (h *ManagementHandler) HandleRulesByCategory(c *fiber.Ctx) error {
 		}
 		response["rules"] = append(response["rules"].([]fiber.Map), rule)
 	}
-	
+
 	return c.JSON(response)
 }
 
@@ -107,13 +107,13 @@ func (h *ManagementHandler) HandleRulesByCategory(c *fiber.Ctx) error {
 func (h *ManagementHandler) HandleSystemInfo(c *fiber.Ctx) error {
 	allRules := rules.ListAvailableRules()
 	enabledRules := rules.ListEnabledRules()
-	
+
 	// Count categories
 	categories := make(map[string]int)
 	for _, ruleInfo := range allRules {
 		categories[ruleInfo.Category]++
 	}
-	
+
 	return c.JSON(fiber.Map{
 		"service":           "naysayer-webhook",
 		"version":           "v1.0.0",
@@ -131,7 +131,7 @@ func (h *ManagementHandler) HandleSystemInfo(c *fiber.Ctx) error {
 		},
 		"endpoints": []string{
 			"/health",
-			"/ready", 
+			"/ready",
 			"/webhook",
 			"/api/rules",
 			"/api/rules/enabled",

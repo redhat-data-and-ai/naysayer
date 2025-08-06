@@ -8,7 +8,6 @@ import (
 )
 
 // Rule implements source binding configuration approval logic
-// This is a template/example rule for future development based on ADR 0037
 type Rule struct {
 	client *gitlab.Client
 }
@@ -27,7 +26,7 @@ func (r *Rule) Name() string {
 
 // Description returns human-readable description
 func (r *Rule) Description() string {
-	return "Evaluates source binding configuration changes (sourceBinding.yaml) - Template rule for future implementation"
+	return "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding)"
 }
 
 // Applies checks if this rule should evaluate the MR
@@ -46,44 +45,32 @@ func (r *Rule) isSourceBindingFile(path string) bool {
 	if path == "" {
 		return false
 	}
-	
+
 	lowerPath := strings.ToLower(path)
-	return strings.HasSuffix(lowerPath, "sourcebinding.yaml") || 
-		   strings.HasSuffix(lowerPath, "sourcebinding.yml") ||
-		   strings.Contains(lowerPath, "sourcebinding")
+	return strings.HasSuffix(lowerPath, "sourcebinding.yaml") ||
+		strings.HasSuffix(lowerPath, "sourcebinding.yml") ||
+		strings.Contains(lowerPath, "sourcebinding")
 }
 
 // ShouldApprove executes the source binding logic and returns a binary decision
-// This is a template implementation - actual logic should be implemented based on requirements
 func (r *Rule) ShouldApprove(mrCtx *shared.MRContext) (shared.DecisionType, string) {
-	// Template implementation - always requires manual review for now
-	// TODO: Implement actual source binding validation logic based on ADR 0037
-	
 	if r.client == nil {
 		return shared.ManualReview, "GitLab token not configured - cannot analyze sourceBinding files"
 	}
-	
-	// Count sourceBinding file changes
-	sourceBindingChanges := 0
-	for _, change := range mrCtx.Changes {
-		if r.isSourceBindingFile(change.NewPath) || r.isSourceBindingFile(change.OldPath) {
-			sourceBindingChanges++
-		}
-	}
-	
-	if sourceBindingChanges == 0 {
-		return shared.Approve, "No sourceBinding changes detected"
-	}
-	
-	// For now, all sourceBinding changes require manual review
-	// Future implementation should analyze the actual changes and determine approval criteria
-	return shared.ManualReview, "sourceBinding configuration changes require manual review (template rule)"
-}
 
-// Future implementation ideas based on ADR 0037:
-// 1. Parse sourceBinding.yaml structure
-// 2. Validate source configurations
-// 3. Check for breaking changes
-// 4. Validate against allowed source types
-// 5. Check for security implications
-// 6. Validate data schema compatibility
+	// Use shared dataverse file analysis
+	fileTypes := shared.AnalyzeDataverseChanges(mrCtx.Changes)
+
+	// If no dataverse files, approve (this rule doesn't apply)
+	if len(fileTypes) == 0 {
+		return shared.Approve, "No dataverse file changes detected"
+	}
+
+	// If all changes are dataverse-safe files, auto-approve with dynamic message
+	if shared.AreAllDataverseSafe(mrCtx.Changes) {
+		return shared.Approve, shared.BuildDataverseApprovalMessage(fileTypes)
+	}
+
+	// Mixed changes - require manual review
+	return shared.ManualReview, "MR contains non-dataverse file changes"
+}
