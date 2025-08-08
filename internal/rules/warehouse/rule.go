@@ -2,7 +2,6 @@ package warehouse
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
@@ -39,21 +38,11 @@ func (r *Rule) Description() string {
 func (r *Rule) Applies(mrCtx *shared.MRContext) bool {
 	// Only apply if dataproduct files are changed
 	for _, change := range mrCtx.Changes {
-		if r.isDataProductFile(change.NewPath) || r.isDataProductFile(change.OldPath) {
+		if shared.IsDataProductFile(change.NewPath) || shared.IsDataProductFile(change.OldPath) {
 			return true
 		}
 	}
 	return false
-}
-
-// isDataProductFile checks if a file is a dataproduct configuration file
-func (r *Rule) isDataProductFile(path string) bool {
-	if path == "" {
-		return false
-	}
-
-	lowerPath := strings.ToLower(path)
-	return strings.HasSuffix(lowerPath, "product.yaml") || strings.HasSuffix(lowerPath, "product.yml")
 }
 
 // ShouldApprove executes the warehouse size logic and returns a binary decision

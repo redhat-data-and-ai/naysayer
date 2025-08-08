@@ -24,12 +24,6 @@ func TestNewRuleRegistry(t *testing.T) {
 	assert.Equal(t, "warehouse_rule", warehouseRule.Name)
 	assert.Equal(t, "warehouse", warehouseRule.Category)
 	assert.True(t, warehouseRule.Enabled)
-
-	sourceRule, exists := registry.GetRule("source_binding_rule")
-	assert.True(t, exists, "Source binding rule should be registered")
-	assert.Equal(t, "source_binding_rule", sourceRule.Name)
-	assert.Equal(t, "source", sourceRule.Category)
-	assert.True(t, sourceRule.Enabled)
 }
 
 func TestRuleRegistry_RegisterRule(t *testing.T) {
@@ -136,11 +130,10 @@ func TestRuleRegistry_ListRules(t *testing.T) {
 	assert.NoError(t, err)
 
 	rules := registry.ListRules()
-	assert.Greater(t, len(rules), 2, "Should have at least built-in rules plus test rule")
+	assert.Greater(t, len(rules), 1, "Should have at least built-in rules plus test rule")
 
 	// Verify built-in rules are present
 	assert.Contains(t, rules, "warehouse_rule")
-	assert.Contains(t, rules, "source_binding_rule")
 	assert.Contains(t, rules, "test_list_rule")
 
 	// Verify returned map is a copy (modification doesn't affect registry)
@@ -177,7 +170,6 @@ func TestRuleRegistry_ListEnabledRules(t *testing.T) {
 
 	// Should contain built-in enabled rules plus our enabled test rule
 	assert.Contains(t, enabledRules, "warehouse_rule")
-	assert.Contains(t, enabledRules, "source_binding_rule")
 	assert.Contains(t, enabledRules, "enabled_test_rule")
 
 	// Should NOT contain disabled rule
@@ -228,7 +220,6 @@ func TestRuleRegistry_ListRulesByCategory(t *testing.T) {
 
 	// Test source category
 	sourceRules := registry.ListRulesByCategory("source")
-	assert.Contains(t, sourceRules, "source_binding_rule") // Built-in
 	assert.Contains(t, sourceRules, "source_test_rule")    // Our test rule
 	assert.NotContains(t, sourceRules, "warehouse_rule")
 	assert.NotContains(t, sourceRules, "security_rule")
@@ -320,14 +311,14 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 
 	client := &gitlab.Client{}
 
-	// Should return fallback empty manager when dataverse rules are missing
+	// Should return manager with warehouse rule since it's available
 	manager := registry.CreateDataverseRuleManager(client)
 	assert.NotNil(t, manager)
 
-	// Should be an empty SimpleRuleManager
+	// Should be a SimpleRuleManager with the warehouse rule
 	simpleManager, ok := manager.(*SimpleRuleManager)
 	assert.True(t, ok)
-	assert.Equal(t, 0, len(simpleManager.rules), "Should be empty fallback manager")
+	assert.Equal(t, 1, len(simpleManager.rules), "Should have warehouse rule available")
 }
 
 func TestGlobalRegistry(t *testing.T) {
@@ -373,15 +364,6 @@ func TestRuleFactory_Functionality(t *testing.T) {
 	rule := warehouseRuleInfo.Factory(client)
 	assert.NotNil(t, rule)
 	assert.Equal(t, "warehouse_rule", rule.Name())
-
-	// Test source rule factory
-	sourceRuleInfo, exists := registry.GetRule("source_binding_rule")
-	assert.True(t, exists)
-	assert.NotNil(t, sourceRuleInfo.Factory)
-
-	sourceRule := sourceRuleInfo.Factory(client)
-	assert.NotNil(t, sourceRule)
-	assert.Equal(t, "source_binding_rule", sourceRule.Name())
 }
 
 func TestRuleRegistry_EdgeCases(t *testing.T) {

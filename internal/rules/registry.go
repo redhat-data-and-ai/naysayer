@@ -2,11 +2,10 @@ package rules
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
-	"github.com/redhat-data-and-ai/naysayer/internal/rules/source"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
 
@@ -54,17 +53,6 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "warehouse",
 	})
 
-	// Source binding rule
-	r.RegisterRule(&RuleInfo{
-		Name:        "source_binding_rule",
-		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding)",
-		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
-			return source.NewRule(client)
-		},
-		Enabled:  true, // Now fully implemented
-		Category: "source",
-	})
 }
 
 // RegisterRule registers a new rule in the registry
@@ -82,7 +70,7 @@ func (r *RuleRegistry) RegisterRule(info *RuleInfo) error {
 	}
 
 	r.rules[info.Name] = info
-	log.Printf("Registered rule: %s (category: %s, enabled: %t)", info.Name, info.Category, info.Enabled)
+	logging.Info("Registered rule: %s (category: %s, enabled: %t)", info.Name, info.Category, info.Enabled)
 
 	return nil
 }
@@ -134,19 +122,18 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 		for _, info := range r.ListEnabledRules() {
 			rule := info.Factory(client)
 			manager.AddRule(rule)
-			log.Printf("Added enabled rule: %s", info.Name)
+			logging.Info("Added enabled rule: %s", info.Name)
 		}
 	} else {
-		// Add specific requested rules
+		// Add only specified rules from the list
 		for _, ruleName := range ruleNames {
-			info, exists := r.GetRule(ruleName)
-			if !exists {
-				return nil, fmt.Errorf("rule '%s' not found in registry", ruleName)
+			info, ok := r.rules[ruleName]
+			if !ok {
+				return nil, fmt.Errorf("rule not found: %s", ruleName)
 			}
-
 			rule := info.Factory(client)
 			manager.AddRule(rule)
-			log.Printf("Added requested rule: %s", info.Name)
+			logging.Info("Added requested rule: %s", info.Name)
 		}
 	}
 
@@ -155,16 +142,18 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
 func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.RuleManager {
-	// For dataverse, we want specific rules
+	// For dataverse, we want specific rules that are actually implemented
 	dataverseRules := []string{
 		"warehouse_rule",
-		"source_binding_rule",
-		// Add more dataverse-specific rules here as they're implemented
+		// TODO: Add back when implemented:
+		// "service_account_rule",
+		// "migrations_rule",
+		// "naming_conventions_rule",
 	}
 
 	manager, err := r.CreateRuleManager(client, dataverseRules)
 	if err != nil {
-		log.Printf("Error creating dataverse rule manager: %v", err)
+		logging.Error("Error creating dataverse rule manager: %v", err)
 		// Fallback to empty manager
 		return NewSimpleRuleManager()
 	}

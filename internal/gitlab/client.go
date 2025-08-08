@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +22,14 @@ type Client struct {
 func NewClient(cfg config.GitLabConfig) *Client {
 	return &Client{
 		config: cfg,
+		http:   &http.Client{},
+	}
+}
+
+// NewClientWithConfig creates a new GitLab API client with full config
+func NewClientWithConfig(cfg *config.Config) *Client {
+	return &Client{
+		config: cfg.GitLab,
 		http:   &http.Client{},
 	}
 }
@@ -136,4 +145,100 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 		SourceBranch: sourceBranch,
 		TargetBranch: targetBranch,
 	}, nil
+}
+
+// AddMRComment adds a comment to a merge request
+func (c *Client) AddMRComment(projectID, mrIID int, comment string) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	payload := map[string]string{
+		"body": comment,
+	}
+	
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal comment payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create comment request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to add comment: %w", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 201:
+		return nil // Success
+	case 401:
+		return fmt.Errorf("comment failed: insufficient permissions")
+	case 404:
+		return fmt.Errorf("comment failed: MR not found")
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("comment failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
+
+// ApproveMR approves a merge request (simple approval without message)
+func (c *Client) ApproveMR(projectID, mrIID int) error {
+	return c.ApproveMRWithMessage(projectID, mrIID, "")
+}
+
+// ApproveMRWithMessage approves a merge request with a custom approval message
+func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/approve",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	var jsonPayload []byte
+	var err error
+
+	if message != "" {
+		payload := map[string]string{
+			"note": message,
+		}
+		jsonPayload, err = json.Marshal(payload)
+	} else {
+		jsonPayload = []byte("{}")
+	}
+	
+	if err != nil {
+		return fmt.Errorf("failed to marshal approval payload: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create approval request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to approve MR: %w", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 201:
+		return nil // Success
+	case 401:
+		return fmt.Errorf("approval failed: insufficient permissions")
+	case 404:
+		return fmt.Errorf("approval failed: MR not found")
+	case 405:
+		return fmt.Errorf("approval failed: MR already approved or cannot be approved")
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("approval failed with status %d: %s", resp.StatusCode, string(body))
+	}
 }

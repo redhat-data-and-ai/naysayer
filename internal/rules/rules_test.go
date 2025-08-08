@@ -29,7 +29,7 @@ func TestCreateCustomRuleManager_Success(t *testing.T) {
 	client := &gitlab.Client{}
 	
 	// Test with existing rules
-	ruleNames := []string{"warehouse_rule", "source_binding_rule"}
+	ruleNames := []string{"warehouse_rule"}
 	manager, err := CreateCustomRuleManager(client, ruleNames)
 	
 	assert.NoError(t, err)
@@ -42,7 +42,7 @@ func TestCreateCustomRuleManager_Success(t *testing.T) {
 	// Should have the requested rules
 	simpleManager, ok := manager.(*SimpleRuleManager)
 	assert.True(t, ok)
-	assert.Equal(t, 2, len(simpleManager.rules), "Should have exactly 2 rules")
+	assert.Equal(t, 1, len(simpleManager.rules), "Should have exactly 1 rule")
 }
 
 func TestCreateCustomRuleManager_WithNonExistentRule(t *testing.T) {
@@ -86,11 +86,6 @@ func TestCreateRuleManagerByCategory(t *testing.T) {
 			expectRules: true,
 		},
 		{
-			name:     "source category", 
-			category: "source",
-			expectRules: true,
-		},
-		{
 			name:     "non-existent category",
 			category: "non_existent",
 			expectRules: false,
@@ -128,7 +123,6 @@ func TestListAvailableRules(t *testing.T) {
 	
 	// Verify built-in rules are present
 	assert.Contains(t, rules, "warehouse_rule")
-	assert.Contains(t, rules, "source_binding_rule")
 	
 	// Verify rule structure
 	warehouseRule := rules["warehouse_rule"]
@@ -153,7 +147,6 @@ func TestListEnabledRules(t *testing.T) {
 	
 	// Built-in rules should be enabled by default
 	assert.Contains(t, rules, "warehouse_rule")
-	assert.Contains(t, rules, "source_binding_rule")
 }
 
 func TestListAvailableRules_IsCopy(t *testing.T) {

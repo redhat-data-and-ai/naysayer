@@ -22,8 +22,8 @@ NAYSAYER helps the data platform team by automatically approving merge requests 
 
 2. **Deploy to Kubernetes/OpenShift**:
    ```bash
-   # Configure GitLab token in config/deployment.yaml
-   kubectl apply -f config/
+   # Configure GitLab token in config/secrets.yaml
+kubectl apply -f config/
    ```
 
 3. **Configure GitLab webhook** in your dataproduct-config repository:
@@ -93,7 +93,7 @@ It understands the DDIS dataproduct structure and focuses only on `product.yaml`
 1. **Configure secrets**:
    ```bash
    echo -n "your-gitlab-token" | base64
-   # Update gitlab-token in config/deployment.yaml
+   # Update gitlab-token in config/secrets.yaml
    ```
 
 2. **Deploy**:
