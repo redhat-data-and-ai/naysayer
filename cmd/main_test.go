@@ -26,7 +26,7 @@ func createTestApplication() *fiber.App {
 			Token:   "test-token",
 		},
 		Webhook: config.WebhookConfig{
-			EnableVerification: false,
+
 		},
 		Server: config.ServerConfig{
 			Port: "8080",

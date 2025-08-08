@@ -57,7 +57,7 @@ func createTestConfig() *config.Config {
 			Token:   "test-token",
 		},
 		Webhook: config.WebhookConfig{
-			EnableVerification: false,
+
 			AllowedIPs:         []string{},
 		},
 	}

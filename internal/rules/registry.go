@@ -2,9 +2,9 @@ package rules
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
@@ -70,7 +70,7 @@ func (r *RuleRegistry) RegisterRule(info *RuleInfo) error {
 	}
 
 	r.rules[info.Name] = info
-	log.Printf("Registered rule: %s (category: %s, enabled: %t)", info.Name, info.Category, info.Enabled)
+	logging.Info("Registered rule: %s (category: %s, enabled: %t)", info.Name, info.Category, info.Enabled)
 
 	return nil
 }
@@ -122,19 +122,18 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 		for _, info := range r.ListEnabledRules() {
 			rule := info.Factory(client)
 			manager.AddRule(rule)
-			log.Printf("Added enabled rule: %s", info.Name)
+			logging.Info("Added enabled rule: %s", info.Name)
 		}
 	} else {
-		// Add specific requested rules
+		// Add only specified rules from the list
 		for _, ruleName := range ruleNames {
-			info, exists := r.GetRule(ruleName)
-			if !exists {
-				return nil, fmt.Errorf("rule '%s' not found in registry", ruleName)
+			info, ok := r.rules[ruleName]
+			if !ok {
+				return nil, fmt.Errorf("rule not found: %s", ruleName)
 			}
-
 			rule := info.Factory(client)
 			manager.AddRule(rule)
-			log.Printf("Added requested rule: %s", info.Name)
+			logging.Info("Added requested rule: %s", info.Name)
 		}
 	}
 
@@ -154,7 +153,7 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 
 	manager, err := r.CreateRuleManager(client, dataverseRules)
 	if err != nil {
-		log.Printf("Error creating dataverse rule manager: %v", err)
+		logging.Error("Error creating dataverse rule manager: %v", err)
 		// Fallback to empty manager
 		return NewSimpleRuleManager()
 	}

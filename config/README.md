@@ -51,7 +51,7 @@ The application requires these secrets to be configured in `secrets.yaml`:
 The deployment configures these environment variables:
 
 - `PORT` - Service port (3000)
-- `WEBHOOK_VERIFY` - Enable webhook signature verification (true)
+
 - `LOG_LEVEL` - Logging level (info)
 - `ENVIRONMENT` - Deployment environment (production)
 

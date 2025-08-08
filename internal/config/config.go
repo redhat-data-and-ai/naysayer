@@ -28,9 +28,8 @@ type ServerConfig struct {
 
 // WebhookConfig holds webhook security configuration
 type WebhookConfig struct {
-	Secret             string   // GitLab webhook secret token
-	EnableVerification bool     // Enable signature verification
-	AllowedIPs         []string // Optional: restrict webhook calls to specific IPs
+	Secret     string   // GitLab webhook secret token
+	AllowedIPs []string // Optional: restrict webhook calls to specific IPs
 }
 
 // CommentsConfig holds MR comments and messages configuration
@@ -95,9 +94,8 @@ func Load() *Config {
 			Port: getEnv("PORT", "3000"),
 		},
 		Webhook: WebhookConfig{
-			Secret:             getEnv("WEBHOOK_SECRET", ""),
-			EnableVerification: getEnv("WEBHOOK_VERIFY", "true") == "true",
-			AllowedIPs:         parseIPList(getEnv("WEBHOOK_ALLOWED_IPS", "")),
+			Secret:     getEnv("WEBHOOK_SECRET", ""),
+			AllowedIPs: parseIPList(getEnv("WEBHOOK_ALLOWED_IPS", "")),
 		},
 		Comments: CommentsConfig{
 			EnableMRComments: getEnv("ENABLE_MR_COMMENTS", "true") == "true",
@@ -155,13 +153,10 @@ func (c *Config) HasWebhookSecret() bool {
 
 // WebhookSecurityMode returns a description of the current webhook security mode
 func (c *Config) WebhookSecurityMode() string {
-	if !c.Webhook.EnableVerification {
-		return "Disabled (INSECURE)"
-	}
 	if c.HasWebhookSecret() {
-		return "Token verification enabled"
+		return "Token verification available"
 	}
-	return "Verification enabled but no secret configured"
+	return "No secret configured"
 }
 
 func getEnv(key, defaultValue string) string {

@@ -95,9 +95,7 @@ func TestHealthHandler_HandleReady_Success(t *testing.T) {
 			BaseURL: "https://gitlab.example.com",
 			Token:   "test-token",
 		},
-		Webhook: config.WebhookConfig{
-			EnableVerification: false, // Disabled, so should be ready
-		},
+		Webhook: config.WebhookConfig{},
 	}
 	handler := NewHealthHandler(cfg)
 
@@ -118,7 +116,7 @@ func TestHealthHandler_HandleReady_Success(t *testing.T) {
 	assert.Equal(t, "naysayer-webhook", ready["service"])
 	assert.NotNil(t, ready["timestamp"])
 	assert.NotNil(t, ready["gitlab_token"])
-	assert.NotNil(t, ready["webhook_verify"])
+	assert.NotNil(t, ready["webhook_secret"])
 }
 
 func TestHealthHandler_HandleReady_MissingGitLabToken(t *testing.T) {
@@ -128,7 +126,6 @@ func TestHealthHandler_HandleReady_MissingGitLabToken(t *testing.T) {
 			Token:   "", // No token
 		},
 		Webhook: config.WebhookConfig{
-			EnableVerification: true, // Verification enabled but no token
 		},
 	}
 	handler := NewHealthHandler(cfg)
@@ -157,37 +154,7 @@ func TestHealthHandler_HandleReady_MissingWebhookSecret(t *testing.T) {
 			Token:   "test-token",
 		},
 		Webhook: config.WebhookConfig{
-			EnableVerification: true, // Verification enabled but no secret
 			Secret:             "",   // No secret
-		},
-	}
-	handler := NewHealthHandler(cfg)
-
-	app := createTestApp()
-	app.Get("/ready", handler.HandleReady)
-
-	req := httptest.NewRequest("GET", "/ready", nil)
-	resp, err := app.Test(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, 503, resp.StatusCode)
-
-	body, _ := io.ReadAll(resp.Body)
-	var ready map[string]interface{}
-	json.Unmarshal(body, &ready)
-
-	assert.Equal(t, false, ready["ready"])
-	assert.Equal(t, "Webhook secret not configured", ready["reason"])
-}
-
-func TestHealthHandler_HandleReady_VerificationDisabled(t *testing.T) {
-	cfg := &config.Config{
-		GitLab: config.GitLabConfig{
-			BaseURL: "https://gitlab.example.com",
-			Token:   "", // No token, but verification disabled
-		},
-		Webhook: config.WebhookConfig{
-			EnableVerification: false, // Verification disabled
 		},
 	}
 	handler := NewHealthHandler(cfg)
@@ -206,9 +173,36 @@ func TestHealthHandler_HandleReady_VerificationDisabled(t *testing.T) {
 	json.Unmarshal(body, &ready)
 
 	assert.Equal(t, true, ready["ready"])
-	// Should not have a reason field when ready
-	_, hasReason := ready["reason"]
-	assert.False(t, hasReason)
+	assert.Nil(t, ready["reason"])
+}
+
+func TestHealthHandler_HandleReady_VerificationDisabled(t *testing.T) {
+	cfg := &config.Config{
+		GitLab: config.GitLabConfig{
+			BaseURL: "https://gitlab.example.com",
+			Token:   "", // No token, should fail readiness
+		},
+		Webhook: config.WebhookConfig{
+
+		},
+	}
+	handler := NewHealthHandler(cfg)
+
+	app := createTestApp()
+	app.Get("/ready", handler.HandleReady)
+
+	req := httptest.NewRequest("GET", "/ready", nil)
+	resp, err := app.Test(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 503, resp.StatusCode)
+
+	body, _ := io.ReadAll(resp.Body)
+	var ready map[string]interface{}
+	json.Unmarshal(body, &ready)
+
+	assert.Equal(t, false, ready["ready"])
+	assert.Equal(t, "GitLab token not configured", ready["reason"])
 }
 
 func TestHealthHandler_HandleHealth_WithSecureConfig(t *testing.T) {
@@ -218,7 +212,7 @@ func TestHealthHandler_HandleHealth_WithSecureConfig(t *testing.T) {
 			Token:   "secure-token",
 		},
 		Webhook: config.WebhookConfig{
-			EnableVerification: true,
+
 			Secret:             "webhook-secret",
 			AllowedIPs:         []string{"192.168.1.0/24", "10.0.0.0/8"},
 		},

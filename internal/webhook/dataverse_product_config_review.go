@@ -2,14 +2,15 @@ package webhook
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"go.uber.org/zap"
 )
 
 // DataProductConfigMrReviewHandler handles GitLab webhook requests
@@ -29,13 +30,13 @@ func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigM
 	manager := rules.CreateDataverseRuleManager(ruleManagerClient)
 
 	// Log security configuration
-	log.Printf("Webhook security: %s", cfg.WebhookSecurityMode())
+	logging.Info("Webhook security: %s", cfg.WebhookSecurityMode())
 	if len(cfg.Webhook.AllowedIPs) > 0 {
-		log.Printf("IP restrictions enabled: %v", cfg.Webhook.AllowedIPs)
+		logging.Info("IP restrictions enabled: %v", cfg.Webhook.AllowedIPs)
 	}
 
 	// Log comments configuration
-	log.Printf("MR Comments: %t (verbosity: %s)", 
+	logging.Info("MR Comments: %t (verbosity: %s)", 
 		cfg.Comments.EnableMRComments, cfg.Comments.CommentVerbosity)
 
 	return &DataProductConfigMrReviewHandler{
@@ -53,7 +54,7 @@ func (h *DataProductConfigMrReviewHandler) HandleWebhook(c *fiber.Ctx) error {
 	// Quick validation of content type
 	contentType := c.Get("Content-Type")
 	if !strings.Contains(contentType, "application/json") {
-		log.Printf("Invalid content type: %s", contentType)
+		logging.Warn("Invalid content type: %s", contentType)
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Content-Type must be application/json",
 		})
@@ -62,7 +63,7 @@ func (h *DataProductConfigMrReviewHandler) HandleWebhook(c *fiber.Ctx) error {
 	// Parse webhook payload
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
-		log.Printf("Failed to parse payload: %v", err)
+		logging.Error("Failed to parse payload: %v", err)
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
 		})
@@ -71,14 +72,14 @@ func (h *DataProductConfigMrReviewHandler) HandleWebhook(c *fiber.Ctx) error {
 	// Only support MR events
 	eventType, ok := payload["object_kind"].(string)
 	if !ok {
-		log.Printf("Missing object_kind in payload")
+		logging.Warn("Missing object_kind in payload")
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Missing object_kind",
 		})
 	}
 
 	if eventType != "merge_request" {
-		log.Printf("Skipping unsupported event: %s", eventType)
+		logging.Warn("Skipping unsupported event: %s", eventType)
 		return c.Status(400).JSON(fiber.Map{
 			"error": fmt.Sprintf("Unsupported event type: %s. Only merge_request events are supported.", eventType),
 		})
@@ -92,14 +93,12 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 	// Fetch MR changes from GitLab API with timeout handling
 	changes, err := h.gitlabClient.FetchMRChanges(projectID, mrID)
 	if err != nil {
-		log.Printf("MR %d: Failed to fetch MR changes: %v", mrID, err)
+		logging.MRError(mrID, "Failed to fetch MR changes", err)
 		// Return manual review decision if we can't fetch changes
 		return &shared.RuleEvaluation{
 			FinalDecision: shared.Decision{
-				Type:    shared.ManualReview,
-				Reason:  "Could not fetch MR changes from GitLab API",
-				Summary: "🚫 API error - manual review required",
-				Details: fmt.Sprintf("GitLab API error: %v", err),
+				Type:   shared.ManualReview,
+				Reason: "Could not fetch MR changes from GitLab API",
 			},
 			RuleResults:   []shared.RuleResult{},
 			ExecutionTime: 0,
@@ -115,14 +114,15 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 	}
 
 	// Log rule evaluation start
-	log.Printf("MR %d: Starting rule evaluation with %d file changes", mrID, len(changes))
+	logging.MRInfo(mrID, "Starting rule evaluation", zap.Int("file_changes", len(changes)))
 
 	// Evaluate all rules using the simple rule manager
 	result := h.ruleManager.EvaluateAll(mrContext)
 	
 	// Log rule evaluation completion
-	log.Printf("MR %d: Rule evaluation completed: %d rules evaluated, decision=%s", 
-		mrID, len(result.RuleResults), result.FinalDecision.Type)
+	logging.MRInfo(mrID, "Rule evaluation completed", 
+		zap.String("decision", string(result.FinalDecision.Type)), 
+		zap.Int("rules_evaluated", len(result.RuleResults)))
 	
 	return result, nil
 }
@@ -136,27 +136,27 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
 		
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
-			log.Printf("MR %d: Failed to add comment: %v", mrInfo.MRIID, err)
+			logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
 			// Continue with approval even if comment fails - comment is nice-to-have
 		} else {
-			log.Printf("MR %d: 📝 Added approval comment", mrInfo.MRIID)
+			logging.MRInfo(mrInfo.MRIID, "Added approval comment")
 		}
 	} else {
-		log.Printf("MR %d: Skipping comment (comments disabled)", mrInfo.MRIID)
+		logging.MRInfo(mrInfo.MRIID, "Skipping comment (comments disabled)")
 	}
 
-	// Approve with meaningful message
+	// Approve the MR with message
 	approvalMessage := messageBuilder.BuildApprovalMessage(result)
 	
 	if err := h.gitlabClient.ApproveMRWithMessage(mrInfo.ProjectID, mrInfo.MRIID, approvalMessage); err != nil {
 		// Try fallback to simple approval if message approval fails
-		log.Printf("MR %d: Failed to approve with message, trying simple approval: %v", mrInfo.MRIID, err)
+		logging.MRWarn(mrInfo.MRIID, "Failed to approve with message, trying simple approval", zap.Error(err))
 		if fallbackErr := h.gitlabClient.ApproveMR(mrInfo.ProjectID, mrInfo.MRIID); fallbackErr != nil {
 			return fmt.Errorf("failed to approve MR (both with message and simple): %w", fallbackErr)
 		}
-		log.Printf("MR %d: ✅ Auto-approved (fallback approval)", mrInfo.MRIID)
+		logging.MRInfo(mrInfo.MRIID, "Auto-approved (fallback approval)")
 	} else {
-		log.Printf("MR %d: ✅ Auto-approved: %s", mrInfo.MRIID, approvalMessage)
+		logging.MRInfo(mrInfo.MRIID, "Auto-approved", zap.String("message", approvalMessage))
 	}
 
 	return nil
@@ -167,39 +167,43 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 	// Extract MR information
 	mrInfo, err := gitlab.ExtractMRInfo(payload)
 	if err != nil {
-		log.Printf("Failed to extract MR info: %v", err)
+		logging.Error("Failed to extract MR info: %v", err)
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Missing MR information: " + err.Error(),
 		})
 	}
 
-	log.Printf("MR %d: Processing MR event: Project=%d, Author=%s", mrInfo.MRIID, mrInfo.ProjectID, mrInfo.Author)
+	logging.MRInfo(mrInfo.MRIID, "Processing MR event", 
+		zap.Int("project_id", mrInfo.ProjectID), 
+		zap.String("author", mrInfo.Author))
 
 	// Fast evaluation using rule manager
 	result, err := h.evaluateRules(mrInfo.ProjectID, mrInfo.MRIID, mrInfo)
 	if err != nil {
-		log.Printf("MR %d: Rule evaluation failed: %v", mrInfo.MRIID, err)
+		logging.MRError(mrInfo.MRIID, "Rule evaluation failed", err)
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Rule evaluation failed: " + err.Error(),
 		})
 	}
 
 	// Log decision with execution time
-	log.Printf("MR %d: Decision: type=%s, reason=%s, execution_time=%v",
-		mrInfo.MRIID, result.FinalDecision.Type, result.FinalDecision.Reason, result.ExecutionTime)
+	logging.MRInfo(mrInfo.MRIID, "Decision", 
+		zap.String("type", string(result.FinalDecision.Type)), 
+		zap.String("reason", result.FinalDecision.Reason), 
+		zap.Duration("execution_time", result.ExecutionTime))
 
 	// Handle approval with comments if decision is to approve
 	approved := false
 	if result.FinalDecision.Type == shared.Approve {
 		if err := h.handleApprovalWithComments(result, mrInfo); err != nil {
-			log.Printf("MR %d: Failed to approve: %v", mrInfo.MRIID, err)
+			logging.MRError(mrInfo.MRIID, "Failed to approve", err)
 			return c.Status(500).JSON(fiber.Map{
 				"error": "Failed to approve MR: " + err.Error(),
 			})
 		}
 		approved = true
 	} else {
-		log.Printf("MR %d: 🚫 Manual review required: %s", mrInfo.MRIID, result.FinalDecision.Reason)
+		logging.MRInfo(mrInfo.MRIID, "Manual review required", zap.String("reason", result.FinalDecision.Reason))
 	}
 
 	// Return structured response for GitLab webhook

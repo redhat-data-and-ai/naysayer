@@ -1,6 +1,6 @@
 # NAYSAYER Makefile
 
-.PHONY: build run test test-unit test-integration test-coverage clean install help docker fmt vet lint
+.PHONY: build run test test-coverage clean install help docker fmt vet lint
 
 # Default target
 help:
@@ -12,9 +12,7 @@ help:
 	@echo "  docker         Build Docker image"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test           Run all tests (unit + integration)"
-	@echo "  test-unit      Run unit tests only"
-	@echo "  test-integration Run integration tests only"
+	@echo "  test           Run all tests"
 	@echo "  test-coverage  Generate test coverage report"
 	@echo ""
 	@echo "Code Quality:"
@@ -39,21 +37,9 @@ run: build
 	./naysayer
 
 # Run unit tests
-test-unit:
+test:
 	@echo "Running unit tests..."
 	go test ./... -v -race -cover
-
-# Run integration tests
-test-integration:
-	@echo "Running integration tests..."
-	@if ! curl -s http://localhost:3000/health > /dev/null; then \
-		echo "❌ Server not running. Start with 'make run' first."; \
-		exit 1; \
-	fi
-	./test_mr.sh
-
-# Run all tests
-test: test-unit test-integration
 
 # Generate test coverage report
 test-coverage:
