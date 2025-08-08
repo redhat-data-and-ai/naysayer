@@ -16,6 +16,7 @@ COPY vendor/ vendor/
 
 # Copy source code (file-based analysis implementation)
 COPY cmd/ cmd/
+COPY internal/ internal/
 
 # Build the binary with file analysis capabilities
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
