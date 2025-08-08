@@ -54,7 +54,7 @@ func TestCreateCustomRuleManager_WithNonExistentRule(t *testing.T) {
 	
 	assert.Error(t, err)
 	assert.Nil(t, manager)
-	assert.Contains(t, err.Error(), "rule 'non_existent_rule' not found in registry")
+	assert.Contains(t, err.Error(), "rule not found: non_existent_rule")
 }
 
 func TestCreateCustomRuleManager_EmptyRuleList(t *testing.T) {

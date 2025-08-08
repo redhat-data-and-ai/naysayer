@@ -275,7 +275,7 @@ func TestRuleRegistry_CreateRuleManager_SpecificRules(t *testing.T) {
 	invalidRules := []string{"warehouse_rule", "non_existent_rule"}
 	manager, err = registry.CreateRuleManager(client, invalidRules)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "rule 'non_existent_rule' not found in registry")
+	assert.Contains(t, err.Error(), "rule not found: non_existent_rule")
 	assert.Nil(t, manager)
 }
 
