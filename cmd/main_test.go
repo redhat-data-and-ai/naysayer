@@ -34,9 +34,8 @@ func createTestApplication() *fiber.App {
 	}
 
 	// Create handlers
-	webhookHandler := webhook.NewWebhookHandler(cfg)
+	webhookHandler := webhook.NewDataProductConfigMrReviewHandler(cfg)
 	healthHandler := webhook.NewHealthHandler(cfg)
-	managementHandler := webhook.NewManagementHandler(cfg)
 
 	// Create Fiber app with same config as main
 	app := fiber.New(fiber.Config{
@@ -59,11 +58,7 @@ func createTestApplication() *fiber.App {
 	app.Get("/health", healthHandler.HandleHealth)
 	app.Get("/ready", healthHandler.HandleReady)
 
-	// Management API routes (same as main)
-	app.Get("/api/system", managementHandler.HandleSystemInfo)
-	app.Get("/api/rules", managementHandler.HandleRules)
-	app.Get("/api/rules/enabled", managementHandler.HandleRulesEnabled)
-	app.Get("/api/rules/category/:category", managementHandler.HandleRulesByCategory)
+
 
 	// Webhook routes (same as main)
 	app.Post("/dataverse-product-config-review", webhookHandler.HandleWebhook)
@@ -114,60 +109,7 @@ func TestApplication_HealthEndpoints(t *testing.T) {
 	}
 }
 
-func TestApplication_ManagementEndpoints(t *testing.T) {
-	app := createTestApplication()
 
-	tests := []struct {
-		name         string
-		method       string
-		path         string
-		expectedCode int
-	}{
-		{
-			name:         "System info endpoint",
-			method:       "GET",
-			path:         "/api/system",
-			expectedCode: 200,
-		},
-		{
-			name:         "Rules endpoint",
-			method:       "GET",
-			path:         "/api/rules",
-			expectedCode: 200,
-		},
-		{
-			name:         "Enabled rules endpoint",
-			method:       "GET",
-			path:         "/api/rules/enabled",
-			expectedCode: 200,
-		},
-		{
-			name:         "Category rules endpoint",
-			method:       "GET",
-			path:         "/api/rules/category/warehouse",
-			expectedCode: 200,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
-			resp, err := app.Test(req)
-
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedCode, resp.StatusCode)
-
-			// Verify response is JSON
-			assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
-
-			// Parse and verify basic structure
-			body, _ := io.ReadAll(resp.Body)
-			var response map[string]interface{}
-			err = json.Unmarshal(body, &response)
-			assert.NoError(t, err)
-		})
-	}
-}
 
 func TestApplication_WebhookEndpoint(t *testing.T) {
 	app := createTestApplication()
@@ -210,7 +152,7 @@ func TestApplication_WebhookEndpoint(t *testing.T) {
 			path:         "/dataverse-product-config-review",
 			body:         `{"object_kind":"push","commits":[]}`,
 			contentType:  "application/json",
-			expectedCode: 200,
+			expectedCode: 400,
 		},
 	}
 
@@ -365,38 +307,7 @@ func TestApplication_HealthCheck_Integration(t *testing.T) {
 	assert.NotNil(t, health["timestamp"])
 }
 
-func TestApplication_SystemInfo_Integration(t *testing.T) {
-	app := createTestApplication()
 
-	// Test system info endpoint response structure
-	req := httptest.NewRequest("GET", "/api/system", nil)
-	resp, err := app.Test(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-
-	body, _ := io.ReadAll(resp.Body)
-	var system map[string]interface{}
-	json.Unmarshal(body, &system)
-
-	// Verify system response has expected fields
-	assert.Equal(t, "naysayer-webhook", system["service"])
-	assert.Equal(t, "v1.0.0", system["version"])
-	assert.NotNil(t, system["rule_system"])
-
-	// Check endpoints list matches main.go
-	endpoints := system["endpoints"].([]interface{})
-	expectedEndpoints := []string{
-		"/health",
-		"/ready",
-		"/webhook",
-		"/api/rules",
-		"/api/rules/enabled",
-		"/api/rules/category/:category",
-		"/api/system",
-	}
-	assert.Len(t, endpoints, len(expectedEndpoints))
-}
 
 func TestApplication_RouteConfiguration(t *testing.T) {
 	app := createTestApplication()
@@ -405,10 +316,6 @@ func TestApplication_RouteConfiguration(t *testing.T) {
 	expectedRoutes := map[string]string{
 		"GET:/health":                           "200",
 		"GET:/ready":                            "200",
-		"GET:/api/system":                       "200",
-		"GET:/api/rules":                        "200",
-		"GET:/api/rules/enabled":                "200",
-		"GET:/api/rules/category/warehouse":     "200",
 		"POST:/dataverse-product-config-review": "200", // Will return 200 even with API failure
 	}
 

@@ -88,7 +88,7 @@ func TestHasGitLabToken(t *testing.T) {
 	}{
 		{
 			name:     "with valid token",
-			token:    "glpat-xxxxxxxxxxxxxxxxxxxx",
+			token:    "glpat-mock-token-for-testing",
 			expected: true,
 		},
 		{
@@ -125,7 +125,7 @@ func TestAnalysisMode(t *testing.T) {
 	}{
 		{
 			name:     "with GitLab token",
-			token:    "glpat-xxxxxxxxxxxxxxxxxxxx",
+			token:    "glpat-mock-token-for-testing",
 			expected: "Full YAML analysis",
 		},
 		{
@@ -470,7 +470,7 @@ func TestConfigIntegration_RealWorldScenarios(t *testing.T) {
 			name: "development configuration",
 			envVars: map[string]string{
 				"GITLAB_BASE_URL": "https://gitlab.com",
-				"GITLAB_TOKEN":    "glpat-dev-token",
+				"GITLAB_TOKEN": "glpat-mock-token-for-testing",
 				"PORT":            "3000",
 				"WEBHOOK_VERIFY":  "false",
 			},

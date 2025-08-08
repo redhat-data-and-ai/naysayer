@@ -102,7 +102,9 @@ install:
 	@echo "✅ Dependencies installed"
 
 # Build Docker image
-docker:
+docker-build:
 	@echo "Building Docker image..."
 	docker build -t naysayer:latest .
 	@echo "✅ Docker image built: naysayer:latest"
+
+

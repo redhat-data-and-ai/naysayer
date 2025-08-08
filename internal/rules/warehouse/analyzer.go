@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
 )
 
@@ -63,7 +64,7 @@ func (a *Analyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileCha
 		}
 
 		// Only analyze dataproduct YAML files
-		if !a.isDataProductFile(change.NewPath) {
+		if !shared.IsDataProductFile(change.NewPath) {
 			continue
 		}
 
@@ -79,16 +80,6 @@ func (a *Analyzer) AnalyzeChanges(projectID, mrIID int, changes []gitlab.FileCha
 	}
 
 	return warehouseChanges, nil
-}
-
-// isDataProductFile checks if a file is a dataproduct configuration file
-func (a *Analyzer) isDataProductFile(path string) bool {
-	if path == "" {
-		return false
-	}
-
-	lowerPath := strings.ToLower(path)
-	return strings.HasSuffix(lowerPath, "product.yaml") || strings.HasSuffix(lowerPath, "product.yml")
 }
 
 // analyzeFileChange fetches complete file content and compares YAML structures

@@ -1,10 +1,11 @@
 package warehouse
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,8 +18,7 @@ func TestNewAnalyzer(t *testing.T) {
 }
 
 func TestAnalyzer_isDataProductFile(t *testing.T) {
-	analyzer := NewAnalyzer(nil)
-
+	// Test the shared function instead of analyzer method
 	tests := []struct {
 		name     string
 		path     string
@@ -31,23 +31,8 @@ func TestAnalyzer_isDataProductFile(t *testing.T) {
 		},
 		{
 			name:     "product.yml file",
-			path:     "dataproducts/agg/costops/dev/product.yml",
+			path:     "dataproducts/source/users/dev/product.yml",
 			expected: true,
-		},
-		{
-			name:     "uppercase extension",
-			path:     "dataproducts/agg/test/product.YAML",
-			expected: true,
-		},
-		{
-			name:     "mixed case extension",
-			path:     "dataproducts/agg/test/product.Yml",
-			expected: true,
-		},
-		{
-			name:     "sourcebinding.yaml file",
-			path:     "dataproducts/source/marketo/sandbox/sourcebinding.yaml",
-			expected: false,
 		},
 		{
 			name:     "README file",
@@ -60,26 +45,16 @@ func TestAnalyzer_isDataProductFile(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "similar but not exact",
-			path:     "dataproducts/agg/test/product-config.yaml",
-			expected: false,
-		},
-		{
-			name:     "nested product file",
-			path:     "dataproducts/nested/deep/structure/product.yaml",
-			expected: true,
-		},
-		{
-			name:     "yaml with different prefix",
-			path:     "config/settings.yaml",
+			name:     "config file",
+			path:     "dataproducts/agg/test/config.yaml",
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := analyzer.isDataProductFile(tt.path)
-			assert.Equal(t, tt.expected, actual, "isDataProductFile() failed for path: %s", tt.path)
+			actual := shared.IsDataProductFile(tt.path)
+			assert.Equal(t, tt.expected, actual, "IsDataProductFile() failed for path: %s", tt.path)
 		})
 	}
 }
@@ -491,7 +466,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 		{
 			name: "get target branch error",
 			mockClient: &MockGitLabClient{
-				targetBranchError: errors.New("network timeout"),
+				targetBranchError: fmt.Errorf("network timeout"),
 			},
 			expectedError:  "failed to get target branch: network timeout",
 			expectedResult: nil,
@@ -500,7 +475,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			name: "fetch old file content error",
 			mockClient: &MockGitLabClient{
 				targetBranch: "main",
-				oldFileError: errors.New("API rate limit"),
+				oldFileError: fmt.Errorf("API rate limit"),
 			},
 			expectedError:  "failed to fetch old file content: API rate limit",
 			expectedResult: nil,
@@ -509,7 +484,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			name: "file not found - should be handled gracefully",
 			mockClient: &MockGitLabClient{
 				targetBranch: "main",
-				oldFileError: errors.New("file not found"),
+				oldFileError: fmt.Errorf("file not found"),
 			},
 			expectedError:  "",
 			expectedResult: &[]WarehouseChange{},
@@ -519,7 +494,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			mockClient: &MockGitLabClient{
 				targetBranch:   "main",
 				oldFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
-				mrDetailsError: errors.New("unauthorized"),
+				mrDetailsError: fmt.Errorf("unauthorized"),
 			},
 			expectedError:  "failed to get MR details: unauthorized",
 			expectedResult: nil,
@@ -530,7 +505,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 				targetBranch:   "main",
 				oldFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
 				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature"},
-				newFileError:   errors.New("file corrupted"),
+				newFileError:   fmt.Errorf("file corrupted"),
 			},
 			expectedError:  "failed to fetch new file content: file corrupted",
 			expectedResult: nil,

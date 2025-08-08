@@ -7,9 +7,12 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	GitLab  GitLabConfig
-	Server  ServerConfig
-	Webhook WebhookConfig
+	GitLab   GitLabConfig
+	Server   ServerConfig
+	Webhook  WebhookConfig
+	Comments CommentsConfig
+	Rules    RulesConfig
+	Approval ApprovalConfig
 }
 
 // GitLabConfig holds GitLab API configuration
@@ -30,6 +33,57 @@ type WebhookConfig struct {
 	AllowedIPs         []string // Optional: restrict webhook calls to specific IPs
 }
 
+// CommentsConfig holds MR comments and messages configuration
+type CommentsConfig struct {
+	EnableMRComments bool   // Enable/disable MR commenting
+	CommentVerbosity string // Comment verbosity level (basic, detailed, debug)
+}
+
+// RulesConfig holds rule-specific configuration
+type RulesConfig struct {
+	EnabledRules        []string // List of enabled rule names
+	DisabledRules       []string // List of disabled rule names
+	WarehouseRule       WarehouseRuleConfig
+	ServiceAccountRule  ServiceAccountRuleConfig
+	MigrationsRule      MigrationsRuleConfig
+	NamingRule          NamingRuleConfig
+}
+
+// WarehouseRuleConfig holds warehouse-specific configuration
+type WarehouseRuleConfig struct {
+	AllowTOCBypass      bool     // Allow bypassing TOC approval for specific cases
+	PlatformEnvironments []string // Environments requiring platform approval
+	AutoApproveEnvs     []string // Environments allowing auto-approval
+}
+
+// ServiceAccountRuleConfig holds service account validation configuration
+type ServiceAccountRuleConfig struct {
+	ValidateEmailFormat    bool     // Enable email format validation
+	RequireIndividualEmail bool     // Require individual vs group emails
+	AllowedDomains        []string // Allowed email domains
+}
+
+// MigrationsRuleConfig holds migrations validation configuration  
+type MigrationsRuleConfig struct {
+	RequirePlatformApproval bool // Always require platform approval
+	AllowSelfServicePaths   []string // Paths that allow self-service migrations
+}
+
+// NamingRuleConfig holds naming conventions configuration
+type NamingRuleConfig struct {
+	ValidateTagMatching     bool // Validate data_product tag matches product name
+	EnforceNamingConventions bool // Enforce naming conventions
+}
+
+// ApprovalConfig holds approval workflow configuration
+type ApprovalConfig struct {
+	EnableAutoApproval    bool   // Enable auto-approval functionality
+	EnableTOCWorkflow     bool   // Enable TOC approval workflow
+	EnablePlatformWorkflow bool  // Enable platform approval workflow
+	TOCGroupID            string // GitLab group ID for TOC team
+	PlatformGroupID       string // GitLab group ID for platform team
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -44,6 +98,39 @@ func Load() *Config {
 			Secret:             getEnv("WEBHOOK_SECRET", ""),
 			EnableVerification: getEnv("WEBHOOK_VERIFY", "true") == "true",
 			AllowedIPs:         parseIPList(getEnv("WEBHOOK_ALLOWED_IPS", "")),
+		},
+		Comments: CommentsConfig{
+			EnableMRComments: getEnv("ENABLE_MR_COMMENTS", "true") == "true",
+			CommentVerbosity: getEnv("COMMENT_VERBOSITY", "detailed"),
+		},
+		Rules: RulesConfig{
+			EnabledRules:  parseStringList(getEnv("ENABLED_RULES", "")),
+			DisabledRules: parseStringList(getEnv("DISABLED_RULES", "")),
+			WarehouseRule: WarehouseRuleConfig{
+				AllowTOCBypass:       getEnv("WAREHOUSE_ALLOW_TOC_BYPASS", "false") == "true",
+				PlatformEnvironments: parseStringList(getEnv("WAREHOUSE_PLATFORM_ENVS", "preprod,prod")),
+				AutoApproveEnvs:      parseStringList(getEnv("WAREHOUSE_AUTO_APPROVE_ENVS", "dev,sandbox")),
+			},
+			ServiceAccountRule: ServiceAccountRuleConfig{
+				ValidateEmailFormat:    getEnv("SA_VALIDATE_EMAIL", "true") == "true",
+				RequireIndividualEmail: getEnv("SA_REQUIRE_INDIVIDUAL_EMAIL", "true") == "true",
+				AllowedDomains:         parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
+			},
+			MigrationsRule: MigrationsRuleConfig{
+				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",
+				AllowSelfServicePaths:   parseStringList(getEnv("MIGRATIONS_SELF_SERVICE_PATHS", "")),
+			},
+			NamingRule: NamingRuleConfig{
+				ValidateTagMatching:      getEnv("NAMING_VALIDATE_TAGS", "true") == "true",
+				EnforceNamingConventions: getEnv("NAMING_ENFORCE_CONVENTIONS", "true") == "true",
+			},
+		},
+		Approval: ApprovalConfig{
+			EnableAutoApproval:     getEnv("ENABLE_AUTO_APPROVAL", "true") == "true",
+			EnableTOCWorkflow:      getEnv("ENABLE_TOC_WORKFLOW", "true") == "true",
+			EnablePlatformWorkflow: getEnv("ENABLE_PLATFORM_WORKFLOW", "true") == "true",
+			TOCGroupID:            getEnv("TOC_GROUP_ID", ""),
+			PlatformGroupID:       getEnv("PLATFORM_GROUP_ID", ""),
 		},
 	}
 }
@@ -93,6 +180,21 @@ func parseIPList(ipString string) []string {
 	result := make([]string, 0) // Initialize to empty slice, not nil
 	for _, ip := range ips {
 		if trimmed := strings.TrimSpace(ip); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// parseStringList parses a comma-separated list of strings
+func parseStringList(s string) []string {
+	if s == "" {
+		return []string{}
+	}
+	items := strings.Split(s, ",")
+	result := make([]string, 0) // Initialize to empty slice, not nil
+	for _, item := range items {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
 			result = append(result, trimmed)
 		}
 	}

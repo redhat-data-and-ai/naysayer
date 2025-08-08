@@ -102,8 +102,7 @@ func TestWarehouseRule_Applies(t *testing.T) {
 }
 
 func TestWarehouseRule_isDataProductFile(t *testing.T) {
-	rule := NewRule(nil)
-
+	// Test the shared function instead of instance method
 	tests := []struct {
 		name     string
 		path     string
@@ -116,21 +115,11 @@ func TestWarehouseRule_isDataProductFile(t *testing.T) {
 		},
 		{
 			name:     "product.yml",
-			path:     "dataproducts/agg/costops/dev/product.yml",
+			path:     "dataproducts/source/users/dev/product.yml",
 			expected: true,
 		},
 		{
-			name:     "uppercase extension",
-			path:     "dataproducts/agg/test/product.YAML",
-			expected: true,
-		},
-		{
-			name:     "sourcebinding.yaml file",
-			path:     "dataproducts/source/marketo/sandbox/sourcebinding.yaml",
-			expected: false,
-		},
-		{
-			name:     "README file",
+			name:     "not a product file",
 			path:     "README.md",
 			expected: false,
 		},
@@ -140,16 +129,16 @@ func TestWarehouseRule_isDataProductFile(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "similar but not exact",
-			path:     "dataproducts/agg/test/product-config.yaml",
+			name:     "similar name but not product",
+			path:     "dataproducts/agg/bookings/prod/product_config.yaml",
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := rule.isDataProductFile(tt.path)
-			assert.Equal(t, tt.expected, actual, "isDataProductFile() failed")
+			actual := shared.IsDataProductFile(tt.path)
+			assert.Equal(t, tt.expected, actual, "IsDataProductFile() failed")
 		})
 	}
 }

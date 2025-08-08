@@ -6,7 +6,6 @@ import (
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
-	"github.com/redhat-data-and-ai/naysayer/internal/rules/source"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
 
@@ -54,17 +53,6 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "warehouse",
 	})
 
-	// Source binding rule
-	r.RegisterRule(&RuleInfo{
-		Name:        "source_binding_rule",
-		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding)",
-		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
-			return source.NewRule(client)
-		},
-		Enabled:  true, // Now fully implemented
-		Category: "source",
-	})
 }
 
 // RegisterRule registers a new rule in the registry
@@ -155,11 +143,13 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
 func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.RuleManager {
-	// For dataverse, we want specific rules
+	// For dataverse, we want specific rules that are actually implemented
 	dataverseRules := []string{
 		"warehouse_rule",
-		"source_binding_rule",
-		// Add more dataverse-specific rules here as they're implemented
+		// TODO: Add back when implemented:
+		// "service_account_rule",
+		// "migrations_rule",
+		// "naming_conventions_rule",
 	}
 
 	manager, err := r.CreateRuleManager(client, dataverseRules)

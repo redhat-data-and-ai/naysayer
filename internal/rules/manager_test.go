@@ -115,20 +115,12 @@ func TestSimpleRuleManager_EvaluateAll_AllRulesApprove(t *testing.T) {
 		decision: shared.Approve,
 		reason:   "Auto-approving MR with only 2 warehouse changes",
 	}
-	rule2 := &MockRule{
-		name:     "source_binding_rule",
-		applies:  true,
-		decision: shared.Approve,
-		reason:   "Auto-approving MR with only 1 sourcebinding changes",
-	}
 	manager.AddRule(rule1)
-	manager.AddRule(rule2)
 
 	mrCtx := &shared.MRContext{
 		MRInfo: &gitlab.MRInfo{Title: "Update configs", Author: "user"},
 		Changes: []gitlab.FileChange{
 			{NewPath: "dataproducts/agg/test/product.yaml"},
-			{NewPath: "dataproducts/source/test/sourcebinding.yaml"},
 		},
 	}
 
@@ -139,8 +131,7 @@ func TestSimpleRuleManager_EvaluateAll_AllRulesApprove(t *testing.T) {
 	assert.Equal(t, "✅ All rules approved", result.FinalDecision.Summary)
 	assert.Contains(t, result.FinalDecision.Details, "Rule evaluations:")
 	assert.Contains(t, result.FinalDecision.Details, "warehouse_rule:")
-	assert.Contains(t, result.FinalDecision.Details, "source_binding_rule:")
-	assert.Equal(t, 2, len(result.RuleResults), "Should have results from both rules")
+	assert.Equal(t, 1, len(result.RuleResults), "Should have results from the rule")
 
 	// Check individual rule results
 	assert.Equal(t, "warehouse_rule", result.RuleResults[0].RuleName)
@@ -148,14 +139,8 @@ func TestSimpleRuleManager_EvaluateAll_AllRulesApprove(t *testing.T) {
 	assert.Equal(t, "✅ warehouse_rule approved", result.RuleResults[0].Decision.Summary)
 	assert.Equal(t, 1.0, result.RuleResults[0].Confidence)
 
-	assert.Equal(t, "source_binding_rule", result.RuleResults[1].RuleName)
-	assert.Equal(t, shared.Approve, result.RuleResults[1].Decision.Type)
-	assert.Equal(t, "✅ source_binding_rule approved", result.RuleResults[1].Decision.Summary)
-
 	assert.True(t, rule1.applyWasCalled, "Apply should be called")
 	assert.True(t, rule1.shouldApproveWasCalled, "ShouldApprove should be called")
-	assert.True(t, rule2.applyWasCalled, "Apply should be called")
-	assert.True(t, rule2.shouldApproveWasCalled, "ShouldApprove should be called")
 }
 
 func TestSimpleRuleManager_EvaluateAll_OneRuleRequiresManualReview(t *testing.T) {
@@ -167,7 +152,7 @@ func TestSimpleRuleManager_EvaluateAll_OneRuleRequiresManualReview(t *testing.T)
 		reason:   "Auto-approving warehouse changes",
 	}
 	rule2 := &MockRule{
-		name:     "source_binding_rule",
+		name:     "second_rule",
 		applies:  true,
 		decision: shared.ManualReview,
 		reason:   "MR contains non-dataverse file changes",
@@ -197,7 +182,7 @@ func TestSimpleRuleManager_EvaluateAll_OneRuleRequiresManualReview(t *testing.T)
 	assert.Equal(t, "🚫 Manual review required", result.FinalDecision.Summary)
 	assert.Contains(t, result.FinalDecision.Details, "Rule evaluations:")
 	assert.Contains(t, result.FinalDecision.Details, "warehouse_rule:")
-	assert.Contains(t, result.FinalDecision.Details, "source_binding_rule:")
+	assert.Contains(t, result.FinalDecision.Details, "second_rule:")
 
 	// Should have results from first two rules (stops at manual review)
 	assert.Equal(t, 2, len(result.RuleResults), "Should stop evaluation after manual review")
@@ -325,13 +310,13 @@ func TestSimpleRuleManager_createDetailsFromResults(t *testing.T) {
 					},
 				},
 				{
-					RuleName: "source_binding_rule",
+					RuleName: "second_rule",
 					Decision: shared.Decision{
 						Reason: "Manual review required",
 					},
 				},
 			},
-			expected: "Rule evaluations:\n- warehouse_rule: Auto-approving warehouse changes\n- source_binding_rule: Manual review required\n",
+			expected: "Rule evaluations:\n- warehouse_rule: Auto-approving warehouse changes\n- second_rule: Manual review required\n",
 		},
 	}
 

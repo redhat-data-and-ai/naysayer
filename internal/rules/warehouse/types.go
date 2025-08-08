@@ -8,6 +8,14 @@ type WarehouseChange struct {
 	IsDecrease bool
 }
 
+// ValidationResult represents warehouse validation outcome
+type ValidationResult struct {
+	IsValid      bool
+	Issues       []string
+	RequiresTOC  bool
+	RequiresPlatform bool
+}
+
 // WarehouseSizes maps warehouse size names to numeric values for comparison
 // Complete Snowflake warehouse size hierarchy
 var WarehouseSizes = map[string]int{

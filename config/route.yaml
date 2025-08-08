@@ -2,9 +2,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: naysayer
-  labels:
-    app: naysayer
-    component: webhook
+  namespace: ddis-asteroid--naysayer
 spec:
   host: naysayer-webhook.your-domain.com  # Update with your actual domain
   to:
@@ -12,7 +10,7 @@ spec:
     name: naysayer
     weight: 100
   port:
-    targetPort: http
+    targetPort: https
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect

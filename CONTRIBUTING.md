@@ -7,7 +7,7 @@ Welcome to NAYSAYER! This guide will help you understand the codebase structure 
 ### Root Directory
 ```
 ├── cmd/                    # Application entry points
-├── config/                 # Kubernetes/OpenShift configuration files
+├── config/                 # OpenShift deployment manifests
 ├── docs/                   # Project documentation
 ├── internal/               # Private application code
 ├── vendor/                 # Go module dependencies (vendored)

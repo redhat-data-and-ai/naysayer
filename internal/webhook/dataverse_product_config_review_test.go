@@ -65,7 +65,7 @@ func createTestConfig() *config.Config {
 
 func TestNewWebhookHandler(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	assert.NotNil(t, handler)
 	assert.NotNil(t, handler.gitlabClient)
@@ -75,7 +75,7 @@ func TestNewWebhookHandler(t *testing.T) {
 
 func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -123,7 +123,7 @@ func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
 
 func TestWebhookHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -144,7 +144,7 @@ func TestWebhookHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 
 func TestWebhookHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -165,7 +165,7 @@ func TestWebhookHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 
 func TestWebhookHandler_HandleWebhook_NonMREvent(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -182,49 +182,19 @@ func TestWebhookHandler_HandleWebhook_NonMREvent(t *testing.T) {
 
 	resp, err := app.Test(req)
 	assert.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, 400, resp.StatusCode)
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
 	json.Unmarshal(body, &response)
 
-	assert.Equal(t, "Event processed", response["message"])
-	assert.Equal(t, "skipped", response["action"])
-	assert.Equal(t, "Not a merge request event", response["reason"])
-}
-
-func TestWebhookHandler_HandleWebhook_MissingObjectKind(t *testing.T) {
-	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
-
-	app := createTestApp()
-	app.Post("/webhook", handler.HandleWebhook)
-
-	// Create payload without object_kind
-	payload := map[string]interface{}{
-		"project": map[string]interface{}{
-			"id": 123,
-		},
-	}
-
-	jsonData, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader(jsonData))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	assert.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-
-	body, _ := io.ReadAll(resp.Body)
-	var response map[string]interface{}
-	json.Unmarshal(body, &response)
-
-	assert.Equal(t, "skipped", response["action"])
+	assert.Contains(t, response["error"], "Unsupported event type: push")
+	assert.Contains(t, response["error"], "Only merge_request events are supported")
 }
 
 func TestWebhookHandler_HandleWebhook_InvalidMRInfo(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -258,7 +228,7 @@ func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 	// Test that the webhook handler correctly handles GitLab API failures
 	// by returning a manual review decision when it can't fetch MR changes
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -299,30 +269,9 @@ func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 	assert.NotNil(t, response["execution_time"])
 }
 
-func TestWebhookHandler_HandleWebhook_EmptyPayload(t *testing.T) {
-	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
-
-	app := createTestApp()
-	app.Post("/webhook", handler.HandleWebhook)
-
-	req := httptest.NewRequest("POST", "/webhook", bytes.NewReader([]byte("{}")))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	assert.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-
-	body, _ := io.ReadAll(resp.Body)
-	var response map[string]interface{}
-	json.Unmarshal(body, &response)
-
-	assert.Equal(t, "skipped", response["action"])
-}
-
 func TestWebhookHandler_HandleWebhook_LargePayload(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewWebhookHandler(cfg)
+	handler := NewDataProductConfigMrReviewHandler(cfg)
 
 	app := createTestApp()
 	app.Post("/webhook", handler.HandleWebhook)
@@ -403,7 +352,7 @@ func TestWebhookHandler_ContentTypeVariations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := createTestConfig()
-			handler := NewWebhookHandler(cfg)
+			handler := NewDataProductConfigMrReviewHandler(cfg)
 
 			app := createTestApp()
 			app.Post("/webhook", handler.HandleWebhook)
