@@ -88,6 +88,21 @@ func TestWarehouseRule_Applies(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "sourcebinding files should apply rule",
+			changes: []gitlab.FileChange{
+				{NewPath: "dataproducts/source/test/sourcebinding.yaml"},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed sourcebinding and non-dataverse files should apply rule",
+			changes: []gitlab.FileChange{
+				{NewPath: "dataproducts/source/test/sourcebinding.yaml"},
+				{NewPath: "README.md"},
+			},
+			expected: true, // CRITICAL: Must apply to catch mixed changes
+		},
 	}
 
 	for _, tt := range tests {
@@ -101,47 +116,7 @@ func TestWarehouseRule_Applies(t *testing.T) {
 	}
 }
 
-func TestWarehouseRule_isDataProductFile(t *testing.T) {
-	// Test the shared function instead of instance method
-	tests := []struct {
-		name     string
-		path     string
-		expected bool
-	}{
-		{
-			name:     "product.yaml",
-			path:     "dataproducts/agg/bookings/prod/product.yaml",
-			expected: true,
-		},
-		{
-			name:     "product.yml",
-			path:     "dataproducts/source/users/dev/product.yml",
-			expected: true,
-		},
-		{
-			name:     "not a product file",
-			path:     "README.md",
-			expected: false,
-		},
-		{
-			name:     "empty path",
-			path:     "",
-			expected: false,
-		},
-		{
-			name:     "similar name but not product",
-			path:     "dataproducts/agg/bookings/prod/product_config.yaml",
-			expected: false,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := shared.IsDataProductFile(tt.path)
-			assert.Equal(t, tt.expected, actual, "IsDataProductFile() failed")
-		})
-	}
-}
 
 func TestWarehouseRule_ShouldApprove(t *testing.T) {
 	tests := []struct {
@@ -196,7 +171,18 @@ func TestWarehouseRule_ShouldApprove(t *testing.T) {
 				{NewPath: "README.md"},
 			},
 			expectedDecision: shared.ManualReview,
-			expectedReason:   "MR contains non-dataverse file changes",
+			expectedReason:   "MR contains changes outside the allowed scope of the warehouse rule",
+		},
+		{
+			name:   "CRITICAL: sourcebinding with non-dataverse files should require manual review",
+			client: &gitlab.Client{},
+			changes: []gitlab.FileChange{
+				{NewPath: "dataproducts/source/test/sourcebinding.yaml"},
+				{NewPath: "README.md"},
+				{NewPath: "scripts/deploy.sh"},
+			},
+			expectedDecision: shared.ManualReview,
+			expectedReason:   "MR contains changes outside the allowed scope of the warehouse rule",
 		},
 	}
 
@@ -474,6 +460,70 @@ func TestWarehouseRule_evaluateWarehouseChanges(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Warehouse increase detected: SMALL → XLARGE in dataproducts/agg/test2/product.yaml (type: snowflake)",
+		},
+		{
+			name: "new warehouse creation",
+			changes: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/rosettastone/dev/product.yaml (type: user)",
+					FromSize:   "",
+					ToSize:     "XSMALL",
+					IsDecrease: false,
+				},
+			},
+			expectedDecision: shared.ManualReview,
+			expectedReason:   "New warehouse creation detected: XSMALL in dataproducts/agg/rosettastone/dev/product.yaml (type: user)",
+		},
+		{
+			name: "multiple new warehouse creation",
+			changes: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/rosettastone/dev/product.yaml (type: user)",
+					FromSize:   "",
+					ToSize:     "XSMALL",
+					IsDecrease: false,
+				},
+				{
+					FilePath:   "dataproducts/agg/rosettastone/dev/product.yaml (type: service_account)",
+					FromSize:   "",
+					ToSize:     "XSMALL",
+					IsDecrease: false,
+				},
+			},
+			expectedDecision: shared.ManualReview,
+			expectedReason:   "New warehouse creation detected: XSMALL in dataproducts/agg/rosettastone/dev/product.yaml (type: user)",
+		},
+		{
+			name: "non-warehouse changes detected",
+			changes: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/source/ciam/dev/product.yaml (non-warehouse changes)",
+					FromSize:   "N/A",
+					ToSize:     "N/A",
+					IsDecrease: false,
+				},
+			},
+			expectedDecision: shared.ManualReview,
+			expectedReason:   "Non-warehouse changes detected in dataproducts/source/ciam/dev/product.yaml",
+		},
+		{
+			name: "warehouse decrease with non-warehouse changes",
+			changes: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (type: snowflake)",
+					FromSize:   "LARGE",
+					ToSize:     "MEDIUM",
+					IsDecrease: true,
+				},
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (non-warehouse changes)",
+					FromSize:   "N/A",
+					ToSize:     "N/A",
+					IsDecrease: false,
+				},
+			},
+			expectedDecision: shared.ManualReview,
+			expectedReason:   "Non-warehouse changes detected in dataproducts/agg/test/product.yaml",
 		},
 	}
 

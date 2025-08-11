@@ -59,10 +59,6 @@ func (mb *MessageBuilder) BuildManualReviewComment(result *shared.RuleEvaluation
 	default: // "detailed"
 		comment.WriteString(mb.buildDetailedManualReviewSummary(result))
 	}
-
-	// Footer
-	comment.WriteString("\n🤖 *Automated by NAYSAYER v1.0.0*")
-
 	return comment.String()
 }
 

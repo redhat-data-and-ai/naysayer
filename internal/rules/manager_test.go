@@ -155,7 +155,7 @@ func TestSimpleRuleManager_EvaluateAll_OneRuleRequiresManualReview(t *testing.T)
 		name:     "second_rule",
 		applies:  true,
 		decision: shared.ManualReview,
-		reason:   "MR contains non-dataverse file changes",
+		reason:   "MR contains changes outside the allowed scope of the warehouse rule",
 	}
 	rule3 := &MockRule{
 		name:     "third_rule",

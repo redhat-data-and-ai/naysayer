@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
-	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,47 +16,7 @@ func TestNewAnalyzer(t *testing.T) {
 	assert.Equal(t, client, analyzer.gitlabClient)
 }
 
-func TestAnalyzer_isDataProductFile(t *testing.T) {
-	// Test the shared function instead of analyzer method
-	tests := []struct {
-		name     string
-		path     string
-		expected bool
-	}{
-		{
-			name:     "product.yaml file",
-			path:     "dataproducts/agg/bookings/prod/product.yaml",
-			expected: true,
-		},
-		{
-			name:     "product.yml file",
-			path:     "dataproducts/source/users/dev/product.yml",
-			expected: true,
-		},
-		{
-			name:     "README file",
-			path:     "README.md",
-			expected: false,
-		},
-		{
-			name:     "empty path",
-			path:     "",
-			expected: false,
-		},
-		{
-			name:     "config file",
-			path:     "dataproducts/agg/test/config.yaml",
-			expected: false,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			actual := shared.IsDataProductFile(tt.path)
-			assert.Equal(t, tt.expected, actual, "IsDataProductFile() failed for path: %s", tt.path)
-		})
-	}
-}
 
 func TestAnalyzer_parseDataProduct(t *testing.T) {
 	analyzer := NewAnalyzer(nil)
@@ -317,7 +276,14 @@ func TestAnalyzer_compareWarehouses(t *testing.T) {
 					{Type: "redshift", Size: "LARGE"},
 				},
 			},
-			expected: []WarehouseChange{},
+			expected: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (type: redshift)",
+					FromSize:   "",
+					ToSize:     "LARGE",
+					IsDecrease: false,
+				},
+			},
 		},
 		{
 			name: "warehouse removed",
@@ -359,6 +325,32 @@ func TestAnalyzer_compareWarehouses(t *testing.T) {
 			expected: []WarehouseChange{},
 		},
 		{
+			name: "new file with warehouses (like rosettastone)",
+			oldDP: &DataProduct{
+				Warehouses: []Warehouse{}, // Empty - new file scenario
+			},
+			newDP: &DataProduct{
+				Warehouses: []Warehouse{
+					{Type: "user", Size: "XSMALL"},
+					{Type: "service_account", Size: "XSMALL"},
+				},
+			},
+			expected: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (type: user)",
+					FromSize:   "",
+					ToSize:     "XSMALL",
+					IsDecrease: false,
+				},
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (type: service_account)",
+					FromSize:   "",
+					ToSize:     "XSMALL",
+					IsDecrease: false,
+				},
+			},
+		},
+		{
 			name: "extreme size changes",
 			oldDP: &DataProduct{
 				Warehouses: []Warehouse{
@@ -392,7 +384,7 @@ func TestAnalyzer_compareWarehouses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := analyzer.compareWarehouses(filePath, tt.oldDP, tt.newDP)
-			assert.Equal(t, tt.expected, result, "compareWarehouses() result mismatch")
+			assert.ElementsMatch(t, tt.expected, result, "compareWarehouses() result mismatch")
 		})
 	}
 }
@@ -617,4 +609,100 @@ func (m *MockGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails
 		return nil, m.mrDetailsError
 	}
 	return m.mrDetails, nil
+}
+
+func TestAnalyzer_hasNonWarehouseChanges(t *testing.T) {
+	analyzer := NewAnalyzer(nil)
+
+	tests := []struct {
+		name       string
+		oldContent string
+		newContent string
+		oldDP      *DataProduct
+		newDP      *DataProduct
+		expected   bool
+	}{
+		{
+			name: "only warehouse size changes",
+			oldContent: `name: test
+warehouses:
+  - type: snowflake
+    size: LARGE
+tags:
+  data_product: test`,
+			newContent: `name: test
+warehouses:
+  - type: snowflake
+    size: MEDIUM
+tags:
+  data_product: test`,
+			oldDP: &DataProduct{
+				Name: "test",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
+				Tags: Tags{DataProduct: "test"},
+			},
+			newDP: &DataProduct{
+				Name: "test",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "MEDIUM"}},
+				Tags: Tags{DataProduct: "test"},
+			},
+			expected: false,
+		},
+		{
+			name: "name change detected",
+			oldContent: `name: old-name
+warehouses:
+  - type: snowflake
+    size: LARGE`,
+			newContent: `name: new-name
+warehouses:
+  - type: snowflake
+    size: LARGE`,
+			oldDP: &DataProduct{
+				Name: "old-name",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
+			},
+			newDP: &DataProduct{
+				Name: "new-name",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
+			},
+			expected: true,
+		},
+		{
+			name: "consumer changes detected (unparsed field)",
+			oldContent: `name: test
+warehouses:
+  - type: snowflake
+    size: LARGE
+data_product_db:
+  - database: test_db
+    consumers:
+      - name: consumer1`,
+			newContent: `name: test
+warehouses:
+  - type: snowflake
+    size: LARGE
+data_product_db:
+  - database: test_db
+    consumers:
+      - name: consumer1
+      - name: consumer2`,
+			oldDP: &DataProduct{
+				Name: "test",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
+			},
+			newDP: &DataProduct{
+				Name: "test",
+				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := analyzer.hasNonWarehouseChanges(tt.oldContent, tt.newContent, tt.oldDP, tt.newDP)
+			assert.Equal(t, tt.expected, result, "hasNonWarehouseChanges() result mismatch")
+		})
+	}
 }

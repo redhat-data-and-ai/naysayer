@@ -159,8 +159,21 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 		return nil, fmt.Errorf("failed to parse new YAML: %v", err)
 	}
 
-	// Compare warehouse configurations
+	// Compare warehouse configurations and check for non-warehouse changes
 	changes := a.compareWarehouses(filePath, oldDP, newDP)
+	
+	// Check if there are any changes beyond warehouse sizes
+	hasNonWarehouseChanges := a.hasNonWarehouseChanges(oldContent.Content, newContent.Content, oldDP, newDP)
+	if hasNonWarehouseChanges {
+		// Add a special change to indicate non-warehouse modifications
+		changes = append(changes, WarehouseChange{
+			FilePath:   fmt.Sprintf("%s (non-warehouse changes)", filePath),
+			FromSize:   "N/A",
+			ToSize:     "N/A", 
+			IsDecrease: false, // Non-warehouse changes require manual review
+		})
+	}
+	
 	return &changes, nil
 }
 
@@ -190,7 +203,7 @@ func (a *Analyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct)
 		newWarehouses[wh.Type] = wh.Size
 	}
 
-	// Check for warehouse size changes
+	// Check for warehouse size changes and new warehouse creation
 	for whType, newSize := range newWarehouses {
 		if oldSize, exists := oldWarehouses[whType]; exists {
 			if oldSize != newSize {
@@ -207,8 +220,78 @@ func (a *Analyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct)
 					})
 				}
 			}
+		} else {
+			// New warehouse created - treat as an increase
+			if _, newExists := WarehouseSizes[newSize]; newExists {
+				changes = append(changes, WarehouseChange{
+					FilePath:   fmt.Sprintf("%s (type: %s)", filePath, whType),
+					FromSize:   "", // Empty for new warehouses
+					ToSize:     newSize,
+					IsDecrease: false, // New warehouse creation is always an increase
+				})
+			}
 		}
 	}
 
 	return changes
+}
+
+// hasNonWarehouseChanges checks if there are changes beyond warehouse sizes
+func (a *Analyzer) hasNonWarehouseChanges(oldContent, newContent string, oldDP, newDP *DataProduct) bool {
+	// Compare non-warehouse fields from the parsed struct
+	if oldDP.Name != newDP.Name ||
+		oldDP.Kind != newDP.Kind ||
+		oldDP.RoverGroup != newDP.RoverGroup ||
+		oldDP.Tags != newDP.Tags {
+		return true
+	}
+	
+	// For more comprehensive detection, we need to check if the YAML content
+	// has changes in sections we don't parse (like data_product_db, service_account, etc.)
+	// We'll do this by creating a warehouse-normalized version and comparing
+	return a.hasUnparsedFieldChanges(oldContent, newContent, oldDP, newDP)
+}
+
+// hasUnparsedFieldChanges detects changes in YAML fields we don't explicitly parse
+func (a *Analyzer) hasUnparsedFieldChanges(oldContent, newContent string, oldDP, newDP *DataProduct) bool {
+	// Create normalized versions with identical warehouse sections
+	oldNormalized := a.normalizeWarehouseSections(oldContent, oldDP, newDP)
+	newNormalized := a.normalizeWarehouseSections(newContent, newDP, newDP)
+	
+	// If the normalized versions are different, there are non-warehouse changes
+	return oldNormalized != newNormalized
+}
+
+// normalizeWarehouseSections replaces warehouse sections with a standard version
+func (a *Analyzer) normalizeWarehouseSections(content string, originalDP, targetDP *DataProduct) string {
+	// This is a simplified approach - we'll just remove warehouse sections entirely
+	// and compare the rest of the YAML
+	lines := strings.Split(content, "\n")
+	var filteredLines []string
+	
+	inWarehouseSection := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		
+		// Detect start of warehouses section
+		if strings.HasPrefix(trimmed, "warehouses:") {
+			inWarehouseSection = true
+			continue
+		}
+		
+		// Detect end of warehouses section (next top-level key or end of file)
+		if inWarehouseSection {
+			if len(trimmed) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && strings.Contains(line, ":") {
+				// This is a new top-level key
+				inWarehouseSection = false
+				filteredLines = append(filteredLines, line)
+			}
+			// Skip warehouse section lines
+			continue
+		}
+		
+		filteredLines = append(filteredLines, line)
+	}
+	
+	return strings.Join(filteredLines, "\n")
 }
