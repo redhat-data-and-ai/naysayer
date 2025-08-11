@@ -476,15 +476,18 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			mockClient: &MockGitLabClient{
 				targetBranch: "main",
 				oldFileError: fmt.Errorf("API rate limit"),
+				mrDetails:    &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 123, TargetProjectID: 123},
 			},
-			expectedError:  "failed to fetch old file content: API rate limit",
+			expectedError:  "failed to fetch old file content from target project 123, branch main: API rate limit",
 			expectedResult: nil,
 		},
 		{
 			name: "file not found - should be handled gracefully",
 			mockClient: &MockGitLabClient{
-				targetBranch: "main",
-				oldFileError: fmt.Errorf("file not found"),
+				targetBranch:   "main",
+				oldFileError:   fmt.Errorf("file not found"),
+				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 123, TargetProjectID: 123},
+				newFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
 			},
 			expectedError:  "",
 			expectedResult: &[]WarehouseChange{},
@@ -504,10 +507,10 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			mockClient: &MockGitLabClient{
 				targetBranch:   "main",
 				oldFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
-				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature"},
+				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 123, TargetProjectID: 123},
 				newFileError:   fmt.Errorf("file corrupted"),
 			},
-			expectedError:  "failed to fetch new file content: file corrupted",
+			expectedError:  "failed to fetch new file content from source project 123, branch feature: file corrupted",
 			expectedResult: nil,
 		},
 		{
@@ -515,7 +518,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			mockClient: &MockGitLabClient{
 				targetBranch:   "main",
 				oldFileContent: &gitlab.FileContent{Content: "invalid: yaml: content:"},
-				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature"},
+				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 123, TargetProjectID: 123},
 				newFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
 			},
 			expectedError:  "failed to parse old YAML:",
@@ -526,11 +529,27 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 			mockClient: &MockGitLabClient{
 				targetBranch:   "main",
 				oldFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test"},
-				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature"},
+				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 123, TargetProjectID: 123},
 				newFileContent: &gitlab.FileContent{Content: "invalid: yaml: content:"},
 			},
 			expectedError:  "failed to parse new YAML:",
 			expectedResult: nil,
+		},
+		{
+			name: "cross-fork MR - different source project",
+			mockClient: &MockGitLabClient{
+				targetBranch:   "main",
+				oldFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test\nwarehouses:\n  - type: snowflake\n    size: MEDIUM"},
+				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 456, TargetProjectID: 123},
+				newFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test\nwarehouses:\n  - type: snowflake\n    size: LARGE"},
+			},
+			expectedError:  "",
+			expectedResult: &[]WarehouseChange{{
+				FilePath:   "dataproducts/agg/test/product.yaml (type: snowflake)",
+				FromSize:   "MEDIUM",
+				ToSize:     "LARGE",
+				IsDecrease: false,
+			}},
 		},
 	}
 
@@ -554,14 +573,16 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 
 // MockGitLabClient is a test implementation of the GitLab client interface
 type MockGitLabClient struct {
-	targetBranch      string
-	targetBranchError error
-	oldFileContent    *gitlab.FileContent
-	oldFileError      error
-	newFileContent    *gitlab.FileContent
-	newFileError      error
-	mrDetails         *gitlab.MRDetails
-	mrDetailsError    error
+	targetBranch         string
+	targetBranchError    error
+	oldFileContent       *gitlab.FileContent
+	oldFileError         error
+	newFileContent       *gitlab.FileContent
+	newFileError         error
+	mrDetails            *gitlab.MRDetails
+	mrDetailsError       error
+	lastFetchProjectID   int  // Track which project ID was used for last fetch
+	lastFetchBranch      string  // Track which branch was used for last fetch
 }
 
 func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, error) {
@@ -572,6 +593,10 @@ func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, erro
 }
 
 func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, branch string) (*gitlab.FileContent, error) {
+	// Track the last fetch call
+	m.lastFetchProjectID = projectID
+	m.lastFetchBranch = branch
+	
 	// Return different content based on which branch is requested
 	// This is a simple way to distinguish between old and new content requests
 	if branch == m.targetBranch && m.oldFileError != nil {

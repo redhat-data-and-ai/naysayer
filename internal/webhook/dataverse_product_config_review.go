@@ -162,6 +162,27 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 	return nil
 }
 
+// handleManualReviewWithComments handles manual review decisions with informational comments
+func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) error {
+	messageBuilder := NewMessageBuilder(h.config)
+
+	// Add informational comment to MR if enabled
+	if h.config.Comments.EnableMRComments {
+		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
+		
+		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
+			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
+			// Continue without error - comment is nice-to-have
+		} else {
+			logging.MRInfo(mrInfo.MRIID, "Added manual review comment")
+		}
+	} else {
+		logging.MRInfo(mrInfo.MRIID, "Skipping manual review comment (comments disabled)")
+	}
+
+	return nil
+}
+
 // handleMergeRequestEvent handles traditional MR events (immediate processing)
 func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx, payload map[string]interface{}) error {
 	// Extract MR information
@@ -203,6 +224,11 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		}
 		approved = true
 	} else {
+		// Handle manual review with informational comments
+		if err := h.handleManualReviewWithComments(result, mrInfo); err != nil {
+			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
+			// Continue - comment failure shouldn't block the webhook response
+		}
 		logging.MRInfo(mrInfo.MRIID, "Manual review required", zap.String("reason", result.FinalDecision.Reason))
 	}
 

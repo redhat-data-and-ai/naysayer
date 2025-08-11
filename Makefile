@@ -90,7 +90,16 @@ install:
 # Build Docker image
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t naysayer:latest .
-	@echo "✅ Docker image built: naysayer:latest"
+	docker build -t quay.io/redhat-data-and-ai/naysayer:latest .
+	@echo "✅ Docker image built: quay.io/redhat-data-and-ai/naysayer:latest"
+
+
+docker-push:
+	docker push quay.io/redhat-data-and-ai/naysayer:latest
+	@echo "✅ Docker image pushed: quay.io/redhat-data-and-ai/naysayer:latest"
+
+
+
+
 
 

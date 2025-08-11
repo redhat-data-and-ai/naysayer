@@ -3,8 +3,12 @@ kind: Route
 metadata:
   name: naysayer
   namespace: ddis-asteroid--naysayer
+  labels:
+    shard: internal
+  annotations:
+    haproxy.router.openshift.io/timeout: 180s
 spec:
-  host: naysayer-webhook.your-domain.com  # Update with your actual domain
+  host: naysayer-ddis-asteroid--naysayer.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com
   to:
     kind: Service
     name: naysayer
@@ -13,5 +17,4 @@ spec:
     targetPort: https
   tls:
     termination: edge
-    insecureEdgeTerminationPolicy: Redirect
   wildcardPolicy: None

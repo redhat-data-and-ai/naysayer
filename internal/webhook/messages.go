@@ -43,6 +43,29 @@ func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mr
 	return comment.String()
 }
 
+// BuildManualReviewComment creates a detailed comment for MRs requiring manual review
+func (mb *MessageBuilder) BuildManualReviewComment(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) string {
+	var comment strings.Builder
+
+	// Header
+	comment.WriteString("🔍 **Manual review required**\n\n")
+
+	// Analysis results based on verbosity
+	switch mb.config.Comments.CommentVerbosity {
+	case "basic":
+		comment.WriteString(mb.buildBasicManualReviewSummary(result))
+	case "debug":
+		comment.WriteString(mb.buildDebugManualReviewSummary(result, mrInfo))
+	default: // "detailed"
+		comment.WriteString(mb.buildDetailedManualReviewSummary(result))
+	}
+
+	// Footer
+	comment.WriteString("\n🤖 *Automated by NAYSAYER v1.0.0*")
+
+	return comment.String()
+}
+
 // buildBasicSummary creates a basic approval summary
 func (mb *MessageBuilder) buildBasicSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
@@ -285,4 +308,99 @@ func (mb *MessageBuilder) hasOnlyDataverseFiles(result *shared.RuleEvaluation) b
 		}
 	}
 	return false
+}
+
+// buildBasicManualReviewSummary creates a basic manual review summary
+func (mb *MessageBuilder) buildBasicManualReviewSummary(result *shared.RuleEvaluation) string {
+	var summary strings.Builder
+
+	summary.WriteString("📊 **Analysis Results:**\n")
+	summary.WriteString(fmt.Sprintf("• %d rules evaluated\n", len(result.RuleResults)))
+	summary.WriteString(fmt.Sprintf("• Decision: %s\n", result.FinalDecision.Reason))
+	
+	// Count rules requiring manual review
+	manualReviewCount := 0
+	for _, ruleResult := range result.RuleResults {
+		if ruleResult.Decision.Type == shared.ManualReview {
+			manualReviewCount++
+		}
+	}
+	
+	if manualReviewCount > 0 {
+		summary.WriteString(fmt.Sprintf("• %d rule(s) require manual review\n", manualReviewCount))
+	}
+
+	return summary.String()
+}
+
+// buildDetailedManualReviewSummary creates a detailed manual review summary
+func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEvaluation) string {
+	var summary strings.Builder
+
+	// Analysis results
+	summary.WriteString("📊 **Analysis Results:**\n")
+	summary.WriteString(mb.buildRulesSummary(result.RuleResults))
+	summary.WriteString("\n")
+
+	// File changes summary
+	if filesSummary := mb.buildFilesSummary(result); filesSummary != "" {
+		summary.WriteString("📄 **Files Analyzed:**\n")
+		summary.WriteString(filesSummary)
+		summary.WriteString("\n")
+	}
+
+	// Next steps
+	summary.WriteString("👀 **Next Steps:**\n")
+	summary.WriteString("• A reviewer will evaluate this MR manually\n")
+	summary.WriteString("• You can find more details about the requirements in the project documentation\n")
+	summary.WriteString("• Feel free to ask questions in the MR comments\n")
+	summary.WriteString("\n")
+
+	// Timing information
+	summary.WriteString("⏱️ **Processing Details:**\n")
+	summary.WriteString(fmt.Sprintf("• Rule evaluation time: %v\n", result.ExecutionTime))
+	summary.WriteString(fmt.Sprintf("• Analyzed at: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+
+	return summary.String()
+}
+
+// buildDebugManualReviewSummary creates a verbose debug summary for manual review
+func (mb *MessageBuilder) buildDebugManualReviewSummary(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) string {
+	var summary strings.Builder
+
+	// MR Information
+	summary.WriteString("🔍 **MR Information:**\n")
+	summary.WriteString(fmt.Sprintf("• Project ID: %d\n", mrInfo.ProjectID))
+	summary.WriteString(fmt.Sprintf("• MR IID: %d\n", mrInfo.MRIID))
+	summary.WriteString(fmt.Sprintf("• Author: %s\n", mrInfo.Author))
+	summary.WriteString(fmt.Sprintf("• Title: %s\n", mrInfo.Title))
+	summary.WriteString("\n")
+
+	// Detailed analysis results
+	summary.WriteString("📊 **Detailed Analysis Results:**\n")
+	summary.WriteString(mb.buildDetailedRulesSummary(result.RuleResults))
+	summary.WriteString("\n")
+
+	// File changes with metadata
+	if filesSummary := mb.buildDetailedFilesSummary(result); filesSummary != "" {
+		summary.WriteString("📄 **Detailed File Analysis:**\n")
+		summary.WriteString(filesSummary)
+		summary.WriteString("\n")
+	}
+
+	// Next steps
+	summary.WriteString("👀 **Next Steps:**\n")
+	summary.WriteString("• A reviewer will evaluate this MR manually\n")
+	summary.WriteString("• Check the detailed rule results above for specific requirements\n")
+	summary.WriteString("• Review the project documentation for guidelines\n")
+	summary.WriteString("\n")
+
+	// System information
+	summary.WriteString("⚙️ **System Details:**\n")
+	summary.WriteString(fmt.Sprintf("• Rule evaluation time: %v\n", result.ExecutionTime))
+	summary.WriteString(fmt.Sprintf("• Total rules evaluated: %d\n", len(result.RuleResults)))
+	summary.WriteString(fmt.Sprintf("• Final decision: %s\n", result.FinalDecision.Type))
+	summary.WriteString(fmt.Sprintf("• Analyzed at: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+
+	return summary.String()
 }
