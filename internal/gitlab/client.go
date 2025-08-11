@@ -2,10 +2,13 @@ package gitlab
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,19 +21,65 @@ type Client struct {
 	http   *http.Client
 }
 
+// createHTTPClient creates an HTTP client with custom TLS configuration
+func createHTTPClient(cfg config.GitLabConfig) (*http.Client, error) {
+	transport := &http.Transport{}
+	
+	// Configure TLS settings
+	tlsConfig := &tls.Config{}
+	
+	// Handle insecure TLS (skip certificate verification)
+	if cfg.InsecureTLS {
+		tlsConfig.InsecureSkipVerify = true
+	}
+	
+	// Handle custom CA certificate
+	if cfg.CACertPath != "" {
+		caCert, err := os.ReadFile(cfg.CACertPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate from %s: %w", cfg.CACertPath, err)
+		}
+		
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate from %s", cfg.CACertPath)
+		}
+		
+		tlsConfig.RootCAs = caCertPool
+	}
+	
+	transport.TLSClientConfig = tlsConfig
+	
+	return &http.Client{
+		Transport: transport,
+	}, nil
+}
+
 // NewClient creates a new GitLab API client
 func NewClient(cfg config.GitLabConfig) *Client {
+	httpClient, err := createHTTPClient(cfg)
+	if err != nil {
+		// Fallback to default client if TLS configuration fails
+		httpClient = &http.Client{}
+	}
+	
 	return &Client{
 		config: cfg,
-		http:   &http.Client{},
+		http:   httpClient,
 	}
 }
 
 // NewClientWithConfig creates a new GitLab API client with full config
 func NewClientWithConfig(cfg *config.Config) *Client {
+	httpClient, err := createHTTPClient(cfg.GitLab)
+	if err != nil {
+		// Fallback to default client if TLS configuration fails
+		httpClient = &http.Client{}
+	}
+	
 	return &Client{
 		config: cfg.GitLab,
-		http:   &http.Client{},
+		http:   httpClient,
 	}
 }
 

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: naysayer
-          image: quay.io/ddis/naysayer:latest
+          image: quay.io/redhat-data-and-ai/naysayer:latest
           ports:
             - containerPort: 3000
               protocol: TCP
@@ -37,7 +37,10 @@ spec:
                 secretKeyRef:
                   name: naysayer-secrets
                   key: WEBHOOK_SECRET
-
+            - name: GITLAB_INSECURE_TLS
+              value: "true"
+            - name: ENABLE_MR_COMMENTS
+              value: "true"
             - name: LOG_LEVEL
               value: "info"
             - name: ENVIRONMENT

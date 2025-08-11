@@ -308,10 +308,12 @@ func TestClient_GetMRDetails_Success(t *testing.T) {
 
 		// Return mock MR details response
 		response := MRDetails{
-			TargetBranch: "main",
-			SourceBranch: "feature/new-feature",
-			IID:          456,
-			ProjectID:    123,
+			TargetBranch:    "main",
+			SourceBranch:    "feature/new-feature",
+			IID:             456,
+			ProjectID:       123,
+			SourceProjectID: 123,
+			TargetProjectID: 123,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -333,6 +335,8 @@ func TestClient_GetMRDetails_Success(t *testing.T) {
 	assert.Equal(t, "feature/new-feature", details.SourceBranch)
 	assert.Equal(t, 456, details.IID)
 	assert.Equal(t, 123, details.ProjectID)
+	assert.Equal(t, 123, details.SourceProjectID)
+	assert.Equal(t, 123, details.TargetProjectID)
 }
 
 func TestClient_GetMRDetails_HTTPError(t *testing.T) {

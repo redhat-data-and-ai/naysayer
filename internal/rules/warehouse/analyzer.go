@@ -90,26 +90,62 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 		return nil, fmt.Errorf("failed to get target branch: %v", err)
 	}
 
-	// Fetch file content from target branch (before changes)
-	oldContent, err := a.gitlabClient.FetchFileContent(projectID, filePath, targetBranch)
-	if err != nil {
-		// File might be new, skip comparison
-		if strings.Contains(err.Error(), "file not found") {
-			return &[]WarehouseChange{}, nil
-		}
-		return nil, fmt.Errorf("failed to fetch old file content: %v", err)
-	}
-
 	// Get the MR details to find source branch
 	mrDetails, err := a.gitlabClient.GetMRDetails(projectID, mrIID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get MR details: %v", err)
 	}
 
+	// Determine project IDs for target and source branches
+	targetProjectID := projectID // Always use the target project ID for target branch
+	sourceProjectID := projectID // Default to target project ID
+	
+	// For cross-fork MRs, use the source project ID for source branch
+	if mrDetails.SourceProjectID != 0 && mrDetails.SourceProjectID != targetProjectID {
+		sourceProjectID = mrDetails.SourceProjectID
+	}
+
+	// Fetch file content from target branch (before changes)
+	oldContent, err := a.gitlabClient.FetchFileContent(targetProjectID, filePath, targetBranch)
+	if err != nil && strings.Contains(err.Error(), "file not found") {
+		// File is new - doesn't exist in target branch
+		// Try to fetch from source branch to analyze the new file
+		newContent, err := a.gitlabClient.FetchFileContent(sourceProjectID, filePath, mrDetails.SourceBranch)
+		if err != nil {
+			if strings.Contains(err.Error(), "file not found") {
+				// File doesn't exist in either branch - this shouldn't happen for non-deleted files
+				return &[]WarehouseChange{}, nil
+			}
+			return nil, fmt.Errorf("failed to fetch new file content from source project %d, branch %s: %v", sourceProjectID, mrDetails.SourceBranch, err)
+		}
+		
+		// New file - compare empty state with new content
+		oldDP := &DataProduct{Warehouses: []Warehouse{}}
+		newDP, err := a.parseDataProduct(newContent.Content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse new YAML file: %v", err)
+		}
+		changes := a.compareWarehouses(filePath, oldDP, newDP)
+		return &changes, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to fetch old file content from target project %d, branch %s: %v", targetProjectID, targetBranch, err)
+	}
+
 	// Fetch file content from source branch (after changes)
-	newContent, err := a.gitlabClient.FetchFileContent(projectID, filePath, mrDetails.SourceBranch)
+	newContent, err := a.gitlabClient.FetchFileContent(sourceProjectID, filePath, mrDetails.SourceBranch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch new file content: %v", err)
+		// File might be deleted in source branch
+		if strings.Contains(err.Error(), "file not found") {
+			// File was deleted in source branch - compare old content with empty state
+			newDP := &DataProduct{Warehouses: []Warehouse{}}
+			oldDP, err := a.parseDataProduct(oldContent.Content)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse old YAML for deleted file: %v", err)
+			}
+			changes := a.compareWarehouses(filePath, oldDP, newDP)
+			return &changes, nil
+		}
+		return nil, fmt.Errorf("failed to fetch new file content from source project %d, branch %s: %v", sourceProjectID, mrDetails.SourceBranch, err)
 	}
 
 	// Parse both YAML contents
