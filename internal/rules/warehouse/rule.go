@@ -2,6 +2,7 @@ package warehouse
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
@@ -36,9 +37,14 @@ func (r *Rule) Description() string {
 
 // Applies checks if this rule should evaluate the MR
 func (r *Rule) Applies(mrCtx *shared.MRContext) bool {
-	// Only apply if dataproduct files are changed
+	// Apply if ANY dataverse files are changed (warehouse OR sourcebinding)
 	for _, change := range mrCtx.Changes {
-		if shared.IsDataProductFile(change.NewPath) || shared.IsDataProductFile(change.OldPath) {
+		// Check new path
+		if isDataverse, _ := shared.IsDataverseFile(change.NewPath); isDataverse {
+			return true
+		}
+		// Check old path
+		if isDataverse, _ := shared.IsDataverseFile(change.OldPath); isDataverse {
 			return true
 		}
 	}
@@ -79,7 +85,7 @@ func (r *Rule) ShouldApprove(mrCtx *shared.MRContext) (shared.DecisionType, stri
 	}
 
 	// Mixed changes - require manual review
-	return shared.ManualReview, "MR contains non-dataverse file changes"
+	return shared.ManualReview, "MR contains changes outside the allowed scope of the warehouse rule"
 }
 
 // evaluateWarehouseChanges applies the warehouse decision logic
@@ -91,8 +97,19 @@ func (r *Rule) evaluateWarehouseChanges(changes []WarehouseChange) (shared.Decis
 	// Check if all changes are decreases
 	for _, change := range changes {
 		if !change.IsDecrease {
-			return shared.ManualReview, fmt.Sprintf("Warehouse increase detected: %s → %s in %s",
-				change.FromSize, change.ToSize, change.FilePath)
+			if strings.Contains(change.FilePath, "(non-warehouse changes)") {
+				// Non-warehouse changes detected
+				return shared.ManualReview, fmt.Sprintf("Non-warehouse changes detected in %s",
+					strings.Replace(change.FilePath, " (non-warehouse changes)", "", 1))
+			} else if change.FromSize == "" {
+				// New warehouse creation
+				return shared.ManualReview, fmt.Sprintf("New warehouse creation detected: %s in %s",
+					change.ToSize, change.FilePath)
+			} else {
+				// Warehouse size increase
+				return shared.ManualReview, fmt.Sprintf("Warehouse increase detected: %s → %s in %s",
+					change.FromSize, change.ToSize, change.FilePath)
+			}
 		}
 	}
 
