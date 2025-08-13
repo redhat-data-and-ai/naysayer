@@ -34,7 +34,6 @@ NAYSAYER helps the data platform team by automatically approving merge requests 
 
 ## How It Works
 
-
 ### Working Diagram and Code walkthrough
 
 ```mermaid
@@ -134,7 +133,7 @@ warehouses:
 ## Repository Integration
 
 NAYSAYER is designed specifically for the dataproduct-config repository at:
-`/Users/isequeir/go/src/gitlab.com/ddis/repos/dataproduct-config`
+`go/src/gitlab.com/ddis/repos/dataproduct-config`
 
 It understands the DDIS dataproduct structure and focuses only on `product.yaml` files.
 
