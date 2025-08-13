@@ -23,15 +23,72 @@ NAYSAYER helps the data platform team by automatically approving merge requests 
 2. **Deploy to Kubernetes/OpenShift**:
    ```bash
    # Configure GitLab token in config/secrets.yaml
-kubectl apply -f config/
+    kubectl apply -f config/
    ```
 
 3. **Configure GitLab webhook** in your dataproduct-config repository:
+
    - URL: `https://your-naysayer-domain.com/webhook`
    - Trigger: Merge Request events
    - Secret: (optional)
 
 ## How It Works
+
+
+### Working Diagram and Code walkthrough
+
+```mermaid
+flowchart TB
+    %% External System
+    GitLab["Redhat GitLab"]:::external
+    GitLab -->|"Merge Request Event"| Webhook["POST /webhook\n(Webhook Receiver)"]:::transport
+
+  subgraph "NAYSAYER Microservice (Container/Pod)"
+        direction TB
+        ConfigLoader["Config Loader \n (internal/config)"]:::infra
+        Logger["Structured Logger\n(internal/logging)"]:::infra
+        Health["GET /health\n(Health Checker)"]:::transport
+        Webhook
+        RulesManager["Rules Manager\n(internal/rules/manager)"]:::business
+        WarehouseAnalyzer["Warehouse Analyzer\n(internal/rules/warehouse)"]:::business
+        Decision{"All decreases?"}:::business
+        AutoApprove["Auto-approve Path"]:::business
+        ManualReview["Manual review Path"]:::business
+        GitLabClient["GitLab API Client\n(internal/gitlab/client)"]:::infra
+    end
+
+    %% ConfigMap/Secrets
+    ConfigMap[(ConfigMap/Secrets Config)]:::infra
+    ConfigMap -->|loads| ConfigLoader
+
+    %% Internal Flow
+    Webhook -->|decode payload| RulesManager
+    RulesManager -->|invoke analyzer| WarehouseAnalyzer
+    WarehouseAnalyzer -->|evaluate diffs| Decision
+    Decision -->|yes| AutoApprove
+    Decision -->|no| ManualReview
+    AutoApprove -->|POST approval| GitLabClient
+    GitLabClient -->|GET changes| RulesManager
+
+    %% Health Check Flow
+    Health -->|returns 200| GitLab
+
+    %% Click Events
+    click Webhook "https://github.com/redhat-data-and-ai/naysayer/blob/main/cmd/main.go"
+    click Health "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/webhook/health.go"
+    click ConfigLoader "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/config/config.go"
+    click ConfigMap "https://github.com/redhat-data-and-ai/naysayer/tree/main/config/"
+    click GitLabClient "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/gitlab/client.go"
+    click RulesManager "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/rules/manager.go"
+    click WarehouseAnalyzer "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/rules/warehouse/analyzer.go"
+    click Logger "https://github.com/redhat-data-and-ai/naysayer/blob/main/internal/logging/logger.go"
+
+    %% Styles
+    classDef external fill:#e0f7e9,stroke:#2e7d32,color:#2e7d32;
+    classDef transport fill:#e3f2fd,stroke:#1565c0,color:#1565c0;
+    classDef business fill:#fff8e1,stroke:#f9a825,color:#f9a825;
+    classDef infra fill:#fff3e0,stroke:#ef6c00,color:#ef6c00;
+```
 
 NAYSAYER analyzes changes in `product.yaml` files within the dataproduct-config repository structure:
 
