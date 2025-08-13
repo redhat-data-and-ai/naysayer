@@ -244,7 +244,7 @@ The bot analyzes diffs like this:
 
 ```bash
 # Test with mock GitLab webhook payload
-curl -X POST localhost:3000/webhook \
+curl -X POST your-server:3000/webhook \
   -H "Content-Type: application/json" \
   -d '{
     "object_attributes": {
