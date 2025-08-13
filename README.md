@@ -41,20 +41,22 @@ NAYSAYER helps the data platform team by automatically approving merge requests 
 flowchart TB
     %% External System
     GitLab["Redhat GitLab"]:::external
-    GitLab -->|"Merge Request Event"| Webhook["POST /webhook\n(Webhook Receiver)"]:::transport
+    GitLab -->|"Merge Request Event"| Webhook["POST /webhook (Webhook Receiver)"]:::transport
 
-  subgraph "NAYSAYER Microservice (Container/Pod)"
+  subgraph "NAYSAYER Container / Pod"
         direction TB
-        ConfigLoader["Config Loader \n (internal/config)"]:::infra
-        Logger["Structured Logger\n(internal/logging)"]:::infra
-        Health["GET /health\n(Health Checker)"]:::transport
+        ConfigLoader["Config Loader 
+        (internal/config)"]:::infra
+        Logger["Structured Logger (internal/logging)"]:::infra
+        Health["GET /health
+        (Health Checker)"]:::transport
         Webhook
-        RulesManager["Rules Manager\n(internal/rules/manager)"]:::business
-        WarehouseAnalyzer["Warehouse Analyzer\n(internal/rules/warehouse)"]:::business
+        RulesManager["Rules Manager  (internal/rules/manager)"]:::business
+        WarehouseAnalyzer["Warehouse Analyzer \n(internal/rules/warehouse)"]:::business
         Decision{"All decreases?"}:::business
         AutoApprove["Auto-approve Path"]:::business
         ManualReview["Manual review Path"]:::business
-        GitLabClient["GitLab API Client\n(internal/gitlab/client)"]:::infra
+        GitLabClient["GitLab API Client (internal/gitlab/client)"]:::infra
     end
 
     %% ConfigMap/Secrets
