@@ -134,6 +134,8 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 	// Add detailed comment to MR if enabled
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
+
+		logging.MRInfo(mrInfo.MRIID, "Adding approval comment", zap.String("comment", comment))
 		
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
@@ -147,6 +149,7 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 
 	// Approve the MR with message
 	approvalMessage := messageBuilder.BuildApprovalMessage(result)
+	logging.MRInfo(mrInfo.MRIID, "Approving MR with message", zap.String("message", approvalMessage))
 	
 	if err := h.gitlabClient.ApproveMRWithMessage(mrInfo.ProjectID, mrInfo.MRIID, approvalMessage); err != nil {
 		// Try fallback to simple approval if message approval fails
@@ -170,6 +173,8 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
 		
+		logging.MRInfo(mrInfo.MRIID, "Adding manual review comment", zap.String("comment", comment))
+
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
 			// Continue without error - comment is nice-to-have

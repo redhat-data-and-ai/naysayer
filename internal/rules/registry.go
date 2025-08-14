@@ -5,6 +5,7 @@ import (
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/serviceaccount"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
@@ -51,6 +52,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "warehouse",
+	})
+
+	// Service Account rule
+	r.RegisterRule(&RuleInfo{
+		Name:        "service_account_rule",
+		Description: "Validates service account configurations for email format, scoping, environment restrictions, and naming conventions",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			return serviceaccount.NewRule(client)
+		},
+		Enabled:  true,
+		Category: "service_accounts",
 	})
 
 }
@@ -145,8 +158,8 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 	// For dataverse, we want specific rules that are actually implemented
 	dataverseRules := []string{
 		"warehouse_rule",
+		"service_account_rule",
 		// TODO: Add back when implemented:
-		// "service_account_rule",
 		// "migrations_rule",
 		// "naming_conventions_rule",
 	}

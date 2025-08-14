@@ -59,9 +59,11 @@ type WarehouseRuleConfig struct {
 
 // ServiceAccountRuleConfig holds service account validation configuration
 type ServiceAccountRuleConfig struct {
-	ValidateEmailFormat    bool     // Enable email format validation
-	RequireIndividualEmail bool     // Require individual vs group emails
-	AllowedDomains        []string // Allowed email domains
+	ValidateEmailFormat      bool     // Enable email format validation
+	RequireIndividualEmail   bool     // Require individual vs group emails
+	AllowedDomains          []string // Allowed email domains
+	AstroEnvironmentsOnly   []string // Environments where Astro service accounts are allowed
+	EnforceNamingConventions bool     // Enforce naming conventions
 }
 
 // MigrationsRuleConfig holds migrations validation configuration  
@@ -114,9 +116,11 @@ func Load() *Config {
 				AutoApproveEnvs:      parseStringList(getEnv("WAREHOUSE_AUTO_APPROVE_ENVS", "dev,sandbox")),
 			},
 			ServiceAccountRule: ServiceAccountRuleConfig{
-				ValidateEmailFormat:    getEnv("SA_VALIDATE_EMAIL", "true") == "true",
-				RequireIndividualEmail: getEnv("SA_REQUIRE_INDIVIDUAL_EMAIL", "true") == "true",
-				AllowedDomains:         parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
+				ValidateEmailFormat:      getEnv("SA_VALIDATE_EMAIL", "true") == "true",
+				RequireIndividualEmail:   getEnv("SA_REQUIRE_INDIVIDUAL_EMAIL", "true") == "true",
+				AllowedDomains:          parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
+				AstroEnvironmentsOnly:   parseStringList(getEnv("SA_ASTRO_ENVS", "preprod,prod")),
+				EnforceNamingConventions: getEnv("SA_ENFORCE_NAMING", "true") == "true",
 			},
 			MigrationsRule: MigrationsRuleConfig{
 				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",
