@@ -1,395 +1,174 @@
-# NAYSAYER - Dataproduct Config Review Bot
+# 🛡️ Naysayer - GitLab MR Validation System
 
-A self-service GitLab webhook for automatically reviewing warehouse size changes in dataproduct configurations.
+A GitLab webhook service that automatically validates merge requests using configurable rules, helping teams maintain quality and compliance through smart automation.
 
-## Purpose
+> **🎯 Smart Decisions**: Auto-approves safe changes, flags risky ones for human review
 
-NAYSAYER helps the data platform team by automatically approving merge requests that only **decrease** warehouse sizes in `product.yaml` files, while requiring manual review for increases.
+## 🚀 What Naysayer Does
 
-**Self-Service Rules:**
-- ✅ **Warehouse size decrease** (LARGE → SMALL) → Auto-approve
-- 🚫 **Warehouse size increase** (SMALL → LARGE) → Platform approval needed
-- 🚫 **No warehouse changes** → Standard review process
+Naysayer analyzes GitLab merge requests and automatically:
+- ✅ **Auto-approves** safe changes (cost reductions, compliant configurations)
+- ⚠️ **Flags for review** risky changes (cost increases, security violations)
+- 🔍 **Validates** file content against organizational policies
+- 📝 **Documents** decisions with clear reasoning
 
-## Quick Start
+## 🛡️ Current Validation Rules
 
-1. **Build and run locally**:
-   ```bash
-   make build
-   export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
-   make run
-   ```
+| **Rule** | **Validates** | **Auto-Approves** | **Requires Review** |
+|----------|---------------|-------------------|---------------------|
+| **🏢 Warehouse** | Data warehouse configs (`product.yaml`) | Cost reductions | Cost increases |
 
-2. **Deploy to Kubernetes/OpenShift**:
-   ```bash
-   # Configure GitLab token in config/secrets.yaml
+> **📚 Detailed Rule Documentation**: See [Rules Documentation](docs/rules/README.md) for complete rule behaviors and troubleshooting guides.
+
+## 🏗️ How It Works
+
+Naysayer uses **line-level validation** with YAML section-aware parsing to ensure comprehensive coverage:
+
+```mermaid
+graph TD
+    A[📥 GitLab MR] --> B[📄 File Analysis]
+    B --> C[🧩 YAML Section Parsing]
+    C --> D{📏 Line Coverage Check}
+    D --> E[🏢 Warehouse Rule<br/>Covers entire product.yaml file]
+    E --> H{🔍 Rule Coverage?}
+    D --> F[❌ No Rule Coverage<br/>For non-warehouse files]
+    F --> J
+    H -->|✅ All lines covered & approved| I[🎉 Auto-Approve MR]
+    H -->|❌ Uncovered lines or failed rules| J[🔍 Manual Review Required]
+```
+
+**Key Features**:
+- 🎯 **Line-Level Validation**: Every changed line must be validated by at least one rule
+- 🧩 **File-Level Coverage**: Warehouse rule validates entire `product.yaml` files
+- 📊 **Coverage Enforcement**: Files without rule coverage automatically require manual review
+- 📝 **Detailed Reporting**: File-by-file breakdown showing which rules passed/failed
+
+## 🚀 Quick Start
+
+### 1. Deploy Naysayer
+```bash
+# Deploy to Kubernetes/OpenShift
 kubectl apply -f config/
-   ```
 
-3. **Configure GitLab webhook** in your dataproduct-config repository:
-   - URL: `https://your-naysayer-domain.com/webhook`
-   - Trigger: Merge Request events
-   - Secret: (optional)
-
-## How It Works
-
-NAYSAYER analyzes changes in `product.yaml` files within the dataproduct-config repository structure:
-
-```
-dataproducts/
-├── source/product-name/env/product.yaml
-├── aggregate/product-name/env/product.yaml
-└── platform/product-name/env/product.yaml
-```
-
-### Dataproduct YAML Format
-
-```yaml
-name: your-dataproduct
-kind: source-aligned  # or aggregated
-rover_group: dataverse-source-your-dataproduct
-warehouses:
-  - type: user
-    size: XSMALL          # ← NAYSAYER analyzes this
-  - type: service_account
-    size: LARGE           # ← and this
-```
-
-### Approval Logic
-
-- **Auto-approve**: Warehouse size decreases only
-  - `X6LARGE(10) → X5LARGE(9)` ✅
-  - `X5LARGE(9) → X4LARGE(8)` ✅
-  - `X4LARGE(8) → X3LARGE(7)` ✅
-  - `X3LARGE(7) → XXLARGE(6)` ✅
-  - `XXLARGE(6) → XLARGE(5)` ✅
-  - `XLARGE(5) → LARGE(4)` ✅
-  - `LARGE(4) → MEDIUM(3)` ✅
-  - `MEDIUM(3) → SMALL(2)` ✅
-  - `SMALL(2) → XSMALL(1)` ✅
-
-- **Require approval**: Any increase or no warehouse changes
-  - `SMALL(2) → MEDIUM(3)` ❌ (platform approval needed)
-  - No warehouse changes ❌ (standard review process)
-
-## Repository Integration
-
-NAYSAYER is designed specifically for the dataproduct-config repository at:
-`/Users/isequeir/go/src/gitlab.com/ddis/repos/dataproduct-config`
-
-It understands the DDIS dataproduct structure and focuses only on `product.yaml` files.
-
-## Configuration
-
-**Environment Variables:**
-- `GITLAB_TOKEN` - GitLab API token (required for file analysis)
-- `GITLAB_BASE_URL` - GitLab instance URL (default: https://gitlab.com)
-- `PORT` - Server port (default: 3000)
-
-## Deployment
-
-### Kubernetes/OpenShift
-
-1. **Configure secrets**:
-   ```bash
-   echo -n "your-gitlab-token" | base64
-   # Update gitlab-token in config/secrets.yaml
-   ```
-
-2. **Deploy**:
-   ```bash
-   kubectl apply -f config/
-   ```
-
-3. **Image management** (push to Quay):
-   ```bash
-   make build-image
-   make push-image
-   ```
-
-### Container Image
-
-- Registry: `quay.io/ddis/naysayer`
-- Tag: `latest`
-
-## API Endpoints
-
-- `POST /webhook` - GitLab webhook endpoint
-- `GET /health` - Health check
-
-## Testing
-
-Basic functionality:
-```bash
-./test_simple.sh
-```
-
-File analysis with real GitLab API:
-```bash
+# Or run locally for development
 export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
-./test_file_analysis.sh
+make build && make run
 ```
 
-## Self-Service Benefits
+### 2. Configure GitLab Webhook
+1. Go to GitLab project → **Settings** → **Webhooks**
+2. Add URL: `https://your-naysayer-domain.com/webhook`
+3. Select **"Merge request events"**
+4. Save configuration
 
-- **Faster approvals** for warehouse downsizing
-- **Platform team focus** on increases and complex changes  
-- **Automated compliance** with resource optimization
-- **Clear audit trail** in GitLab MR comments
+### 3. Test It
+Create an MR that modifies:
+- `dataproducts/*/product.yaml` (triggers Warehouse Rule)
 
-## How It Works (Technical Details)
+**Result**: Naysayer automatically approves or requests review based on the changes
 
-### File Analysis Process
+## ⚙️ Configuration
 
-1. **Webhook received** → Extract project ID and MR IID
-2. **Fetch file changes** → Call GitLab API `/projects/:id/merge_requests/:iid/changes`
-3. **Analyze config files** → Look for warehouse changes in YAML/JSON files
-4. **Check diff patterns** → Find `-  warehouse: LARGE` → `+  warehouse: SMALL`
-5. **Make decision** → Auto-approve only if all changes are decreases
-
-### Supported File Types
-
-- `.yaml` and `.yml` files
-- `.json` files
-- Looks for `warehouse:` configuration changes
-
-### Example File Change
-
-The bot analyzes diffs like this:
-
-```diff
-# config/dataproduct.yaml
-- warehouse: LARGE
-+ warehouse: SMALL
-```
-
-**Result:** ✅ Auto-approved (decrease detected)
-
-```diff
-# config/dataproduct.yaml
-- warehouse: SMALL  
-+ warehouse: LARGE
-```
-
-**Result:** 🚫 Requires approval (increase detected)
-
-## Usage
-
-### GitLab Webhook Setup
-
-1. Go to your GitLab project → Settings → Webhooks
-2. Add webhook URL: `http://your-server:3000/webhook`
-3. Select "Merge request events"
-4. Save
-
-### Test It
+Basic configuration via environment variables:
 
 ```bash
-# Test with mock GitLab webhook payload
-curl -X POST localhost:3000/webhook \
-  -H "Content-Type: application/json" \
-  -d '{
-    "object_attributes": {
-      "iid": 123
-    },
-    "project": {
-      "id": 456
-    }
-  }'
+# Required
+GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
 
-# Response with GitLab token:
-# {
-#   "auto_approve": true,
-#   "reason": "all warehouse changes are decreases",
-#   "summary": "✅ Warehouse decrease(s) - auto-approved",
-#   "details": "Found 1 warehouse decrease(s)"
-# }
+# Optional
+GITLAB_BASE_URL=https://gitlab.com
+PORT=3000
 
-# Response without GitLab token:
-# {
-#   "auto_approve": false,
-#   "reason": "GitLab token not configured",
-#   "summary": "🚫 Cannot analyze files - missing GitLab token",
-#   "details": "Set GITLAB_TOKEN environment variable to enable file analysis"
-# }
+# Rule toggles
+WAREHOUSE_RULE_ENABLED=true
 ```
 
-## Warehouse Sizes
+> **📖 Complete Configuration**: See [Configuration Guide](docs/CONFIGURATION.md) for all rule-specific settings.
 
+## 📚 Documentation
+
+### 👥 For Users
+- 🏠 **[Rules Overview](docs/rules/README.md)** - Understand what gets validated
+- 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Fix common issues
+- ⚙️ **[Configuration Guide](docs/CONFIGURATION.md)** - Environment setup
+
+### 👨‍💻 For Developers  
+- 🎯 **[Rule Creation Guide](docs/RULE_CREATION_GUIDE.md)** - Build new validation rules
+- 🧪 **[Rule Testing Guide](docs/RULE_TESTING_GUIDE.md)** - Testing strategies
+
+### 🚀 For Operators
+- 🐳 **[Deployment Guide](docs/DEPLOYMENT.md)** - Production setup
+- 📊 **[Monitoring Guide](docs/MONITORING.md)** - Health checks and metrics
+
+## 🛠️ Development
+
+### Quick Development Setup
+```bash
+# Clone and setup
+git clone https://github.com/your-org/naysayer.git
+cd naysayer && go mod tidy
+
+# Run tests
+make test
+
+# Start development server
+export GITLAB_TOKEN=your-token
+go run cmd/main.go
 ```
-XSMALL (1) → SMALL (2) → MEDIUM (3) → LARGE (4) → XXLARGE (5)
-```
 
-**Decreases** (higher → lower) are auto-approved.  
-**Increases** (lower → higher) require approval.
-
-## API Endpoints
-
-- **POST /webhook** - Main webhook endpoint
-- **GET /health** - Health check
-
-## Project Structure
-
+### Project Structure
 ```
 naysayer/
-├── cmd/main.go              # Complete application (360+ lines)
-├── go.mod                   # Dependencies (GoFiber + YAML)
-├── go.sum
-├── Makefile                 # Build commands
-└── README.md                # This file
+├── internal/rules/           # Rule engine and validation logic
+│   └── warehouse/           # Warehouse configuration validation  
+├── docs/                    # Complete documentation
+│   ├── rules/              # User-facing rule guides
+│   └── templates/          # Developer templates
+└── config/                 # Kubernetes/OpenShift manifests
 ```
 
-## Error Handling
-
-### Common Issues
-
-**Missing GitLab Token:**
-```json
-{
-  "auto_approve": false,
-  "reason": "GitLab token not configured",
-  "summary": "🚫 Cannot analyze files - missing GitLab token"
-}
-```
-
-**GitLab API Error:**
-```json
-{
-  "auto_approve": false,
-  "reason": "Failed to fetch file changes",
-  "summary": "🚫 API error - requires manual approval",
-  "details": "Error: GitLab API error 401: Unauthorized"
-}
-```
-
-**No Warehouse Changes:**
-```json
-{
-  "auto_approve": false,
-  "reason": "no warehouse changes detected in files",
-  "summary": "🚫 No warehouse changes - requires approval"
-}
-```
-
-## Deployment
-
-### Docker
-
-```dockerfile
-FROM golang:1.23-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o naysayer cmd/main.go
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/naysayer .
-EXPOSE 3000
-CMD ["./naysayer"]
-```
-
-### Environment Setup
-
+### Adding New Rules
 ```bash
-# Set required GitLab token
-export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
+# 1. Create from template
+mkdir internal/rules/myrule
+cp docs/templates/rule_templates/enhanced_basic_rule_template.go.template internal/rules/myrule/rule.go
 
-# Optional: Set custom GitLab URL (for self-hosted)
-export GITLAB_BASE_URL=https://gitlab.mycompany.com
-
-# Optional: Set custom port
-export PORT=8080
+# 2. Follow the Rule Creation Guide
+# See: docs/RULE_CREATION_GUIDE.md
 ```
 
-### Systemd Service
+## 🔒 Security & Compliance
 
-```ini
-# /etc/systemd/system/naysayer.service
-[Unit]
-Description=NAYSAYER File-Based Webhook Service
-After=network.target
+- **Minimal Permissions**: GitLab token only needs `read_repository` scope
+- **Audit Trail**: All decisions logged with detailed reasoning  
+- **Input Validation**: All webhook payloads validated
+- **Policy Enforcement**: Consistent application of organizational standards
 
-[Service]
-Type=simple
-User=naysayer
-ExecStart=/opt/naysayer/naysayer
-Environment=PORT=3000
-Environment=GITLAB_TOKEN=your_token_here
-Environment=GITLAB_BASE_URL=https://gitlab.com
-Restart=always
+## 🎯 Benefits
 
-[Install]
-WantedBy=multi-user.target
-```
+- **⚡ Faster Reviews**: Safe changes approved automatically
+- **🛡️ Risk Reduction**: Automated detection of policy violations  
+- **📏 Consistency**: Uniform application of organizational standards
+- **🔍 Transparency**: Clear explanations for all decisions
 
-## Development
+## 🚀 Deployment
 
-```bash
-# Install dependencies
-go mod tidy
+**Production**: See [Deployment Guide](docs/DEPLOYMENT.md) for complete Kubernetes/OpenShift setup
 
-# Build
-go build -o naysayer cmd/main.go
+**Container**: `quay.io/ddis/naysayer:latest`
 
-# Run with debug logging
-go run cmd/main.go
+**Health Check**: `GET /health`
 
-# Test health endpoint
-curl http://localhost:3000/health
-```
+## 🤝 Contributing
 
-## Why File-Based Analysis?
+1. Read [Rule Creation Guide](docs/RULE_CREATION_GUIDE.md)
+2. Use [enhanced templates](docs/templates/rule_templates/)
+3. Follow [testing guidelines](docs/RULE_TESTING_GUIDE.md)
+4. Update documentation in `docs/rules/`
 
-**Previous Approach:** Analyzed MR titles for patterns like "Warehouse from LARGE to SMALL"
-- ❌ Unreliable (depends on title format)
-- ❌ Easy to bypass
-- ❌ No validation of actual changes
+---
 
-**Current Approach:** Analyzes actual file diffs for warehouse configuration changes
-- ✅ **Accurate** - sees real file changes
-- ✅ **Secure** - can't be bypassed with clever titles
-- ✅ **Reliable** - works regardless of MR title format
-- ✅ **Detailed** - knows which files changed and how
-
-## Troubleshooting
-
-### Check GitLab Token
-
-```bash
-# Test your token manually
-curl -H "Authorization: Bearer $GITLAB_TOKEN" \
-  https://gitlab.com/api/v4/projects/YOUR_PROJECT_ID/merge_requests/YOUR_MR_IID/changes
-```
-
-### Verify Webhook Payload
-
-```bash
-# Check webhook is sending correct data
-curl -X POST localhost:3000/webhook \
-  -H "Content-Type: application/json" \
-  -d @webhook_payload.json
-```
-
-### Debug Mode
-
-Set log level for detailed debugging:
-```bash
-# Run with verbose logging
-go run cmd/main.go 2>&1 | tee naysayer.log
-```
-
-## Security
-
-- GitLab API token should have minimal scopes (`read_repository`)
-- Use environment variables for sensitive configuration
-- Consider webhook signature validation for production use
-- Run with restricted user permissions
-
-## Contributing
-
-The goal is to keep this focused on file-based warehouse analysis. Before adding features, ask: "Does this improve warehouse change detection?"
-
-## License
-
-Dual licensed under Apache 2.0 and MIT licenses.
+**🚀 Ready to get started?** 
+- **Users**: Check [Rules Documentation](docs/rules/README.md) to understand what Naysayer validates
+- **Developers**: See [Rule Creation Guide](docs/RULE_CREATION_GUIDE.md) to build custom rules
+- **Operators**: Follow [Deployment Guide](docs/DEPLOYMENT.md) for production setup

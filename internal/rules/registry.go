@@ -53,6 +53,8 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "warehouse",
 	})
 
+
+
 }
 
 // RegisterRule registers a new rule in the registry
@@ -142,11 +144,10 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
 func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.RuleManager {
-	// For dataverse, we want specific rules that are actually implemented
+	// For dataverse, we only have the warehouse rule implemented
 	dataverseRules := []string{
 		"warehouse_rule",
 		// TODO: Add back when implemented:
-		// "service_account_rule",
 		// "migrations_rule",
 		// "naming_conventions_rule",
 	}
