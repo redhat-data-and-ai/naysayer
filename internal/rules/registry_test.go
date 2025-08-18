@@ -8,6 +8,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// MockRule is a simple mock rule for testing
+type MockRule struct {
+	name string
+}
+
+func (r *MockRule) Name() string {
+	return r.name
+}
+
+func (r *MockRule) Description() string {
+	return "Mock rule for testing"
+}
+
+func (r *MockRule) GetCoveredLines(filePath string, fileContent string) []shared.LineRange {
+	return nil
+}
+
+func (r *MockRule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
+	return shared.Approve, "Mock validation"
+}
+
 func TestNewRuleRegistry(t *testing.T) {
 	registry := NewRuleRegistry()
 
@@ -298,7 +319,7 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 		rules: make(map[string]*RuleInfo),
 	}
 
-	// Only register warehouse rule, not source binding rule
+	// Only register warehouse rule, not service account rule
 	warehouseRule := &RuleInfo{
 		Name:        "warehouse_rule",
 		Description: "Warehouse rule",
@@ -311,14 +332,14 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 
 	client := &gitlab.Client{}
 
-	// Should return manager with warehouse rule since it's available
+	// Should return manager even when some rules are missing (fallback behavior)
 	manager := registry.CreateDataverseRuleManager(client)
 	assert.NotNil(t, manager)
 
-	// Should be a SimpleRuleManager with the warehouse rule
+	// Should be a SimpleRuleManager with fallback to empty manager due to missing rules
 	simpleManager, ok := manager.(*SimpleRuleManager)
 	assert.True(t, ok)
-	assert.Equal(t, 1, len(simpleManager.rules), "Should have warehouse rule available")
+	assert.Equal(t, 0, len(simpleManager.rules), "Should fallback to empty manager when rules are missing")
 }
 
 func TestGlobalRegistry(t *testing.T) {

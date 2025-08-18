@@ -1,209 +1,144 @@
 package shared
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsDataverseFile(t *testing.T) {
+func TestIsDataProductFile(t *testing.T) {
 	tests := []struct {
-		name         string
-		path         string
-		expectedSafe bool
-		expectedType DataverseFileType
+		name     string
+		path     string
+		expected bool
 	}{
-		// Warehouse files
+		// Data product files
 		{
-			name:         "warehouse file - product.yaml",
-			path:         "dataproducts/aggregate/bookingsmaster/prod/product.yaml",
-			expectedSafe: true,
-			expectedType: WarehouseFile,
+			name:     "data product file - product.yaml",
+			path:     "dataproducts/aggregate/bookingsmaster/prod/product.yaml",
+			expected: true,
 		},
 		{
-			name:         "warehouse file - product.yml",
-			path:         "dataproducts/aggregate/costops/dev/product.yml",
-			expectedSafe: true,
-			expectedType: WarehouseFile,
+			name:     "data product file - product.yml",
+			path:     "dataproducts/aggregate/costops/dev/product.yml",
+			expected: true,
 		},
 		{
-			name:         "warehouse file - uppercase",
-			path:         "dataproducts/aggregate/spa/PRODUCT.YAML",
-			expectedSafe: true,
-			expectedType: WarehouseFile,
+			name:     "data product file - uppercase",
+			path:     "dataproducts/aggregate/spa/PRODUCT.YAML",
+			expected: true,
 		},
 
-		// Sourcebinding files
+		// Non-data product files
 		{
-			name:         "sourcebinding file - sourcebinding.yaml",
-			path:         "dataproducts/source/marketo/sandbox/sourcebinding.yaml",
-			expectedSafe: true,
-			expectedType: SourceBindingFile,
+			name:     "README file",
+			path:     "README.md",
+			expected: false,
 		},
 		{
-			name:         "sourcebinding file - sourcebinding.yml",
-			path:         "dataproducts/source/hellosource/prod/sourcebinding.yml",
-			expectedSafe: true,
-			expectedType: SourceBindingFile,
+			name:     "random YAML file",
+			path:     "config/settings.yaml",
+			expected: false,
 		},
 		{
-			name:         "sourcebinding file - uppercase",
-			path:         "dataproducts/source/sfsales/SOURCEBINDING.YAML",
-			expectedSafe: true,
-			expectedType: SourceBindingFile,
-		},
-
-		// Non-dataverse files
-		{
-			name:         "README file",
-			path:         "README.md",
-			expectedSafe: false,
-			expectedType: "",
+			name:     "developers file",
+			path:     "dataproducts/aggregate/bookingsmaster/developers.yaml",
+			expected: false,
 		},
 		{
-			name:         "random YAML file",
-			path:         "config/settings.yaml",
-			expectedSafe: false,
-			expectedType: "",
-		},
-		{
-			name:         "developers file",
-			path:         "dataproducts/aggregate/bookingsmaster/developers.yaml",
-			expectedSafe: false,
-			expectedType: "",
-		},
-		{
-			name:         "similar but not exact match",
-			path:         "dataproducts/source/test/product-config.yaml",
-			expectedSafe: false,
-			expectedType: "",
+			name:     "similar but not exact match",
+			path:     "dataproducts/source/test/product-config.yaml",
+			expected: false,
 		},
 
 		// Edge cases
 		{
-			name:         "empty path",
-			path:         "",
-			expectedSafe: false,
-			expectedType: "",
+			name:     "empty path",
+			path:     "",
+			expected: false,
 		},
 		{
-			name:         "path with spaces",
-			path:         "data products/source/test/sourcebinding.yaml",
-			expectedSafe: true,
-			expectedType: SourceBindingFile,
+			name:     "path with spaces",
+			path:     "data products/source/test/product.yaml",
+			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualSafe, actualType := IsDataverseFile(tt.path)
-			assert.Equal(t, tt.expectedSafe, actualSafe, "IsDataverseFile() safety check failed")
-			assert.Equal(t, tt.expectedType, actualType, "IsDataverseFile() type detection failed")
+			actual := IsDataProductFile(tt.path)
+			assert.Equal(t, tt.expected, actual, "IsDataProductFile() failed")
 		})
 	}
 }
 
-func TestAnalyzeDataverseChanges(t *testing.T) {
+func TestAnalyzeDataProductChanges(t *testing.T) {
 	tests := []struct {
 		name     string
 		changes  []gitlab.FileChange
-		expected map[DataverseFileType]int
+		expected int
 	}{
 		{
 			name:     "no changes",
 			changes:  []gitlab.FileChange{},
-			expected: map[DataverseFileType]int{},
+			expected: 0,
 		},
 		{
-			name: "only warehouse changes",
+			name: "only data product changes",
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/agg/bookings/prod/product.yaml"},
 				{NewPath: "dataproducts/agg/costops/dev/product.yaml"},
 			},
-			expected: map[DataverseFileType]int{
-				WarehouseFile: 2,
-			},
+			expected: 2,
 		},
 		{
-			name: "only sourcebinding changes",
-			changes: []gitlab.FileChange{
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
-				{NewPath: "dataproducts/source/sfsales/prod/sourcebinding.yaml"},
-				{NewPath: "dataproducts/source/hellosource/dev/sourcebinding.yaml"},
-			},
-			expected: map[DataverseFileType]int{
-				SourceBindingFile: 3,
-			},
-		},
-		{
-			name: "mixed warehouse and sourcebinding changes",
+			name: "mixed data product and non-data product files",
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/agg/spa/prod/product.yaml"},
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
-				{NewPath: "dataproducts/agg/forecasting/dev/product.yaml"},
-				{NewPath: "dataproducts/source/orders/prod/sourcebinding.yaml"},
+				{NewPath: "README.md"},
+				{NewPath: "dataproducts/source/marketo/sandbox/product.yaml"},
 			},
-			expected: map[DataverseFileType]int{
-				WarehouseFile:     2,
-				SourceBindingFile: 2,
-			},
+			expected: 2,
 		},
 		{
-			name: "non-dataverse files",
+			name: "non-data product files",
 			changes: []gitlab.FileChange{
 				{NewPath: "README.md"},
 				{NewPath: "config/settings.yaml"},
 				{NewPath: "dataproducts/agg/bookings/developers.yaml"},
 			},
-			expected: map[DataverseFileType]int{},
-		},
-		{
-			name: "mixed dataverse and non-dataverse files",
-			changes: []gitlab.FileChange{
-				{NewPath: "dataproducts/agg/spa/prod/product.yaml"},
-				{NewPath: "README.md"},
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
-			},
-			expected: map[DataverseFileType]int{
-				WarehouseFile:     1,
-				SourceBindingFile: 1,
-			},
+			expected: 0,
 		},
 		{
 			name: "file deletions - old path detection",
 			changes: []gitlab.FileChange{
 				{OldPath: "dataproducts/agg/old/product.yaml", NewPath: ""},
-				{OldPath: "dataproducts/source/old/sourcebinding.yaml", NewPath: ""},
 			},
-			expected: map[DataverseFileType]int{
-				WarehouseFile:     1,
-				SourceBindingFile: 1,
-			},
+			expected: 1,
 		},
 		{
-			name: "file renames - both paths same type",
+			name: "file renames - both paths data product",
 			changes: []gitlab.FileChange{
 				{
 					OldPath: "dataproducts/agg/old/product.yaml",
 					NewPath: "dataproducts/agg/new/product.yaml",
 				},
 			},
-			expected: map[DataverseFileType]int{
-				WarehouseFile: 1,
-			},
+			expected: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := AnalyzeDataverseChanges(tt.changes)
-			assert.Equal(t, tt.expected, actual, "AnalyzeDataverseChanges() failed")
+			actual := CountDataProductChanges(tt.changes)
+			assert.Equal(t, tt.expected, actual, "CountDataProductChanges() failed")
 		})
 	}
 }
 
-func TestAreAllDataverseSafe(t *testing.T) {
+func TestAreAllDataProductSafe(t *testing.T) {
 	tests := []struct {
 		name     string
 		changes  []gitlab.FileChange
@@ -215,7 +150,7 @@ func TestAreAllDataverseSafe(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "all warehouse files",
+			name: "all data product files",
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/agg/bookings/prod/product.yaml"},
 				{NewPath: "dataproducts/agg/costops/dev/product.yaml"},
@@ -223,23 +158,7 @@ func TestAreAllDataverseSafe(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "all sourcebinding files",
-			changes: []gitlab.FileChange{
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
-				{NewPath: "dataproducts/source/sfsales/prod/sourcebinding.yaml"},
-			},
-			expected: true,
-		},
-		{
-			name: "mixed warehouse and sourcebinding",
-			changes: []gitlab.FileChange{
-				{NewPath: "dataproducts/agg/spa/prod/product.yaml"},
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
-			},
-			expected: true,
-		},
-		{
-			name: "contains non-dataverse file",
+			name: "contains non-data product file",
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/agg/spa/prod/product.yaml"},
 				{NewPath: "README.md"},
@@ -247,7 +166,7 @@ func TestAreAllDataverseSafe(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "all non-dataverse files",
+			name: "all non-data product files",
 			changes: []gitlab.FileChange{
 				{NewPath: "README.md"},
 				{NewPath: "config/settings.yaml"},
@@ -255,16 +174,16 @@ func TestAreAllDataverseSafe(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "file deletion - old path is dataverse",
+			name: "file deletion - old path is data product",
 			changes: []gitlab.FileChange{
 				{OldPath: "dataproducts/agg/old/product.yaml", NewPath: ""},
 			},
 			expected: true,
 		},
 		{
-			name: "file addition - new path is dataverse",
+			name: "file addition - new path is data product",
 			changes: []gitlab.FileChange{
-				{OldPath: "", NewPath: "dataproducts/source/new/sourcebinding.yaml"},
+				{OldPath: "", NewPath: "dataproducts/source/new/product.yaml"},
 			},
 			expected: true,
 		},
@@ -273,7 +192,7 @@ func TestAreAllDataverseSafe(t *testing.T) {
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/agg/spa/prod/product.yaml"},
 				{NewPath: "scripts/deploy.sh"},
-				{NewPath: "dataproducts/source/marketo/sandbox/sourcebinding.yaml"},
+				{NewPath: "dataproducts/source/marketo/sandbox/product.yaml"},
 			},
 			expected: false,
 		},
@@ -281,94 +200,39 @@ func TestAreAllDataverseSafe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := AreAllDataverseSafe(tt.changes)
-			assert.Equal(t, tt.expected, actual, "AreAllDataverseSafe() failed")
+			actual := AreAllDataProductSafe(tt.changes)
+			assert.Equal(t, tt.expected, actual, "AreAllDataProductSafe() failed")
 		})
 	}
 }
 
-func TestBuildDataverseApprovalMessage(t *testing.T) {
+func TestBuildDataProductApprovalMessage(t *testing.T) {
 	tests := []struct {
-		name      string
-		fileTypes map[DataverseFileType]int
-		expected  string
+		name         string
+		changeCount  int
+		expected     string
 	}{
 		{
-			name:      "no changes",
-			fileTypes: map[DataverseFileType]int{},
-			expected:  "Auto-approving MR with no dataverse file changes",
+			name:        "no changes",
+			changeCount: 0,
+			expected:    "Auto-approving MR with no data product file changes",
 		},
 		{
-			name: "single warehouse change",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile: 1,
-			},
-			expected: "Auto-approving MR with only 1 warehouse changes",
+			name:        "single change",
+			changeCount: 1,
+			expected:    "Auto-approving MR with only 1 data product changes",
 		},
 		{
-			name: "multiple warehouse changes",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile: 3,
-			},
-			expected: "Auto-approving MR with only 3 warehouse changes",
-		},
-		{
-			name: "single sourcebinding change",
-			fileTypes: map[DataverseFileType]int{
-				SourceBindingFile: 1,
-			},
-			expected: "Auto-approving MR with only 1 sourcebinding changes",
-		},
-		{
-			name: "multiple sourcebinding changes",
-			fileTypes: map[DataverseFileType]int{
-				SourceBindingFile: 5,
-			},
-			expected: "Auto-approving MR with only 5 sourcebinding changes",
-		},
-		{
-			name: "mixed changes - warehouse and sourcebinding",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile:     2,
-				SourceBindingFile: 3,
-			},
-			expected: "Auto-approving MR with only 2 warehouse and 3 sourcebinding changes",
-		},
-		{
-			name: "mixed changes - single of each",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile:     1,
-				SourceBindingFile: 1,
-			},
-			expected: "Auto-approving MR with only 1 warehouse and 1 sourcebinding changes",
-		},
-		{
-			name: "zero values in map (should be ignored)",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile:     0,
-				SourceBindingFile: 2,
-			},
-			expected: "Auto-approving MR with only 2 sourcebinding changes",
-		},
-		{
-			name: "all zero values",
-			fileTypes: map[DataverseFileType]int{
-				WarehouseFile:     0,
-				SourceBindingFile: 0,
-			},
-			expected: "Auto-approving MR with only no changes",
-		},
-		{
-			name: "nil map (should behave like empty)",
-			fileTypes: nil,
-			expected: "Auto-approving MR with no dataverse file changes",
+			name:        "multiple changes",
+			changeCount: 3,
+			expected:    "Auto-approving MR with only 3 data product changes",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := BuildDataverseApprovalMessage(tt.fileTypes)
-			assert.Equal(t, tt.expected, actual, "BuildDataverseApprovalMessage() failed")
+			actual := BuildDataProductApprovalMessage(tt.changeCount)
+			assert.Equal(t, tt.expected, actual, "BuildDataProductApprovalMessage() failed")
 		})
 	}
 }
@@ -492,4 +356,41 @@ func TestIsAutomatedUser(t *testing.T) {
 			assert.Equal(t, tt.expected, actual, "IsAutomatedUser() failed")
 		})
 	}
+}
+
+// Helper functions for the tests
+
+// CountDataProductChanges counts the number of data product file changes
+func CountDataProductChanges(changes []gitlab.FileChange) int {
+	count := 0
+	for _, change := range changes {
+		// Check both old and new paths for file additions, modifications, and deletions
+		if IsDataProductFile(change.NewPath) || IsDataProductFile(change.OldPath) {
+			count++
+		}
+	}
+	return count
+}
+
+// AreAllDataProductSafe returns true if all changes are data product files
+func AreAllDataProductSafe(changes []gitlab.FileChange) bool {
+	if len(changes) == 0 {
+		return true
+	}
+
+	for _, change := range changes {
+		// For each change, check if at least one of the paths is a data product file
+		if !IsDataProductFile(change.NewPath) && !IsDataProductFile(change.OldPath) {
+			return false
+		}
+	}
+	return true
+}
+
+// BuildDataProductApprovalMessage creates an approval message for data product changes
+func BuildDataProductApprovalMessage(changeCount int) string {
+	if changeCount == 0 {
+		return "Auto-approving MR with no data product file changes"
+	}
+	return fmt.Sprintf("Auto-approving MR with only %d data product changes", changeCount)
 }

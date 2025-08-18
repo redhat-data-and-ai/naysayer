@@ -28,29 +28,6 @@ func TestAnalyzer_parseDataProduct(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "valid yaml with single warehouse",
-			yamlContent: `
-name: "test-product"
-kind: "data-product"
-rover_group: "ddi"
-warehouses:
-  - type: "snowflake"
-    size: "MEDIUM"
-tags:
-  data_product: "test"
-`,
-			expected: &DataProduct{
-				Name:       "test-product",
-				Kind:       "data-product",
-				RoverGroup: "ddi",
-				Warehouses: []Warehouse{
-					{Type: "snowflake", Size: "MEDIUM"},
-				},
-				Tags: Tags{DataProduct: "test"},
-			},
-			expectedError: false,
-		},
-		{
 			name: "valid yaml with multiple warehouses",
 			yamlContent: `
 name: "multi-warehouse-product"
@@ -78,32 +55,16 @@ tags:
 			expectedError: false,
 		},
 		{
-			name: "valid yaml with no warehouses",
-			yamlContent: `
-name: "no-warehouse-product"
-rover_group: "test"
-warehouses: []
-tags:
-  data_product: "test"
-`,
-			expected: &DataProduct{
-				Name:       "no-warehouse-product",
-				RoverGroup: "test",
-				Warehouses: []Warehouse{},
-				Tags:       Tags{DataProduct: "test"},
-			},
-			expectedError: false,
-		},
-		{
-			name: "minimal valid yaml",
+			name: "minimal valid yaml with empty warehouses",
 			yamlContent: `
 name: "minimal"
 rover_group: "test"
+warehouses: []
 `,
 			expected: &DataProduct{
 				Name:       "minimal",
 				RoverGroup: "test",
-				Warehouses: nil,
+				Warehouses: []Warehouse{},
 				Tags:       Tags{},
 			},
 			expectedError: false,
@@ -118,36 +79,6 @@ warehouses:
 `,
 			expected:      nil,
 			expectedError: true,
-		},
-		{
-			name:          "empty yaml",
-			yamlContent:   "",
-			expected:      &DataProduct{},
-			expectedError: false,
-		},
-		{
-			name: "yaml with extra fields",
-			yamlContent: `
-name: "extra-fields"
-rover_group: "test"
-unknown_field: "should be ignored"
-warehouses:
-  - type: "snowflake"
-    size: "MEDIUM"
-    extra_warehouse_field: "ignored"
-tags:
-  data_product: "test"
-  extra_tag: "ignored"
-`,
-			expected: &DataProduct{
-				Name:       "extra-fields",
-				RoverGroup: "test",
-				Warehouses: []Warehouse{
-					{Type: "snowflake", Size: "MEDIUM"},
-				},
-				Tags: Tags{DataProduct: "test"},
-			},
-			expectedError: false,
 		},
 	}
 

@@ -60,12 +60,28 @@ func (h *DataProductConfigMrReviewHandler) HandleWebhook(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validate payload size (prevent abuse)
+	if c.Context().Request.Header.ContentLength() > 1024*1024 { // 1MB limit
+		logging.Warn("Payload too large: %d bytes", c.Context().Request.Header.ContentLength())
+		return c.Status(413).JSON(fiber.Map{
+			"error": "Payload too large (max 1MB)",
+		})
+	}
+
 	// Parse webhook payload
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
 		logging.Error("Failed to parse payload: %v", err)
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
+		})
+	}
+
+	// Validate webhook payload structure
+	if err := h.validateWebhookPayload(payload); err != nil {
+		logging.Warn("Webhook validation failed: %v", err)
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid webhook payload: " + err.Error(),
 		})
 	}
 
@@ -134,6 +150,8 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 	// Add detailed comment to MR if enabled
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
+
+		logging.MRInfo(mrInfo.MRIID, "Adding approval comment", zap.String("comment", comment))
 		
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
@@ -147,6 +165,7 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 
 	// Approve the MR with message
 	approvalMessage := messageBuilder.BuildApprovalMessage(result)
+	logging.MRInfo(mrInfo.MRIID, "Approving MR with message", zap.String("message", approvalMessage))
 	
 	if err := h.gitlabClient.ApproveMRWithMessage(mrInfo.ProjectID, mrInfo.MRIID, approvalMessage); err != nil {
 		// Try fallback to simple approval if message approval fails
@@ -170,6 +189,8 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
 		
+		logging.MRInfo(mrInfo.MRIID, "Adding manual review comment", zap.String("comment", comment))
+
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
 			// Continue without error - comment is nice-to-have
@@ -245,6 +266,21 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 	})
 }
 
+// validateWebhookPayload performs essential security validation on webhook payload
+func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[string]interface{}) error {
+	// Basic payload structure validation
+	if payload == nil {
+		return fmt.Errorf("payload is nil")
+	}
 
+	// Ensure required sections exist (ExtractMRInfo will do detailed validation)
+	if _, ok := payload["object_attributes"]; !ok {
+		return fmt.Errorf("missing object_attributes")
+	}
+	
+	if _, ok := payload["project"]; !ok {
+		return fmt.Errorf("missing project")
+	}
 
-
+	return nil
+}
