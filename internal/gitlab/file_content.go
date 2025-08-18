@@ -44,7 +44,7 @@ func (c *Client) FetchFileContent(projectID int, filePath, ref string) (*FileCon
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 404 {
 		return nil, fmt.Errorf("file not found: %s", filePath)
@@ -89,7 +89,7 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -110,12 +110,12 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 
 // MRDetails represents merge request details
 type MRDetails struct {
-	TargetBranch      string `json:"target_branch"`
-	SourceBranch      string `json:"source_branch"`
-	IID               int    `json:"iid"`
-	ProjectID         int    `json:"project_id"`         // Target project ID
-	SourceProjectID   int    `json:"source_project_id"`  // Source project ID (for cross-fork MRs)
-	TargetProjectID   int    `json:"target_project_id"`  // Target project ID (same as ProjectID)
+	TargetBranch    string `json:"target_branch"`
+	SourceBranch    string `json:"source_branch"`
+	IID             int    `json:"iid"`
+	ProjectID       int    `json:"project_id"`        // Target project ID
+	SourceProjectID int    `json:"source_project_id"` // Source project ID (for cross-fork MRs)
+	TargetProjectID int    `json:"target_project_id"` // Target project ID (same as ProjectID)
 }
 
 // GetMRDetails fetches merge request details
@@ -135,7 +135,7 @@ func (c *Client) GetMRDetails(projectID, mrIID int) (*MRDetails, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)

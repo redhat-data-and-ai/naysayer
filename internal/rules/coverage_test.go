@@ -21,16 +21,16 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string)
 func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 	// Create rule manager with only warehouse rule
 	manager := NewSimpleRuleManager()
-	
+
 	// Register only warehouse rule (pass nil since we're not testing GitLab integration)
 	manager.AddRule(warehouse.NewRule(nil))
 
 	tests := []struct {
-		name            string
-		changes         []gitlab.FileChange
+		name             string
+		changes          []gitlab.FileChange
 		expectedDecision shared.DecisionType
 		expectedReason   string
-		description     string
+		description      string
 	}{
 		{
 			name: "warehouse files only - should auto-approve",
@@ -40,7 +40,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.Approve,
 			expectedReason:   "files validated and approved",
-			description:     "All files covered by warehouse rule",
+			description:      "All files covered by warehouse rule",
 		},
 		{
 			name: "documentation files - should require manual review without general rule",
@@ -51,7 +51,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Files not covered by specific rules require manual review",
+			description:      "Files not covered by specific rules require manual review",
 		},
 		{
 			name: "mixed warehouse and uncovered files - should require manual review",
@@ -61,7 +61,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Any uncovered file forces manual review even if others are covered",
+			description:      "Any uncovered file forces manual review even if others are covered",
 		},
 		{
 			name: "config files - should require manual review",
@@ -71,7 +71,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Configuration files require manual review",
+			description:      "Configuration files require manual review",
 		},
 		{
 			name: "source code files - should require manual review",
@@ -81,17 +81,17 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Source code files require manual review",
+			description:      "Source code files require manual review",
 		},
 		{
 			name: "mixed warehouse and config files - should require manual review",
 			changes: []gitlab.FileChange{
 				{NewPath: "dataproducts/analytics/product.yaml"}, // Covered by warehouse rule
-				{NewPath: "config/secrets.yaml"},                  // Not covered by any rule
+				{NewPath: "config/secrets.yaml"},                 // Not covered by any rule
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Any uncovered file forces manual review",
+			description:      "Any uncovered file forces manual review",
 		},
 		{
 			name: "unknown file types - should require manual review",
@@ -101,7 +101,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			},
 			expectedDecision: shared.ManualReview,
 			expectedReason:   "Manual review required",
-			description:     "Unknown files require manual review",
+			description:      "Unknown files require manual review",
 		},
 	}
 
@@ -115,13 +115,13 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 			}
 
 			evaluation := manager.EvaluateAll(mrCtx)
-			
-			assert.Equal(t, tt.expectedDecision, evaluation.FinalDecision.Type, 
+
+			assert.Equal(t, tt.expectedDecision, evaluation.FinalDecision.Type,
 				"Expected decision type mismatch for: %s", tt.description)
-			
+
 			assert.Contains(t, evaluation.FinalDecision.Reason, tt.expectedReason,
 				"Expected reason not found in: %s. Got: %s", tt.description, evaluation.FinalDecision.Reason)
-			
+
 			// Additional assertions based on decision type
 			if evaluation.FinalDecision.Type == shared.Approve {
 				assert.Contains(t, evaluation.FinalDecision.Details, "Approved",
@@ -136,7 +136,7 @@ func TestRuleManager_CompleteCoverageEnforcement(t *testing.T) {
 
 func TestRuleManager_FileCoverageAnalysis(t *testing.T) {
 	manager := NewSimpleRuleManager()
-	
+
 	// Register only warehouse rule (no general rule)
 	manager.AddRule(warehouse.NewRule(nil))
 
@@ -154,7 +154,7 @@ func TestRuleManager_FileCoverageAnalysis(t *testing.T) {
 	assert.Equal(t, 1, coverage.CoveredFiles, "Should count covered files")
 	assert.Equal(t, 2, len(coverage.UncoveredFiles), "Should identify uncovered files")
 	assert.True(t, coverage.HasUncoveredFiles, "Should detect uncovered files")
-	
+
 	// Check specific uncovered files
 	assert.Contains(t, coverage.UncoveredFiles, "README.md")
 	assert.Contains(t, coverage.UncoveredFiles, "src/main.go")
@@ -175,7 +175,7 @@ func TestRuleManager_NoRulesRegistered(t *testing.T) {
 	// Should NEVER auto-approve when no rules are registered
 	assert.Equal(t, shared.ManualReview, evaluation.FinalDecision.Type,
 		"Should require manual review when no rules cover any files")
-	
+
 	assert.Contains(t, evaluation.FinalDecision.Reason, "Manual review required",
 		"Should clearly state that manual review is required")
 }

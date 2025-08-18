@@ -39,6 +39,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "✅ Draft MR skipped",
 				Details: "Draft MRs are automatically approved without rule evaluation",
 			},
+			RuleResults:     []shared.RuleResult{},
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
@@ -52,6 +53,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "🤖 Bot MR skipped",
 				Details: "MRs from automated users (bots) are automatically approved",
 			},
+			RuleResults:     []shared.RuleResult{},
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
@@ -78,8 +80,23 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 		}
 	}
 
+	// Build rule results for backward compatibility
+	var ruleResults []shared.RuleResult
+	for _, fileValidation := range fileValidations {
+		for _, lineValidation := range fileValidation.RuleResults {
+			ruleResults = append(ruleResults, shared.RuleResult{
+				RuleName: lineValidation.RuleName,
+				Decision: shared.Decision{
+					Type:   lineValidation.Decision,
+					Reason: lineValidation.Reason,
+				},
+			})
+		}
+	}
+
 	return &shared.RuleEvaluation{
 		FinalDecision:   overallDecision,
+		RuleResults:     ruleResults,
 		FileValidations: fileValidations,
 		ExecutionTime:   time.Since(start),
 		TotalFiles:      totalFiles,
@@ -89,37 +106,11 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 	}
 }
 
-// createSummary creates a summary message for a rule result
-func (rm *SimpleRuleManager) createSummary(ruleName string, decision shared.DecisionType) string {
-	switch decision {
-	case shared.Approve:
-		return "✅ " + ruleName + " approved"
-	case shared.ManualReview:
-		return "🚫 " + ruleName + " requires manual review"
-	default:
-		return "❓ " + ruleName + " unknown decision"
-	}
-}
-
-// createDetailsFromResults creates a details string from rule results
-func (rm *SimpleRuleManager) createDetailsFromResults(results []shared.RuleResult) string {
-	if len(results) == 0 {
-		return ""
-	}
-
-	details := "Rule evaluations:\n"
-	for _, result := range results {
-		details += "- " + result.RuleName + ": " + result.Decision.Reason + "\n"
-	}
-
-	return details
-}
-
 // FileCoverageResult represents the coverage analysis for an MR
 type FileCoverageResult struct {
-	TotalFiles       int      `json:"total_files"`
-	CoveredFiles     int      `json:"covered_files"`
-	UncoveredFiles   []string `json:"uncovered_files"`
+	TotalFiles        int      `json:"total_files"`
+	CoveredFiles      int      `json:"covered_files"`
+	UncoveredFiles    []string `json:"uncovered_files"`
 	HasUncoveredFiles bool     `json:"has_uncovered_files"`
 }
 
@@ -151,7 +142,7 @@ func (rm *SimpleRuleManager) analyzeFileCoverage(mrCtx *shared.MRContext) *FileC
 				break
 			}
 		}
-		
+
 		if covered {
 			coveredCount++
 		} else {
@@ -311,13 +302,13 @@ func (rm *SimpleRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) []s
 func (rm *SimpleRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
 	// For now, return placeholder content until a GitLab client is available in the manager
 	// In production, this should use a GitLab client to fetch actual file content
-	
+
 	// The current line-level validation system needs actual file content to work properly
 	// This placeholder provides realistic content for testing the validation logic
-	
+
 	// TODO: Add GitLab client to SimpleRuleManager and implement actual file fetching:
 	// client.FetchFileContent(mrCtx.ProjectID, filePath, mrCtx.SourceBranch)
-	
+
 	return "# Placeholder file content\nname: test-product\nkind: aggregated\nwarehouses:\n- type: user\n  size: XSMALL\n"
 }
 
@@ -344,4 +335,3 @@ func (rm *SimpleRuleManager) createDetailedSummary(fileValidations map[string]*s
 
 	return summary.String()
 }
-

@@ -69,7 +69,7 @@ func TestClient_FetchMRChanges_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(mockResponse)
+		_ = json.NewEncoder(w).Encode(mockResponse)
 	}))
 	defer server.Close()
 
@@ -135,7 +135,7 @@ func TestClient_FetchMRChanges_HTTPErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -157,7 +157,7 @@ func TestClient_FetchMRChanges_HTTPErrors(t *testing.T) {
 func TestClient_FetchMRChanges_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"invalid": json}`)) // Invalid JSON
+		_, _ = w.Write([]byte(`{"invalid": json}`)) // Invalid JSON
 	}))
 	defer server.Close()
 
@@ -226,7 +226,7 @@ func TestClient_FetchMRChanges_URLConstruction(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requestURL = r.URL.Path
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
+				_ = json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
 					OldPath     string `json:"old_path"`
 					NewPath     string `json:"new_path"`
 					AMode       string `json:"a_mode"`
@@ -527,7 +527,7 @@ func TestExtractMRInfo_PartialData(t *testing.T) {
 func TestClient_FetchMRChanges_EmptyResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
+		_ = json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
 			OldPath     string `json:"old_path"`
 			NewPath     string `json:"new_path"`
 			AMode       string `json:"a_mode"`
@@ -557,7 +557,7 @@ func TestClient_RequestHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedHeaders = r.Header
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
+		_ = json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
 			OldPath     string `json:"old_path"`
 			NewPath     string `json:"new_path"`
 			AMode       string `json:"a_mode"`

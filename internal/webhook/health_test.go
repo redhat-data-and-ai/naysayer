@@ -36,7 +36,7 @@ func TestHealthHandler_HandleHealth(t *testing.T) {
 	// Parse response
 	body, _ := io.ReadAll(resp.Body)
 	var health map[string]interface{}
-	json.Unmarshal(body, &health)
+	_ = json.Unmarshal(body, &health)
 
 	// Verify all expected fields are present
 	assert.Equal(t, "healthy", health["status"])
@@ -69,7 +69,7 @@ func TestHealthHandler_HandleHealth_UptimeProgression(t *testing.T) {
 
 	body1, _ := io.ReadAll(resp1.Body)
 	var health1 map[string]interface{}
-	json.Unmarshal(body1, &health1)
+	_ = json.Unmarshal(body1, &health1)
 	uptime1 := health1["uptime_seconds"].(float64)
 
 	// Wait a more noticeable amount
@@ -82,7 +82,7 @@ func TestHealthHandler_HandleHealth_UptimeProgression(t *testing.T) {
 
 	body2, _ := io.ReadAll(resp2.Body)
 	var health2 map[string]interface{}
-	json.Unmarshal(body2, &health2)
+	_ = json.Unmarshal(body2, &health2)
 	uptime2 := health2["uptime_seconds"].(float64)
 
 	// Uptime should have increased (allow for small measurement variations)
@@ -110,7 +110,7 @@ func TestHealthHandler_HandleReady_Success(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var ready map[string]interface{}
-	json.Unmarshal(body, &ready)
+	_ = json.Unmarshal(body, &ready)
 
 	assert.Equal(t, true, ready["ready"])
 	assert.Equal(t, "naysayer-webhook", ready["service"])
@@ -125,8 +125,7 @@ func TestHealthHandler_HandleReady_MissingGitLabToken(t *testing.T) {
 			BaseURL: "https://gitlab.example.com",
 			Token:   "", // No token
 		},
-		Webhook: config.WebhookConfig{
-		},
+		Webhook: config.WebhookConfig{},
 	}
 	handler := NewHealthHandler(cfg)
 
@@ -141,7 +140,7 @@ func TestHealthHandler_HandleReady_MissingGitLabToken(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var ready map[string]interface{}
-	json.Unmarshal(body, &ready)
+	_ = json.Unmarshal(body, &ready)
 
 	assert.Equal(t, false, ready["ready"])
 	assert.Equal(t, "GitLab token not configured", ready["reason"])
@@ -154,7 +153,7 @@ func TestHealthHandler_HandleReady_MissingWebhookSecret(t *testing.T) {
 			Token:   "test-token",
 		},
 		Webhook: config.WebhookConfig{
-			Secret:             "",   // No secret
+			Secret: "", // No secret
 		},
 	}
 	handler := NewHealthHandler(cfg)
@@ -170,7 +169,7 @@ func TestHealthHandler_HandleReady_MissingWebhookSecret(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var ready map[string]interface{}
-	json.Unmarshal(body, &ready)
+	_ = json.Unmarshal(body, &ready)
 
 	assert.Equal(t, true, ready["ready"])
 	assert.Nil(t, ready["reason"])
@@ -182,9 +181,7 @@ func TestHealthHandler_HandleReady_VerificationDisabled(t *testing.T) {
 			BaseURL: "https://gitlab.example.com",
 			Token:   "", // No token, should fail readiness
 		},
-		Webhook: config.WebhookConfig{
-
-		},
+		Webhook: config.WebhookConfig{},
 	}
 	handler := NewHealthHandler(cfg)
 
@@ -199,7 +196,7 @@ func TestHealthHandler_HandleReady_VerificationDisabled(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var ready map[string]interface{}
-	json.Unmarshal(body, &ready)
+	_ = json.Unmarshal(body, &ready)
 
 	assert.Equal(t, false, ready["ready"])
 	assert.Equal(t, "GitLab token not configured", ready["reason"])
@@ -213,8 +210,8 @@ func TestHealthHandler_HandleHealth_WithSecureConfig(t *testing.T) {
 		},
 		Webhook: config.WebhookConfig{
 
-			Secret:             "webhook-secret",
-			AllowedIPs:         []string{"192.168.1.0/24", "10.0.0.0/8"},
+			Secret:     "webhook-secret",
+			AllowedIPs: []string{"192.168.1.0/24", "10.0.0.0/8"},
 		},
 	}
 	handler := NewHealthHandler(cfg)
@@ -230,7 +227,7 @@ func TestHealthHandler_HandleHealth_WithSecureConfig(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var health map[string]interface{}
-	json.Unmarshal(body, &health)
+	_ = json.Unmarshal(body, &health)
 
 	assert.Equal(t, "healthy", health["status"])
 	assert.Equal(t, true, health["gitlab_token"])
@@ -279,7 +276,7 @@ func TestHealthHandler_StartTimeImmutable(t *testing.T) {
 	app.Get("/health", handler.HandleHealth)
 
 	req := httptest.NewRequest("GET", "/health", nil)
-	app.Test(req)
+	_, _ = app.Test(req)
 
 	startTime2 := handler.startTime
 	assert.Equal(t, startTime1, startTime2)
@@ -299,7 +296,7 @@ func TestHealthHandler_TimestampFormat(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var health map[string]interface{}
-	json.Unmarshal(body, &health)
+	_ = json.Unmarshal(body, &health)
 
 	timestamp := health["timestamp"].(string)
 

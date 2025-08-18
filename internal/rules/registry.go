@@ -42,7 +42,7 @@ func NewRuleRegistry() *RuleRegistry {
 // registerBuiltInRules registers all built-in rules
 func (r *RuleRegistry) registerBuiltInRules() {
 	// Warehouse rule
-	r.RegisterRule(&RuleInfo{
+	_ = r.RegisterRule(&RuleInfo{
 		Name:        "warehouse_rule",
 		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding), requires manual review for warehouse increases",
 		Version:     "1.0.0",
@@ -52,8 +52,6 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Enabled:  true,
 		Category: "warehouse",
 	})
-
-
 
 }
 

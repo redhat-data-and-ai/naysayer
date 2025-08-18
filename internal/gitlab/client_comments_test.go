@@ -38,12 +38,12 @@ func TestAddMRComment_Success(t *testing.T) {
 		// Verify request body
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]string
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 		assert.Equal(t, "Test comment", payload["body"])
 
 		// Return success response
 		w.WriteHeader(201)
-		w.Write([]byte(`{"id": 123, "body": "Test comment"}`))
+		_, _ = w.Write([]byte(`{"id": 123, "body": "Test comment"}`))
 	}))
 	defer server.Close()
 
@@ -64,7 +64,7 @@ func TestAddMRComment_Success(t *testing.T) {
 func TestAddMRComment_UnauthorizedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
-		w.Write([]byte(`{"message": "401 Unauthorized"}`))
+		_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -86,7 +86,7 @@ func TestAddMRComment_UnauthorizedError(t *testing.T) {
 func TestAddMRComment_NotFoundError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
-		w.Write([]byte(`{"message": "404 Not Found"}`))
+		_, _ = w.Write([]byte(`{"message": "404 Not Found"}`))
 	}))
 	defer server.Close()
 
@@ -108,7 +108,7 @@ func TestAddMRComment_NotFoundError(t *testing.T) {
 func TestAddMRComment_GenericError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`{"message": "Internal Server Error"}`))
+		_, _ = w.Write([]byte(`{"message": "Internal Server Error"}`))
 	}))
 	defer server.Close()
 
@@ -141,7 +141,7 @@ func TestApproveMR_Success(t *testing.T) {
 
 		// Return success response
 		w.WriteHeader(201)
-		w.Write([]byte(`{"id": 123, "approved": true}`))
+		_, _ = w.Write([]byte(`{"id": 123, "approved": true}`))
 	}))
 	defer server.Close()
 
@@ -169,12 +169,12 @@ func TestApproveMRWithMessage_Success(t *testing.T) {
 		// Verify request body contains message
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]string
-		json.Unmarshal(body, &payload)
+		_ = json.Unmarshal(body, &payload)
 		assert.Equal(t, "Auto-approved: Safe changes", payload["note"])
 
 		// Return success response
 		w.WriteHeader(201)
-		w.Write([]byte(`{"id": 123, "approved": true}`))
+		_, _ = w.Write([]byte(`{"id": 123, "approved": true}`))
 	}))
 	defer server.Close()
 
@@ -199,7 +199,7 @@ func TestApproveMRWithMessage_EmptyMessage(t *testing.T) {
 		assert.Equal(t, "{}", string(body))
 
 		w.WriteHeader(201)
-		w.Write([]byte(`{"id": 123, "approved": true}`))
+		_, _ = w.Write([]byte(`{"id": 123, "approved": true}`))
 	}))
 	defer server.Close()
 
@@ -220,7 +220,7 @@ func TestApproveMRWithMessage_EmptyMessage(t *testing.T) {
 func TestApproveMRWithMessage_UnauthorizedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
-		w.Write([]byte(`{"message": "401 Unauthorized"}`))
+		_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -242,7 +242,7 @@ func TestApproveMRWithMessage_UnauthorizedError(t *testing.T) {
 func TestApproveMRWithMessage_NotFoundError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
-		w.Write([]byte(`{"message": "404 Not Found"}`))
+		_, _ = w.Write([]byte(`{"message": "404 Not Found"}`))
 	}))
 	defer server.Close()
 
@@ -264,7 +264,7 @@ func TestApproveMRWithMessage_NotFoundError(t *testing.T) {
 func TestApproveMRWithMessage_AlreadyApprovedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
-		w.Write([]byte(`{"message": "Method Not Allowed"}`))
+		_, _ = w.Write([]byte(`{"message": "Method Not Allowed"}`))
 	}))
 	defer server.Close()
 
@@ -286,7 +286,7 @@ func TestApproveMRWithMessage_AlreadyApprovedError(t *testing.T) {
 func TestApproveMRWithMessage_GenericError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`{"message": "Internal Server Error"}`))
+		_, _ = w.Write([]byte(`{"message": "Internal Server Error"}`))
 	}))
 	defer server.Close()
 
@@ -346,7 +346,7 @@ func TestApproveMR_CallsApproveMRWithMessage(t *testing.T) {
 		assert.Equal(t, "{}", string(body))
 
 		w.WriteHeader(201)
-		w.Write([]byte(`{"id": 123, "approved": true}`))
+		_, _ = w.Write([]byte(`{"id": 123, "approved": true}`))
 	}))
 	defer server.Close()
 

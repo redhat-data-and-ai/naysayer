@@ -1,6 +1,6 @@
 # NAYSAYER Makefile
 
-.PHONY: build run test test-coverage clean install help docker fmt vet lint
+.PHONY: build run test test-coverage clean install help docker fmt vet lint lint-fix
 
 # Default target
 help:
@@ -17,6 +17,7 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  lint           Run golangci-lint"
+	@echo "  lint-fix       Run golangci-lint with automatic fixes"
 	@echo "  fmt            Format code with gofmt"
 	@echo "  vet            Run go vet"
 	@echo ""
@@ -26,7 +27,7 @@ help:
 	@echo ""
 
 # Build the binary
-build:
+build: lint fmt vet test
 	@echo "Building naysayer..."
 	go build -o naysayer cmd/main.go
 	@echo "✅ Built naysayer binary"
@@ -44,10 +45,10 @@ test:
 # Generate test coverage report
 test-coverage:
 	@echo "Generating test coverage report..."
-	go test ./... -coverprofile=coverage.out
+	@mkdir -p coverage
+	go test ./... -coverprofile=coverage/coverage.out -covermode=atomic
 	@echo "📊 Coverage Summary:"
-	go tool cover -func=coverage.out
-	@rm -f coverage.out
+	go tool cover -func=coverage/coverage.out | tail -1
 	@echo "✅ Coverage report completed"
 
 # Format code
@@ -73,10 +74,21 @@ lint:
 		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.54.2"; \
 	fi
 
+# Run linter with automatic fixes
+lint-fix:
+	@echo "Running golangci-lint with automatic fixes..."
+	@if command -v golangci-lint > /dev/null; then \
+		golangci-lint run --fix ./...; \
+		echo "✅ Linting with fixes completed"; \
+	else \
+		echo "⚠️  golangci-lint not installed. Install with:"; \
+		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.54.2"; \
+	fi
+
 # Clean built files and coverage files
 clean:
 	@echo "Cleaning..."
-	rm -f naysayer coverage.out
+	rm -f naysayer
 	rm -rf coverage/
 	@echo "✅ Cleaned"
 
@@ -97,9 +109,3 @@ docker-build:
 docker-push:
 	docker push quay.io/redhat-data-and-ai/naysayer:latest
 	@echo "✅ Docker image pushed: quay.io/redhat-data-and-ai/naysayer:latest"
-
-
-
-
-
-

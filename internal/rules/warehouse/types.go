@@ -10,9 +10,9 @@ type WarehouseChange struct {
 
 // ValidationResult represents warehouse validation outcome
 type ValidationResult struct {
-	IsValid      bool
-	Issues       []string
-	RequiresTOC  bool
+	IsValid          bool
+	Issues           []string
+	RequiresTOC      bool
 	RequiresPlatform bool
 }
 

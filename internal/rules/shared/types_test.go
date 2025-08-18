@@ -208,9 +208,9 @@ func TestAreAllDataProductSafe(t *testing.T) {
 
 func TestBuildDataProductApprovalMessage(t *testing.T) {
 	tests := []struct {
-		name         string
-		changeCount  int
-		expected     string
+		name        string
+		changeCount int
+		expected    string
 	}{
 		{
 			name:        "no changes",

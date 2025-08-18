@@ -108,8 +108,11 @@ WAREHOUSE_RULE_ENABLED=true
 git clone https://github.com/your-org/naysayer.git
 cd naysayer && go mod tidy
 
-# Run tests
-make test
+# Setup code quality tools
+./scripts/setup-quality.sh
+
+# Run code quality checks
+make build
 
 # Start development server
 export GITLAB_TOKEN=your-token
@@ -125,6 +128,19 @@ naysayer/
 │   ├── rules/              # User-facing rule guides
 │   └── templates/          # Developer templates
 └── config/                 # Kubernetes/OpenShift manifests
+```
+
+### Code Quality
+```bash
+# Run individual code quality checks
+make lint       # Run golangci-lint
+make lint-fix   # Run golangci-lint with automatic fixes
+make fmt        # Format code
+make vet        # Run go vet
+make test       # Run tests
+
+# Run all at once
+make lint fmt vet test
 ```
 
 ### Adding New Rules

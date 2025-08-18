@@ -99,7 +99,7 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 	// Determine project IDs for target and source branches
 	targetProjectID := projectID // Always use the target project ID for target branch
 	sourceProjectID := projectID // Default to target project ID
-	
+
 	// For cross-fork MRs, use the source project ID for source branch
 	if mrDetails.SourceProjectID != 0 && mrDetails.SourceProjectID != targetProjectID {
 		sourceProjectID = mrDetails.SourceProjectID
@@ -118,7 +118,7 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 			}
 			return nil, fmt.Errorf("failed to fetch new file content from source project %d, branch %s: %v", sourceProjectID, mrDetails.SourceBranch, err)
 		}
-		
+
 		// New file - compare empty state with new content
 		oldDP := &DataProduct{Warehouses: []Warehouse{}}
 		newDP, err := a.parseDataProduct(newContent.Content)
@@ -161,7 +161,7 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 
 	// Compare warehouse configurations and check for non-warehouse changes
 	changes := a.compareWarehouses(filePath, oldDP, newDP)
-	
+
 	// Check if there are any changes beyond warehouse sizes
 	hasNonWarehouseChanges := a.hasNonWarehouseChanges(oldContent.Content, newContent.Content, oldDP, newDP)
 	if hasNonWarehouseChanges {
@@ -169,11 +169,11 @@ func (a *Analyzer) analyzeFileChange(projectID, mrIID int, filePath string) (*[]
 		changes = append(changes, WarehouseChange{
 			FilePath:   fmt.Sprintf("%s (non-warehouse changes)", filePath),
 			FromSize:   "N/A",
-			ToSize:     "N/A", 
+			ToSize:     "N/A",
 			IsDecrease: false, // Non-warehouse changes require manual review
 		})
 	}
-	
+
 	return &changes, nil
 }
 
@@ -245,7 +245,7 @@ func (a *Analyzer) hasNonWarehouseChanges(oldContent, newContent string, oldDP, 
 		oldDP.Tags != newDP.Tags {
 		return true
 	}
-	
+
 	// For more comprehensive detection, we need to check if the YAML content
 	// has changes in sections we don't parse (like data_product_db, service_account, etc.)
 	// We'll do this by creating a warehouse-normalized version and comparing
@@ -257,7 +257,7 @@ func (a *Analyzer) hasUnparsedFieldChanges(oldContent, newContent string, oldDP,
 	// Create normalized versions with identical warehouse sections
 	oldNormalized := a.normalizeWarehouseSections(oldContent, oldDP, newDP)
 	newNormalized := a.normalizeWarehouseSections(newContent, newDP, newDP)
-	
+
 	// If the normalized versions are different, there are non-warehouse changes
 	return oldNormalized != newNormalized
 }
@@ -268,17 +268,17 @@ func (a *Analyzer) normalizeWarehouseSections(content string, originalDP, target
 	// and compare the rest of the YAML
 	lines := strings.Split(content, "\n")
 	var filteredLines []string
-	
+
 	inWarehouseSection := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Detect start of warehouses section
 		if strings.HasPrefix(trimmed, "warehouses:") {
 			inWarehouseSection = true
 			continue
 		}
-		
+
 		// Detect end of warehouses section (next top-level key or end of file)
 		if inWarehouseSection {
 			if len(trimmed) > 0 && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") && strings.Contains(line, ":") {
@@ -289,9 +289,9 @@ func (a *Analyzer) normalizeWarehouseSections(content string, originalDP, target
 			// Skip warehouse section lines
 			continue
 		}
-		
+
 		filteredLines = append(filteredLines, line)
 	}
-	
+
 	return strings.Join(filteredLines, "\n")
 }

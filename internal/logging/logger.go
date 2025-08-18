@@ -31,7 +31,7 @@ func NewLogger(level LogLevel, component string) *Logger {
 	config.Level = zap.NewAtomicLevelAt(logLevelToZap(level))
 	config.Development = false
 	config.Encoding = "json"
-	
+
 	// Set initial fields
 	config.InitialFields = map[string]interface{}{
 		"component": component,
@@ -131,7 +131,7 @@ func (l *Logger) MRWarn(mrID int, message string, fields ...zap.Field) {
 
 // Sync flushes any buffered log entries
 func (l *Logger) Sync() {
-	l.zap.Sync()
+	_ = l.zap.Sync()
 }
 
 // Global logger instance
@@ -195,4 +195,4 @@ func init() {
 		}
 		InitLogger(level, "NAYSAYER")
 	}
-} 
+}

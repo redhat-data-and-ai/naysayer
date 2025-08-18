@@ -95,6 +95,7 @@ type FileValidationSummary struct {
 // RuleEvaluation contains the results of evaluating all rules
 type RuleEvaluation struct {
 	FinalDecision   Decision                          `json:"final_decision"`
+	RuleResults     []RuleResult                      `json:"rule_results"`     // Individual rule results for backward compatibility
 	FileValidations map[string]*FileValidationSummary `json:"file_validations"` // filePath -> summary
 	ExecutionTime   time.Duration                     `json:"execution_time"`
 
@@ -103,7 +104,6 @@ type RuleEvaluation struct {
 	ApprovedFiles  int `json:"approved_files"`
 	ReviewFiles    int `json:"review_files"`
 	UncoveredFiles int `json:"uncovered_files"`
-
 }
 
 // Common helper functions for rule evaluation
@@ -232,12 +232,12 @@ type YAMLField struct {
 
 // YAMLSection represents a logical section of a YAML file with line tracking
 type YAMLSection struct {
-	Name       string      `json:"name"`
-	StartLine  int         `json:"start_line"`
-	EndLine    int         `json:"end_line"`
-	Content    string      `json:"content"`
-	Fields     []YAMLField `json:"fields"`
-	FilePath   string      `json:"file_path"`
+	Name      string      `json:"name"`
+	StartLine int         `json:"start_line"`
+	EndLine   int         `json:"end_line"`
+	Content   string      `json:"content"`
+	Fields    []YAMLField `json:"fields"`
+	FilePath  string      `json:"file_path"`
 }
 
 // YAMLParseResult contains the parsed YAML structure with line mappings
@@ -260,7 +260,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 
 	lines := strings.Split(content, "\n")
 	totalLines := len(lines)
-	
+
 	result := &YAMLParseResult{
 		Sections:   []YAMLSection{},
 		TotalLines: totalLines,
@@ -268,12 +268,12 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 	}
 
 	var currentSection *YAMLSection
-	var currentIndentLevel int = -1
+	var currentIndentLevel = -1
 
 	for i, line := range lines {
 		lineNum := i + 1
 		trimmedLine := strings.TrimSpace(line)
-		
+
 		// Skip empty lines and comments
 		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") || strings.HasPrefix(trimmedLine, "---") {
 			continue
@@ -281,7 +281,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 
 		// Calculate indentation level
 		indent := len(line) - len(strings.TrimLeft(line, " \t"))
-		
+
 		// Check if this is a top-level key (new section)
 		if strings.Contains(trimmedLine, ":") && (indent == 0 || currentIndentLevel == -1) {
 			// Close previous section if it exists
@@ -289,7 +289,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 				currentSection.EndLine = lineNum - 1
 				result.Sections = append(result.Sections, *currentSection)
 			}
-			
+
 			// Start new section
 			keyName := strings.Split(trimmedLine, ":")[0]
 			currentSection = &YAMLSection{
@@ -301,13 +301,13 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 				FilePath:  filePath,
 			}
 			currentIndentLevel = indent
-			
+
 			// Add the field for this line
 			value := ""
 			if parts := strings.SplitN(trimmedLine, ":", 2); len(parts) > 1 {
 				value = strings.TrimSpace(parts[1])
 			}
-			
+
 			currentSection.Fields = append(currentSection.Fields, YAMLField{
 				Name:      keyName,
 				Value:     value,
@@ -317,7 +317,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 		} else if currentSection != nil {
 			// This line belongs to the current section
 			currentSection.EndLine = lineNum
-			
+
 			// Parse nested fields
 			if strings.Contains(trimmedLine, ":") {
 				keyName := strings.Split(trimmedLine, ":")[0]
@@ -325,7 +325,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 				if parts := strings.SplitN(trimmedLine, ":", 2); len(parts) > 1 {
 					value = strings.TrimSpace(parts[1])
 				}
-				
+
 				currentSection.Fields = append(currentSection.Fields, YAMLField{
 					Name:      strings.TrimSpace(keyName),
 					Value:     value,
@@ -334,7 +334,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 				})
 			}
 		}
-		
+
 		// Add line to current section content
 		if currentSection != nil {
 			if currentSection.Content != "" {
@@ -343,7 +343,7 @@ func ParseYAMLWithLineNumbers(filePath, content string) *YAMLParseResult {
 			currentSection.Content += line
 		}
 	}
-	
+
 	// Close the last section
 	if currentSection != nil {
 		currentSection.EndLine = totalLines

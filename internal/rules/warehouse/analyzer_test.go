@@ -16,8 +16,6 @@ func TestNewAnalyzer(t *testing.T) {
 	assert.Equal(t, client, analyzer.gitlabClient)
 }
 
-
-
 func TestAnalyzer_parseDataProduct(t *testing.T) {
 	analyzer := NewAnalyzer(nil)
 
@@ -466,7 +464,7 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 				mrDetails:      &gitlab.MRDetails{SourceBranch: "feature", ProjectID: 123, SourceProjectID: 456, TargetProjectID: 123},
 				newFileContent: &gitlab.FileContent{Content: "name: test\nrover_group: test\nwarehouses:\n  - type: snowflake\n    size: LARGE"},
 			},
-			expectedError:  "",
+			expectedError: "",
 			expectedResult: &[]WarehouseChange{{
 				FilePath:   "dataproducts/agg/test/product.yaml (type: snowflake)",
 				FromSize:   "MEDIUM",
@@ -496,16 +494,16 @@ func TestAnalyzer_analyzeFileChange_ErrorHandling(t *testing.T) {
 
 // MockGitLabClient is a test implementation of the GitLab client interface
 type MockGitLabClient struct {
-	targetBranch         string
-	targetBranchError    error
-	oldFileContent       *gitlab.FileContent
-	oldFileError         error
-	newFileContent       *gitlab.FileContent
-	newFileError         error
-	mrDetails            *gitlab.MRDetails
-	mrDetailsError       error
-	lastFetchProjectID   int  // Track which project ID was used for last fetch
-	lastFetchBranch      string  // Track which branch was used for last fetch
+	targetBranch       string
+	targetBranchError  error
+	oldFileContent     *gitlab.FileContent
+	oldFileError       error
+	newFileContent     *gitlab.FileContent
+	newFileError       error
+	mrDetails          *gitlab.MRDetails
+	mrDetailsError     error
+	lastFetchProjectID int    // Track which project ID was used for last fetch
+	lastFetchBranch    string // Track which branch was used for last fetch
 }
 
 func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, error) {
@@ -519,7 +517,7 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, branch stri
 	// Track the last fetch call
 	m.lastFetchProjectID = projectID
 	m.lastFetchBranch = branch
-	
+
 	// Return different content based on which branch is requested
 	// This is a simple way to distinguish between old and new content requests
 	if branch == m.targetBranch && m.oldFileError != nil {
@@ -568,14 +566,14 @@ warehouses:
 tags:
   data_product: test`,
 			oldDP: &DataProduct{
-				Name: "test",
+				Name:       "test",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
-				Tags: Tags{DataProduct: "test"},
+				Tags:       Tags{DataProduct: "test"},
 			},
 			newDP: &DataProduct{
-				Name: "test",
+				Name:       "test",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "MEDIUM"}},
-				Tags: Tags{DataProduct: "test"},
+				Tags:       Tags{DataProduct: "test"},
 			},
 			expected: false,
 		},
@@ -590,11 +588,11 @@ warehouses:
   - type: snowflake
     size: LARGE`,
 			oldDP: &DataProduct{
-				Name: "old-name",
+				Name:       "old-name",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
 			},
 			newDP: &DataProduct{
-				Name: "new-name",
+				Name:       "new-name",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
 			},
 			expected: true,
@@ -619,11 +617,11 @@ data_product_db:
       - name: consumer1
       - name: consumer2`,
 			oldDP: &DataProduct{
-				Name: "test",
+				Name:       "test",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
 			},
 			newDP: &DataProduct{
-				Name: "test",
+				Name:       "test",
 				Warehouses: []Warehouse{{Type: "snowflake", Size: "LARGE"}},
 			},
 			expected: true,
