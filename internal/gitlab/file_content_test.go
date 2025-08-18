@@ -43,7 +43,7 @@ tags:
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -84,7 +84,7 @@ warehouses:
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -112,7 +112,7 @@ func TestClient_FetchFileContent_InvalidBase64(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -132,7 +132,7 @@ func TestClient_FetchFileContent_InvalidBase64(t *testing.T) {
 func TestClient_FetchFileContent_FileNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
-		w.Write([]byte(`{"message": "404 File Not Found"}`))
+		_, _ = w.Write([]byte(`{"message": "404 File Not Found"}`))
 	}))
 	defer server.Close()
 
@@ -180,7 +180,7 @@ func TestClient_FetchFileContent_HTTPErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -212,7 +212,7 @@ func TestClient_FetchFileContent_URLEncoding(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -245,7 +245,7 @@ func TestClient_GetMRTargetBranch_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -264,7 +264,7 @@ func TestClient_GetMRTargetBranch_Success(t *testing.T) {
 func TestClient_GetMRTargetBranch_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
-		w.Write([]byte(`{"message": "404 Merge Request Not Found"}`))
+		_, _ = w.Write([]byte(`{"message": "404 Merge Request Not Found"}`))
 	}))
 	defer server.Close()
 
@@ -284,7 +284,7 @@ func TestClient_GetMRTargetBranch_HTTPError(t *testing.T) {
 func TestClient_GetMRTargetBranch_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"invalid": json content}`))
+		_, _ = w.Write([]byte(`{"invalid": json content}`))
 	}))
 	defer server.Close()
 
@@ -317,7 +317,7 @@ func TestClient_GetMRDetails_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -342,7 +342,7 @@ func TestClient_GetMRDetails_Success(t *testing.T) {
 func TestClient_GetMRDetails_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(403)
-		w.Write([]byte(`{"message": "403 Forbidden"}`))
+		_, _ = w.Write([]byte(`{"message": "403 Forbidden"}`))
 	}))
 	defer server.Close()
 
@@ -362,7 +362,7 @@ func TestClient_GetMRDetails_HTTPError(t *testing.T) {
 func TestClient_GetMRDetails_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"incomplete": json`))
+		_, _ = w.Write([]byte(`{"incomplete": json`))
 	}))
 	defer server.Close()
 
@@ -430,7 +430,7 @@ func TestClient_FetchFileContent_QueryParameters(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -454,7 +454,7 @@ func TestClient_FetchFileContent_EmptyResponse(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+						_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 

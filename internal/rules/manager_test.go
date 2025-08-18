@@ -89,7 +89,7 @@ func TestSimpleRuleManager_LineValidation(t *testing.T) {
 	mockRule := &TestRule{
 		name: "test_rule",
 		coveredLines: []shared.LineRange{
-			{StartLine: 1, EndLine: 6, FilePath: "test.yaml"}, // Cover all lines from getFileContent
+			{StartLine: 1, EndLine: 7, FilePath: "test.yaml"}, // Cover all lines from getFileContent (7 lines total)
 		},
 		decision: shared.Approve,
 		reason:   "Test validation passed",
@@ -112,7 +112,7 @@ func TestSimpleRuleManager_LineValidation(t *testing.T) {
 
 	assert.Equal(t, shared.Approve, result.FinalDecision.Type, "Should approve when rule covers all lines")
 	assert.Equal(t, 1, len(result.FileValidations), "Should have validation for one file")
-	
+
 	fileValidation := result.FileValidations["test.yaml"]
 	assert.Equal(t, shared.Approve, fileValidation.FileDecision)
 	assert.Equal(t, 1, len(fileValidation.RuleResults))

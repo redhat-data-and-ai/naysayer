@@ -32,7 +32,7 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 	}
 
 	builder := NewMessageBuilder(cfg)
-	
+
 	result := &shared.RuleEvaluation{
 		FinalDecision: shared.Decision{
 			Type:   shared.Approve,
@@ -74,7 +74,7 @@ func TestBuildApprovalComment_DetailedVerbosity(t *testing.T) {
 	}
 
 	builder := NewMessageBuilder(cfg)
-	
+
 	result := &shared.RuleEvaluation{
 		FinalDecision: shared.Decision{
 			Type:   shared.Approve,
@@ -88,7 +88,7 @@ func TestBuildApprovalComment_DetailedVerbosity(t *testing.T) {
 					Reason: "Warehouse decreases detected",
 				},
 				Metadata: map[string]any{
-					"analyzed_files": []string{"dataproducts/agg/bookings/prod/product.yaml"},
+					"analyzed_files":    []string{"dataproducts/agg/bookings/prod/product.yaml"},
 					"warehouse_changes": []interface{}{"LARGE -> MEDIUM"},
 				},
 			},
@@ -124,7 +124,7 @@ func TestBuildApprovalComment_DebugVerbosity(t *testing.T) {
 	}
 
 	builder := NewMessageBuilder(cfg)
-	
+
 	result := &shared.RuleEvaluation{
 		FinalDecision: shared.Decision{
 			Type:   shared.Approve,
@@ -352,7 +352,7 @@ func TestComment_ContainsExpectedSections(t *testing.T) {
 	}
 
 	builder := NewMessageBuilder(cfg)
-	
+
 	result := &shared.RuleEvaluation{
 		FinalDecision: shared.Decision{
 			Type:   shared.Approve,

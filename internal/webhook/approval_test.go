@@ -63,17 +63,17 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 			commentReceived = true
 			assert.Equal(t, "POST", r.Method)
 			assert.Contains(t, r.URL.Path, "/api/v4/projects/123/merge_requests/456/notes")
-			
+
 			w.WriteHeader(201)
-			w.Write([]byte(`{"id": 789, "body": "comment added"}`))
+			_, _ = w.Write([]byte(`{"id": 789, "body": "comment added"}`))
 		} else if strings.Contains(r.URL.Path, "/approve") {
 			// Approval API call
 			approvalReceived = true
 			assert.Equal(t, "POST", r.Method)
 			assert.Contains(t, r.URL.Path, "/api/v4/projects/123/merge_requests/456/approve")
-			
+
 			w.WriteHeader(201)
-			w.Write([]byte(`{"id": 456, "approved": true}`))
+			_, _ = w.Write([]byte(`{"id": 456, "approved": true}`))
 		} else {
 			w.WriteHeader(404)
 		}
@@ -156,7 +156,6 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 	assert.True(t, approvalReceived, "Should have approved MR in GitLab")
 }
 
-
 func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 	// Create test GitLab server that should only receive approval call (no comment)
 	var commentReceived, approvalReceived bool
@@ -167,7 +166,7 @@ func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 		} else if strings.Contains(r.URL.Path, "/approve") {
 			approvalReceived = true
 			w.WriteHeader(201)
-			w.Write([]byte(`{"approved": true}`))
+			_, _ = w.Write([]byte(`{"approved": true}`))
 		}
 	}))
 	defer gitlabServer.Close()
@@ -192,7 +191,7 @@ func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults: []shared.RuleResult{},
+		RuleResults:   []shared.RuleResult{},
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -217,12 +216,12 @@ func TestHandleApprovalWithComments_CommentFailsContinues(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/notes") {
 			// Comment fails
 			w.WriteHeader(401)
-			w.Write([]byte(`{"message": "Unauthorized"}`))
+			_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 		} else if strings.Contains(r.URL.Path, "/approve") {
 			// Approval succeeds
 			approvalReceived = true
 			w.WriteHeader(201)
-			w.Write([]byte(`{"approved": true}`))
+			_, _ = w.Write([]byte(`{"approved": true}`))
 		}
 	}))
 	defer gitlabServer.Close()
@@ -247,7 +246,7 @@ func TestHandleApprovalWithComments_CommentFailsContinues(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults: []shared.RuleResult{},
+		RuleResults:   []shared.RuleResult{},
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -274,11 +273,11 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 			if callCount == 1 {
 				// First approval call (with message) fails
 				w.WriteHeader(400)
-				w.Write([]byte(`{"message": "Bad Request"}`))
+				_, _ = w.Write([]byte(`{"message": "Bad Request"}`))
 			} else {
 				// Second approval call (simple) succeeds
 				w.WriteHeader(201)
-				w.Write([]byte(`{"approved": true}`))
+				_, _ = w.Write([]byte(`{"approved": true}`))
 			}
 		}
 	}))
@@ -304,7 +303,7 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults: []shared.RuleResult{},
+		RuleResults:   []shared.RuleResult{},
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -326,7 +325,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/approve") {
 			w.WriteHeader(401)
-			w.Write([]byte(`{"message": "Unauthorized"}`))
+			_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 		}
 	}))
 	defer gitlabServer.Close()
@@ -351,7 +350,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults: []shared.RuleResult{},
+		RuleResults:   []shared.RuleResult{},
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -370,13 +369,13 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 
 func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 	// Integration test for the full approval workflow
-	
+
 	// Create mock GitLab server for changes API (to avoid manual review due to API failure)
 	changesServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/changes") {
 			// Return mock changes that should trigger approval
 			w.WriteHeader(200)
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"changes": [
 					{
 						"old_path": "dataproducts/agg/test/prod/product.yaml",
@@ -390,11 +389,11 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 		} else if strings.Contains(r.URL.Path, "/notes") {
 			// Mock comment creation
 			w.WriteHeader(201)
-			w.Write([]byte(`{"id": 123}`))
+			_, _ = w.Write([]byte(`{"id": 123}`))
 		} else if strings.Contains(r.URL.Path, "/approve") {
 			// Mock approval
 			w.WriteHeader(201)
-			w.Write([]byte(`{"approved": true}`))
+			_, _ = w.Write([]byte(`{"approved": true}`))
 		}
 	}))
 	defer changesServer.Close()
@@ -471,16 +470,16 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 
 	// Parse response
 	body := new(bytes.Buffer)
-	body.ReadFrom(resp.Body)
+	_, _ = body.ReadFrom(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body.Bytes(), &response)
+	_ = json.Unmarshal(body.Bytes(), &response)
 
 	// Verify approval workflow executed
 	assert.Equal(t, "processed", response["webhook_response"])
 	assert.Equal(t, true, response["mr_approved"])
 	assert.Equal(t, float64(456), response["project_id"])
 	assert.Equal(t, float64(123), response["mr_iid"])
-	
+
 	decision := response["decision"].(map[string]interface{})
 	assert.Equal(t, "approve", decision["type"])
 }

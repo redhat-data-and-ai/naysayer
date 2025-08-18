@@ -25,9 +25,7 @@ func createTestApplication() *fiber.App {
 			BaseURL: "https://gitlab.example.com",
 			Token:   "test-token",
 		},
-		Webhook: config.WebhookConfig{
-
-		},
+		Webhook: config.WebhookConfig{},
 		Server: config.ServerConfig{
 			Port: "8080",
 		},
@@ -57,8 +55,6 @@ func createTestApplication() *fiber.App {
 	// Health and monitoring routes (same as main)
 	app.Get("/health", healthHandler.HandleHealth)
 	app.Get("/ready", healthHandler.HandleReady)
-
-
 
 	// Webhook routes (same as main)
 	app.Post("/dataverse-product-config-review", webhookHandler.HandleWebhook)
@@ -108,8 +104,6 @@ func TestApplication_HealthEndpoints(t *testing.T) {
 		})
 	}
 }
-
-
 
 func TestApplication_WebhookEndpoint(t *testing.T) {
 	app := createTestApplication()
@@ -281,7 +275,7 @@ func TestApplication_ErrorHandling(t *testing.T) {
 	// Parse response to make sure error handler is working
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 	assert.Equal(t, "Internal server error", response["error"])
 }
 
@@ -297,7 +291,7 @@ func TestApplication_HealthCheck_Integration(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var health map[string]interface{}
-	json.Unmarshal(body, &health)
+	_ = json.Unmarshal(body, &health)
 
 	// Verify health response has expected fields
 	assert.Equal(t, "healthy", health["status"])
@@ -306,8 +300,6 @@ func TestApplication_HealthCheck_Integration(t *testing.T) {
 	assert.NotNil(t, health["uptime_seconds"])
 	assert.NotNil(t, health["timestamp"])
 }
-
-
 
 func TestApplication_RouteConfiguration(t *testing.T) {
 	app := createTestApplication()
@@ -358,6 +350,6 @@ func TestApplication_Middleware_Integration(t *testing.T) {
 	// The response should be successful, indicating middleware didn't interfere
 	body, _ := io.ReadAll(resp.Body)
 	var health map[string]interface{}
-	json.Unmarshal(body, &health)
+	_ = json.Unmarshal(body, &health)
 	assert.Equal(t, "healthy", health["status"])
 }

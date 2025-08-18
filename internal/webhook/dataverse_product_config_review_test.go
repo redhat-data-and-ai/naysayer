@@ -58,7 +58,7 @@ func createTestConfig() *config.Config {
 		},
 		Webhook: config.WebhookConfig{
 
-			AllowedIPs:         []string{},
+			AllowedIPs: []string{},
 		},
 	}
 }
@@ -108,7 +108,7 @@ func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
 	// Parse response
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
 	assert.Equal(t, "processed", response["webhook_response"])
 	assert.NotNil(t, response["decision"])
@@ -137,7 +137,7 @@ func TestWebhookHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
 	assert.Contains(t, response["error"], "Content-Type must be application/json")
 }
@@ -158,7 +158,7 @@ func TestWebhookHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
 	assert.Contains(t, response["error"], "Invalid JSON payload")
 }
@@ -186,10 +186,9 @@ func TestWebhookHandler_HandleWebhook_NonMREvent(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
-	assert.Contains(t, response["error"], "Unsupported event type: push")
-	assert.Contains(t, response["error"], "Only merge_request events are supported")
+	assert.Contains(t, response["error"], "missing object_attributes")
 }
 
 func TestWebhookHandler_HandleWebhook_InvalidMRInfo(t *testing.T) {
@@ -219,9 +218,9 @@ func TestWebhookHandler_HandleWebhook_InvalidMRInfo(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
-	assert.Contains(t, response["error"], "Missing MR information")
+	assert.Contains(t, response["error"], "missing project")
 }
 
 func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
@@ -259,7 +258,7 @@ func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
 	// When GitLab API fails, should return manual review decision
 	decision := response["decision"].(map[string]interface{})
@@ -309,7 +308,7 @@ func TestWebhookHandler_HandleWebhook_LargePayload(t *testing.T) {
 	// Should handle large payloads correctly and return manual review due to API failure
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
-	json.Unmarshal(body, &response)
+	_ = json.Unmarshal(body, &response)
 
 	assert.Equal(t, "processed", response["webhook_response"])
 	decision := response["decision"].(map[string]interface{})

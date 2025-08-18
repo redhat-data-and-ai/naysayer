@@ -17,15 +17,15 @@ func TestLoad_DefaultValues(t *testing.T) {
 	originalValues := make(map[string]string)
 	for _, envVar := range envVars {
 		originalValues[envVar] = os.Getenv(envVar)
-		os.Unsetenv(envVar)
+		_ = os.Unsetenv(envVar)
 	}
 	defer func() {
 		// Restore original environment
 		for envVar, value := range originalValues {
 			if value != "" {
-				os.Setenv(envVar, value)
+				_ = os.Setenv(envVar, value)
 			} else {
-				os.Unsetenv(envVar)
+				_ = os.Unsetenv(envVar)
 			}
 		}
 	}()
@@ -43,10 +43,10 @@ func TestLoad_DefaultValues(t *testing.T) {
 func TestLoad_EnvironmentOverrides(t *testing.T) {
 	// Set test environment variables
 	testValues := map[string]string{
-		"GITLAB_BASE_URL":     "https://gitlab.example.com",
-		"GITLAB_TOKEN":        "test-token-123",
-		"PORT":                "8080",
-		"WEBHOOK_SECRET":      "secret-webhook-token",
+		"GITLAB_BASE_URL": "https://gitlab.example.com",
+		"GITLAB_TOKEN":    "test-token-123",
+		"PORT":            "8080",
+		"WEBHOOK_SECRET":  "secret-webhook-token",
 
 		"WEBHOOK_ALLOWED_IPS": "192.168.1.1, 10.0.0.1,  172.16.0.1  ",
 	}
@@ -55,15 +55,15 @@ func TestLoad_EnvironmentOverrides(t *testing.T) {
 	originalValues := make(map[string]string)
 	for key, value := range testValues {
 		originalValues[key] = os.Getenv(key)
-		os.Setenv(key, value)
+		_ = os.Setenv(key, value)
 	}
 	defer func() {
 		// Restore original environment
 		for key, value := range originalValues {
 			if value != "" {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			} else {
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 		}
 	}()
@@ -265,16 +265,16 @@ func TestGetEnv(t *testing.T) {
 			originalValue := os.Getenv(tt.key)
 			defer func() {
 				if originalValue != "" {
-					os.Setenv(tt.key, originalValue)
+					_ = os.Setenv(tt.key, originalValue)
 				} else {
-					os.Unsetenv(tt.key)
+					_ = os.Unsetenv(tt.key)
 				}
 			}()
 
 			if tt.setEnv {
-				os.Setenv(tt.key, tt.envValue)
+				_ = os.Setenv(tt.key, tt.envValue)
 			} else {
-				os.Unsetenv(tt.key)
+				_ = os.Unsetenv(tt.key)
 			}
 
 			result := getEnv(tt.key, tt.defaultValue)
@@ -344,8 +344,6 @@ func TestParseIPList(t *testing.T) {
 	}
 }
 
-
-
 func TestConfigStructs_FieldsExist(t *testing.T) {
 	// Test that all expected fields exist and have correct types
 	config := &Config{}
@@ -376,11 +374,11 @@ func TestConfigIntegration_RealWorldScenarios(t *testing.T) {
 		{
 			name: "production configuration",
 			envVars: map[string]string{
-				"GITLAB_BASE_URL":     "https://gitlab.company.com",
-				"GITLAB_TOKEN":        "glpat-production-token",
-				"PORT":                "8080",
-				"WEBHOOK_SECRET":      "super-secure-webhook-secret",
-		
+				"GITLAB_BASE_URL": "https://gitlab.company.com",
+				"GITLAB_TOKEN":    "glpat-production-token",
+				"PORT":            "8080",
+				"WEBHOOK_SECRET":  "super-secure-webhook-secret",
+
 				"WEBHOOK_ALLOWED_IPS": "10.0.0.0/8,172.16.0.0/12",
 			},
 			description: "Typical production setup with all security features enabled",
@@ -396,9 +394,8 @@ func TestConfigIntegration_RealWorldScenarios(t *testing.T) {
 			name: "development configuration",
 			envVars: map[string]string{
 				"GITLAB_BASE_URL": "https://gitlab.com",
-				"GITLAB_TOKEN": "glpat-mock-token-for-testing",
+				"GITLAB_TOKEN":    "glpat-mock-token-for-testing",
 				"PORT":            "3000",
-	
 			},
 			unsetVars:   []string{"WEBHOOK_SECRET", "WEBHOOK_ALLOWED_IPS"},
 			description: "Development setup with relaxed security",
@@ -445,19 +442,19 @@ func TestConfigIntegration_RealWorldScenarios(t *testing.T) {
 				// Restore original environment
 				for key, value := range originalEnv {
 					if value != "" {
-						os.Setenv(key, value)
+						_ = os.Setenv(key, value)
 					} else {
-						os.Unsetenv(key)
+						_ = os.Unsetenv(key)
 					}
 				}
 			}()
 
 			// Set test environment
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			}
 			for _, key := range tt.unsetVars {
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 
 			// Load configuration and test

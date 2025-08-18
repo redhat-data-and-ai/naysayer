@@ -24,32 +24,32 @@ type Client struct {
 // createHTTPClient creates an HTTP client with custom TLS configuration
 func createHTTPClient(cfg config.GitLabConfig) (*http.Client, error) {
 	transport := &http.Transport{}
-	
+
 	// Configure TLS settings
 	tlsConfig := &tls.Config{}
-	
+
 	// Handle insecure TLS (skip certificate verification)
 	if cfg.InsecureTLS {
 		tlsConfig.InsecureSkipVerify = true
 	}
-	
+
 	// Handle custom CA certificate
 	if cfg.CACertPath != "" {
 		caCert, err := os.ReadFile(cfg.CACertPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA certificate from %s: %w", cfg.CACertPath, err)
 		}
-		
+
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
 			return nil, fmt.Errorf("failed to parse CA certificate from %s", cfg.CACertPath)
 		}
-		
+
 		tlsConfig.RootCAs = caCertPool
 	}
-	
+
 	transport.TLSClientConfig = tlsConfig
-	
+
 	return &http.Client{
 		Transport: transport,
 	}, nil
@@ -62,7 +62,7 @@ func NewClient(cfg config.GitLabConfig) *Client {
 		// Fallback to default client if TLS configuration fails
 		httpClient = &http.Client{}
 	}
-	
+
 	return &Client{
 		config: cfg,
 		http:   httpClient,
@@ -76,7 +76,7 @@ func NewClientWithConfig(cfg *config.Config) *Client {
 		// Fallback to default client if TLS configuration fails
 		httpClient = &http.Client{}
 	}
-	
+
 	return &Client{
 		config: cfg.GitLab,
 		http:   httpClient,
@@ -100,7 +100,7 @@ func (c *Client) FetchMRChanges(projectID, mrIID int) ([]FileChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -204,7 +204,7 @@ func (c *Client) AddMRComment(projectID, mrIID int, comment string) error {
 	payload := map[string]string{
 		"body": comment,
 	}
-	
+
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal comment payload: %w", err)
@@ -222,7 +222,7 @@ func (c *Client) AddMRComment(projectID, mrIID int, comment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to add comment: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case 201:
@@ -258,7 +258,7 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	} else {
 		jsonPayload = []byte("{}")
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal approval payload: %w", err)
 	}
@@ -275,7 +275,7 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	if err != nil {
 		return fmt.Errorf("failed to approve MR: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case 201:

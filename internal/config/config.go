@@ -42,49 +42,49 @@ type CommentsConfig struct {
 
 // RulesConfig holds rule-specific configuration
 type RulesConfig struct {
-	EnabledRules        []string // List of enabled rule names
-	DisabledRules       []string // List of disabled rule names
-	WarehouseRule       WarehouseRuleConfig
-	ServiceAccountRule  ServiceAccountRuleConfig
-	MigrationsRule      MigrationsRuleConfig
-	NamingRule          NamingRuleConfig
+	EnabledRules       []string // List of enabled rule names
+	DisabledRules      []string // List of disabled rule names
+	WarehouseRule      WarehouseRuleConfig
+	ServiceAccountRule ServiceAccountRuleConfig
+	MigrationsRule     MigrationsRuleConfig
+	NamingRule         NamingRuleConfig
 }
 
 // WarehouseRuleConfig holds warehouse-specific configuration
 type WarehouseRuleConfig struct {
-	AllowTOCBypass      bool     // Allow bypassing TOC approval for specific cases
+	AllowTOCBypass       bool     // Allow bypassing TOC approval for specific cases
 	PlatformEnvironments []string // Environments requiring platform approval
-	AutoApproveEnvs     []string // Environments allowing auto-approval
+	AutoApproveEnvs      []string // Environments allowing auto-approval
 }
 
 // ServiceAccountRuleConfig holds service account validation configuration
 type ServiceAccountRuleConfig struct {
 	ValidateEmailFormat      bool     // Enable email format validation
 	RequireIndividualEmail   bool     // Require individual vs group emails
-	AllowedDomains          []string // Allowed email domains
-	AstroEnvironmentsOnly   []string // Environments where Astro service accounts are allowed
+	AllowedDomains           []string // Allowed email domains
+	AstroEnvironmentsOnly    []string // Environments where Astro service accounts are allowed
 	EnforceNamingConventions bool     // Enforce naming conventions
 }
 
-// MigrationsRuleConfig holds migrations validation configuration  
+// MigrationsRuleConfig holds migrations validation configuration
 type MigrationsRuleConfig struct {
-	RequirePlatformApproval bool // Always require platform approval
+	RequirePlatformApproval bool     // Always require platform approval
 	AllowSelfServicePaths   []string // Paths that allow self-service migrations
 }
 
 // NamingRuleConfig holds naming conventions configuration
 type NamingRuleConfig struct {
-	ValidateTagMatching     bool // Validate data_product tag matches product name
+	ValidateTagMatching      bool // Validate data_product tag matches product name
 	EnforceNamingConventions bool // Enforce naming conventions
 }
 
 // ApprovalConfig holds approval workflow configuration
 type ApprovalConfig struct {
-	EnableAutoApproval    bool   // Enable auto-approval functionality
-	EnableTOCWorkflow     bool   // Enable TOC approval workflow
-	EnablePlatformWorkflow bool  // Enable platform approval workflow
-	TOCGroupID            string // GitLab group ID for TOC team
-	PlatformGroupID       string // GitLab group ID for platform team
+	EnableAutoApproval     bool   // Enable auto-approval functionality
+	EnableTOCWorkflow      bool   // Enable TOC approval workflow
+	EnablePlatformWorkflow bool   // Enable platform approval workflow
+	TOCGroupID             string // GitLab group ID for TOC team
+	PlatformGroupID        string // GitLab group ID for platform team
 }
 
 // Load loads configuration from environment variables
@@ -118,8 +118,8 @@ func Load() *Config {
 			ServiceAccountRule: ServiceAccountRuleConfig{
 				ValidateEmailFormat:      getEnv("SA_VALIDATE_EMAIL", "true") == "true",
 				RequireIndividualEmail:   getEnv("SA_REQUIRE_INDIVIDUAL_EMAIL", "true") == "true",
-				AllowedDomains:          parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
-				AstroEnvironmentsOnly:   parseStringList(getEnv("SA_ASTRO_ENVS", "preprod,prod")),
+				AllowedDomains:           parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
+				AstroEnvironmentsOnly:    parseStringList(getEnv("SA_ASTRO_ENVS", "preprod,prod")),
 				EnforceNamingConventions: getEnv("SA_ENFORCE_NAMING", "true") == "true",
 			},
 			MigrationsRule: MigrationsRuleConfig{
@@ -135,8 +135,8 @@ func Load() *Config {
 			EnableAutoApproval:     getEnv("ENABLE_AUTO_APPROVAL", "true") == "true",
 			EnableTOCWorkflow:      getEnv("ENABLE_TOC_WORKFLOW", "true") == "true",
 			EnablePlatformWorkflow: getEnv("ENABLE_PLATFORM_WORKFLOW", "true") == "true",
-			TOCGroupID:            getEnv("TOC_GROUP_ID", ""),
-			PlatformGroupID:       getEnv("PLATFORM_GROUP_ID", ""),
+			TOCGroupID:             getEnv("TOC_GROUP_ID", ""),
+			PlatformGroupID:        getEnv("PLATFORM_GROUP_ID", ""),
 		},
 	}
 }

@@ -71,10 +71,10 @@ func TestWarehouseRule_GetCoveredLines(t *testing.T) {
 	rule := NewRule(nil)
 
 	tests := []struct {
-		name         string
-		filePath     string
-		fileContent  string
-		expectCover  bool
+		name        string
+		filePath    string
+		fileContent string
+		expectCover bool
 	}{
 		{
 			name:        "warehouse file with content",

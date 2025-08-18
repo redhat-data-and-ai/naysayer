@@ -1,7 +1,6 @@
 package warehouse
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
@@ -20,7 +19,7 @@ func NewRule(client *gitlab.Client) *Rule {
 	if client != nil {
 		analyzer = NewAnalyzer(client)
 	}
-	
+
 	return &Rule{
 		client:   client,
 		analyzer: analyzer,
@@ -85,52 +84,4 @@ func (r *Rule) isWarehouseFile(path string) bool {
 	return false
 }
 
-// analyzeWarehouseChanges analyzes file changes and returns counts by warehouse file type
-func (r *Rule) analyzeWarehouseChanges(changes []gitlab.FileChange) map[string]int {
-	fileTypes := make(map[string]int)
 
-	for _, change := range changes {
-		// Check both old and new paths for file type detection
-		paths := []string{change.NewPath, change.OldPath}
-
-		for _, path := range paths {
-			if r.isWarehouseFile(path) {
-				if strings.HasSuffix(strings.ToLower(path), "product.yaml") || strings.HasSuffix(strings.ToLower(path), "product.yml") {
-					fileTypes["warehouse"]++
-				}
-				break // Don't double count if both paths are same type
-			}
-		}
-	}
-
-	return fileTypes
-}
-
-// evaluateWarehouseChanges applies the warehouse decision logic
-func (r *Rule) evaluateWarehouseChanges(changes []WarehouseChange) (shared.DecisionType, string) {
-	if len(changes) == 0 {
-		return shared.Approve, "No warehouse changes detected in dataproduct files"
-	}
-
-	// Check if all changes are decreases
-	for _, change := range changes {
-		if !change.IsDecrease {
-			if strings.Contains(change.FilePath, "(non-warehouse changes)") {
-				// Non-warehouse changes detected
-				return shared.ManualReview, fmt.Sprintf("Non-warehouse changes detected in %s",
-					strings.Replace(change.FilePath, " (non-warehouse changes)", "", 1))
-			} else if change.FromSize == "" {
-				// New warehouse creation
-				return shared.ManualReview, fmt.Sprintf("New warehouse creation detected: %s in %s",
-					change.ToSize, change.FilePath)
-			} else {
-				// Warehouse size increase
-				return shared.ManualReview, fmt.Sprintf("Warehouse increase detected: %s → %s in %s",
-					change.FromSize, change.ToSize, change.FilePath)
-			}
-		}
-	}
-
-	// All changes are decreases - auto-approve
-	return shared.Approve, fmt.Sprintf("All %d warehouse changes are decreases", len(changes))
-}

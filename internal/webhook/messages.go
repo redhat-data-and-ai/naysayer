@@ -160,7 +160,7 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(ruleResults []shared.RuleRes
 		}
 
 		// Add metadata if available
-		if result.Metadata != nil && len(result.Metadata) > 0 {
+		if len(result.Metadata) > 0 {
 			summary.WriteString("  - Metadata: ")
 			for key, value := range result.Metadata {
 				summary.WriteString(fmt.Sprintf("%s=%v ", key, value))
@@ -313,7 +313,7 @@ func (mb *MessageBuilder) buildBasicManualReviewSummary(result *shared.RuleEvalu
 	summary.WriteString("📊 **Analysis Results:**\n")
 	summary.WriteString(fmt.Sprintf("• %d rules evaluated\n", len(result.RuleResults)))
 	summary.WriteString(fmt.Sprintf("• Decision: %s\n", result.FinalDecision.Reason))
-	
+
 	// Count rules requiring manual review
 	manualReviewCount := 0
 	for _, ruleResult := range result.RuleResults {
@@ -321,7 +321,7 @@ func (mb *MessageBuilder) buildBasicManualReviewSummary(result *shared.RuleEvalu
 			manualReviewCount++
 		}
 	}
-	
+
 	if manualReviewCount > 0 {
 		summary.WriteString(fmt.Sprintf("• %d rule(s) require manual review\n", manualReviewCount))
 	}

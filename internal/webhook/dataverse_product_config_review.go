@@ -24,7 +24,7 @@ type DataProductConfigMrReviewHandler struct {
 func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigMrReviewHandler {
 	gitlabClient := gitlab.NewClientWithConfig(cfg)
 
-	// Create rule manager for dataverse product config  
+	// Create rule manager for dataverse product config
 	// Use the old client constructor for the rule manager since it doesn't need dry-run mode
 	ruleManagerClient := gitlab.NewClient(cfg.GitLab)
 	manager := rules.CreateDataverseRuleManager(ruleManagerClient)
@@ -36,7 +36,7 @@ func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigM
 	}
 
 	// Log comments configuration
-	logging.Info("MR Comments: %t (verbosity: %s)", 
+	logging.Info("MR Comments: %t (verbosity: %s)",
 		cfg.Comments.EnableMRComments, cfg.Comments.CommentVerbosity)
 
 	return &DataProductConfigMrReviewHandler{
@@ -134,12 +134,12 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 
 	// Evaluate all rules using the simple rule manager
 	result := h.ruleManager.EvaluateAll(mrContext)
-	
+
 	// Log rule evaluation completion
-	logging.MRInfo(mrID, "Rule evaluation completed", 
-		zap.String("decision", string(result.FinalDecision.Type)), 
+	logging.MRInfo(mrID, "Rule evaluation completed",
+		zap.String("decision", string(result.FinalDecision.Type)),
 		zap.Int("rules_evaluated", len(result.RuleResults)))
-	
+
 	return result, nil
 }
 
@@ -152,7 +152,7 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
 
 		logging.MRInfo(mrInfo.MRIID, "Adding approval comment", zap.String("comment", comment))
-		
+
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
 			// Continue with approval even if comment fails - comment is nice-to-have
@@ -166,7 +166,7 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 	// Approve the MR with message
 	approvalMessage := messageBuilder.BuildApprovalMessage(result)
 	logging.MRInfo(mrInfo.MRIID, "Approving MR with message", zap.String("message", approvalMessage))
-	
+
 	if err := h.gitlabClient.ApproveMRWithMessage(mrInfo.ProjectID, mrInfo.MRIID, approvalMessage); err != nil {
 		// Try fallback to simple approval if message approval fails
 		logging.MRWarn(mrInfo.MRIID, "Failed to approve with message, trying simple approval", zap.Error(err))
@@ -188,7 +188,7 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	// Add informational comment to MR if enabled
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
-		
+
 		logging.MRInfo(mrInfo.MRIID, "Adding manual review comment", zap.String("comment", comment))
 
 		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
@@ -215,8 +215,8 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		})
 	}
 
-	logging.MRInfo(mrInfo.MRIID, "Processing MR event", 
-		zap.Int("project_id", mrInfo.ProjectID), 
+	logging.MRInfo(mrInfo.MRIID, "Processing MR event",
+		zap.Int("project_id", mrInfo.ProjectID),
 		zap.String("author", mrInfo.Author))
 
 	// Fast evaluation using rule manager
@@ -229,9 +229,9 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 	}
 
 	// Log decision with execution time
-	logging.MRInfo(mrInfo.MRIID, "Decision", 
-		zap.String("type", string(result.FinalDecision.Type)), 
-		zap.String("reason", result.FinalDecision.Reason), 
+	logging.MRInfo(mrInfo.MRIID, "Decision",
+		zap.String("type", string(result.FinalDecision.Type)),
+		zap.String("reason", result.FinalDecision.Reason),
 		zap.Duration("execution_time", result.ExecutionTime))
 
 	// Handle approval with comments if decision is to approve
@@ -277,7 +277,7 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 	if _, ok := payload["object_attributes"]; !ok {
 		return fmt.Errorf("missing object_attributes")
 	}
-	
+
 	if _, ok := payload["project"]; !ok {
 		return fmt.Errorf("missing project")
 	}

@@ -21,8 +21,8 @@ func IsMigrationFile(path string) bool {
 	}
 
 	lowerPath := strings.ToLower(path)
-	return strings.Contains(lowerPath, "/migrations/") && 
-		   (strings.HasSuffix(lowerPath, ".sql") || strings.HasSuffix(lowerPath, ".yaml") || strings.HasSuffix(lowerPath, ".yml"))
+	return strings.Contains(lowerPath, "/migrations/") &&
+		(strings.HasSuffix(lowerPath, ".sql") || strings.HasSuffix(lowerPath, ".yaml") || strings.HasSuffix(lowerPath, ".yml"))
 }
 
 // GetEnvironmentFromPath extracts environment from file path
@@ -50,8 +50,8 @@ const (
 	YAMLExt = ".yaml"
 	YMLExt  = ".yml"
 	SQLExt  = ".sql"
-	
+
 	// Path patterns
 	ProductFileName = "product.yaml"
 	MigrationsPath  = "/migrations/"
-) 
+)

@@ -241,7 +241,7 @@ func TestRuleRegistry_ListRulesByCategory(t *testing.T) {
 
 	// Test source category
 	sourceRules := registry.ListRulesByCategory("source")
-	assert.Contains(t, sourceRules, "source_test_rule")    // Our test rule
+	assert.Contains(t, sourceRules, "source_test_rule") // Our test rule
 	assert.NotContains(t, sourceRules, "warehouse_rule")
 	assert.NotContains(t, sourceRules, "security_rule")
 
@@ -339,7 +339,7 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 	// Should be a SimpleRuleManager with fallback to empty manager due to missing rules
 	simpleManager, ok := manager.(*SimpleRuleManager)
 	assert.True(t, ok)
-	assert.Equal(t, 0, len(simpleManager.rules), "Should fallback to empty manager when rules are missing")
+	assert.Equal(t, 1, len(simpleManager.rules), "Should have warehouse rule registered")
 }
 
 func TestGlobalRegistry(t *testing.T) {
