@@ -51,7 +51,7 @@ func (h *Handler) HandleError(c *fiber.Ctx, err error) error {
 
 	// Extract or create AppError
 	appErr := h.toAppError(err)
-	
+
 	// Add request context if available
 	requestID := c.Get("X-Request-ID")
 	if requestID == "" {
@@ -66,7 +66,7 @@ func (h *Handler) HandleError(c *fiber.Ctx, err error) error {
 
 	// Set appropriate headers
 	c.Set("Content-Type", "application/json")
-	
+
 	// Add retry headers for retryable errors
 	if appErr.IsRetryable() {
 		c.Set("Retry-After", "30") // 30 seconds
@@ -84,7 +84,7 @@ func (h *Handler) toAppError(err error) *AppError {
 
 	// Check for common error patterns and classify them
 	errStr := strings.ToLower(err.Error())
-	
+
 	switch {
 	case strings.Contains(errStr, "context deadline exceeded") || strings.Contains(errStr, "timeout"):
 		return NewErrorWithCause(ErrGitLabTimeout, "Request timeout", err)
@@ -173,7 +173,7 @@ func (h *Handler) logError(appErr *AppError, requestID string, c *fiber.Ctx) {
 	if requestID != "" {
 		fields = append(fields, zap.String("request_id", requestID))
 	}
-	
+
 	if c != nil {
 		fields = append(fields,
 			zap.String("method", c.Method()),
@@ -221,15 +221,15 @@ func (h *Handler) LogAndWrap(err error, code ErrorCode, message string, context 
 	}
 
 	appErr := NewErrorWithCause(code, message, err)
-	
+
 	// Log the error
 	fields := append([]zap.Field{
 		zap.String("error_code", string(code)),
 		zap.Error(err),
 	}, context...)
-	
+
 	logging.Error(message, toInterfaceSlice(fields)...)
-	
+
 	return appErr
 }
 
@@ -246,7 +246,7 @@ func toInterfaceSlice(fields []zap.Field) []interface{} {
 func (h *Handler) RecoverAndHandle(c *fiber.Ctx) {
 	if r := recover(); r != nil {
 		var err error
-		
+
 		// Convert panic to error
 		switch v := r.(type) {
 		case error:

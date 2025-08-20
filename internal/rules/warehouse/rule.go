@@ -93,7 +93,7 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 		// Check if this change affects the current file
 		if strings.Contains(change.FilePath, filePath) {
 			fileHasChanges = true
-			
+
 			// Categorize the change
 			if change.FromSize == "N/A" && change.ToSize == "N/A" {
 				// Non-warehouse changes
@@ -173,5 +173,3 @@ func (r *Rule) extractWarehouseType(filePath string) string {
 	}
 	return "unknown"
 }
-
-

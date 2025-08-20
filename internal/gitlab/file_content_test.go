@@ -43,7 +43,7 @@ tags:
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -84,7 +84,7 @@ warehouses:
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -112,7 +112,7 @@ func TestClient_FetchFileContent_InvalidBase64(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -212,7 +212,7 @@ func TestClient_FetchFileContent_URLEncoding(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -245,7 +245,7 @@ func TestClient_GetMRTargetBranch_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -317,7 +317,7 @@ func TestClient_GetMRDetails_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -430,7 +430,7 @@ func TestClient_FetchFileContent_QueryParameters(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -454,7 +454,7 @@ func TestClient_FetchFileContent_EmptyResponse(t *testing.T) {
 			Encoding: "text",
 		}
 		w.Header().Set("Content-Type", "application/json")
-						_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
