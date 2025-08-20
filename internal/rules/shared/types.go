@@ -58,6 +58,14 @@ type Rule interface {
 	ValidateLines(filePath string, fileContent string, lineRanges []LineRange) (DecisionType, string)
 }
 
+// ContextAwareRule is an optional interface that rules can implement to access MR context
+type ContextAwareRule interface {
+	Rule
+	
+	// SetMRContext provides the full MR context to the rule for advanced analysis
+	SetMRContext(mrCtx *MRContext)
+}
+
 // RuleManager manages and executes rules with simple logic
 type RuleManager interface {
 	// AddRule registers a rule

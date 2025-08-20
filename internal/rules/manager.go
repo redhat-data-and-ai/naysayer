@@ -59,6 +59,9 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 		}
 	}
 
+	// Set MR context for context-aware rules
+	rm.setMRContextForRules(mrCtx)
+
 	// Perform line-level validation
 	fileValidations, overallDecision := rm.validateFilesLineByLine(mrCtx)
 
@@ -180,6 +183,16 @@ func (rm *SimpleRuleManager) validateFilesLineByLine(mrCtx *shared.MRContext) (m
 	// Determine overall decision
 	overallDecision := rm.determineOverallDecision(fileValidations)
 	return fileValidations, overallDecision
+}
+
+// setMRContextForRules provides MR context to context-aware rules
+func (rm *SimpleRuleManager) setMRContextForRules(mrCtx *shared.MRContext) {
+	for _, rule := range rm.rules {
+		// Check if the rule implements ContextAwareRule interface
+		if contextRule, ok := rule.(shared.ContextAwareRule); ok {
+			contextRule.SetMRContext(mrCtx)
+		}
+	}
 }
 
 // validateSingleFile validates a single file using all applicable rules
