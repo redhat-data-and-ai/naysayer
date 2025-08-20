@@ -36,8 +36,12 @@ func (m *MockRuleManager) EvaluateAll(ctx *shared.MRContext) *shared.RuleEvaluat
 			Summary: "✅ Mock test passed",
 			Details: "All mock rules passed",
 		},
-		RuleResults:   []shared.RuleResult{},
-		ExecutionTime: time.Millisecond * 10,
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		ExecutionTime:   time.Millisecond * 10,
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
 	}
 }
 

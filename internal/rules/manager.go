@@ -39,7 +39,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "✅ Draft MR skipped",
 				Details: "Draft MRs are automatically approved without rule evaluation",
 			},
-			RuleResults:     []shared.RuleResult{},
+
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
@@ -53,7 +53,7 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "🤖 Bot MR skipped",
 				Details: "MRs from automated users (bots) are automatically approved",
 			},
-			RuleResults:     []shared.RuleResult{},
+
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
@@ -83,23 +83,8 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 		}
 	}
 
-	// Build rule results for backward compatibility
-	var ruleResults []shared.RuleResult
-	for _, fileValidation := range fileValidations {
-		for _, lineValidation := range fileValidation.RuleResults {
-			ruleResults = append(ruleResults, shared.RuleResult{
-				RuleName: lineValidation.RuleName,
-				Decision: shared.Decision{
-					Type:   lineValidation.Decision,
-					Reason: lineValidation.Reason,
-				},
-			})
-		}
-	}
-
 	return &shared.RuleEvaluation{
 		FinalDecision:   overallDecision,
-		RuleResults:     ruleResults,
 		FileValidations: fileValidations,
 		ExecutionTime:   time.Since(start),
 		TotalFiles:      totalFiles,

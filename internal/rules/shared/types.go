@@ -61,7 +61,7 @@ type Rule interface {
 // ContextAwareRule is an optional interface that rules can implement to access MR context
 type ContextAwareRule interface {
 	Rule
-	
+
 	// SetMRContext provides the full MR context to the rule for advanced analysis
 	SetMRContext(mrCtx *MRContext)
 }
@@ -103,7 +103,6 @@ type FileValidationSummary struct {
 // RuleEvaluation contains the results of evaluating all rules
 type RuleEvaluation struct {
 	FinalDecision   Decision                          `json:"final_decision"`
-	RuleResults     []RuleResult                      `json:"rule_results"`     // Individual rule results for backward compatibility
 	FileValidations map[string]*FileValidationSummary `json:"file_validations"` // filePath -> summary
 	ExecutionTime   time.Duration                     `json:"execution_time"`
 

@@ -11,34 +11,34 @@ type ErrorCode string
 
 const (
 	// Validation errors
-	ErrInvalidInput       ErrorCode = "INVALID_INPUT"
-	ErrMissingField       ErrorCode = "MISSING_FIELD"
-	ErrInvalidFormat      ErrorCode = "INVALID_FORMAT"
-	ErrValidationFailed   ErrorCode = "VALIDATION_FAILED"
-	
+	ErrInvalidInput     ErrorCode = "INVALID_INPUT"
+	ErrMissingField     ErrorCode = "MISSING_FIELD"
+	ErrInvalidFormat    ErrorCode = "INVALID_FORMAT"
+	ErrValidationFailed ErrorCode = "VALIDATION_FAILED"
+
 	// GitLab API errors
-	ErrGitLabAPIFailed    ErrorCode = "GITLAB_API_FAILED"
-	ErrGitLabAuth         ErrorCode = "GITLAB_AUTH_FAILED"
-	ErrGitLabNotFound     ErrorCode = "GITLAB_NOT_FOUND"
-	ErrGitLabRateLimit    ErrorCode = "GITLAB_RATE_LIMIT"
-	ErrGitLabTimeout      ErrorCode = "GITLAB_TIMEOUT"
-	
+	ErrGitLabAPIFailed ErrorCode = "GITLAB_API_FAILED"
+	ErrGitLabAuth      ErrorCode = "GITLAB_AUTH_FAILED"
+	ErrGitLabNotFound  ErrorCode = "GITLAB_NOT_FOUND"
+	ErrGitLabRateLimit ErrorCode = "GITLAB_RATE_LIMIT"
+	ErrGitLabTimeout   ErrorCode = "GITLAB_TIMEOUT"
+
 	// Rule evaluation errors
-	ErrRuleEvaluation     ErrorCode = "RULE_EVALUATION_FAILED"
-	ErrRuleNotFound       ErrorCode = "RULE_NOT_FOUND"
-	ErrRuleConfig         ErrorCode = "RULE_CONFIG_ERROR"
-	
+	ErrRuleEvaluation ErrorCode = "RULE_EVALUATION_FAILED"
+	ErrRuleNotFound   ErrorCode = "RULE_NOT_FOUND"
+	ErrRuleConfig     ErrorCode = "RULE_CONFIG_ERROR"
+
 	// File processing errors
-	ErrFileProcessing     ErrorCode = "FILE_PROCESSING_FAILED"
-	ErrFileNotFound       ErrorCode = "FILE_NOT_FOUND"
-	ErrFileReadFailed     ErrorCode = "FILE_READ_FAILED"
-	ErrYAMLParseFailed    ErrorCode = "YAML_PARSE_FAILED"
-	
+	ErrFileProcessing  ErrorCode = "FILE_PROCESSING_FAILED"
+	ErrFileNotFound    ErrorCode = "FILE_NOT_FOUND"
+	ErrFileReadFailed  ErrorCode = "FILE_READ_FAILED"
+	ErrYAMLParseFailed ErrorCode = "YAML_PARSE_FAILED"
+
 	// External service errors
 	ErrTrillServiceFailed ErrorCode = "TRILL_SERVICE_FAILED"
 	ErrTrillTimeout       ErrorCode = "TRILL_TIMEOUT"
 	ErrTrillAuth          ErrorCode = "TRILL_AUTH_FAILED"
-	
+
 	// System errors
 	ErrDatabaseConnection ErrorCode = "DATABASE_CONNECTION_FAILED"
 	ErrConfigurationError ErrorCode = "CONFIGURATION_ERROR"
@@ -66,15 +66,15 @@ type RetryPolicy struct {
 
 // AppError represents a structured application error with rich context
 type AppError struct {
-	Code       ErrorCode                `json:"code"`
-	Message    string                   `json:"message"`
-	Details    string                   `json:"details,omitempty"`
-	Severity   ErrorSeverity            `json:"severity"`
-	HTTPStatus int                      `json:"http_status"`
-	Context    map[string]interface{}   `json:"context,omitempty"`
-	Timestamp  time.Time                `json:"timestamp"`
-	Retry      RetryPolicy              `json:"retry_policy"`
-	Cause      error                    `json:"-"` // Original error, not serialized
+	Code       ErrorCode              `json:"code"`
+	Message    string                 `json:"message"`
+	Details    string                 `json:"details,omitempty"`
+	Severity   ErrorSeverity          `json:"severity"`
+	HTTPStatus int                    `json:"http_status"`
+	Context    map[string]interface{} `json:"context,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Retry      RetryPolicy            `json:"retry_policy"`
+	Cause      error                  `json:"-"` // Original error, not serialized
 }
 
 // Error implements the error interface

@@ -33,7 +33,7 @@ func (v *Validator) AddError(field, rule, message string, value ...interface{}) 
 	if len(value) > 0 {
 		valueStr = fmt.Sprintf("%v", value[0])
 	}
-	
+
 	v.errors = append(v.errors, ValidationError{
 		Field:   field,
 		Value:   valueStr,
@@ -66,7 +66,7 @@ func (v *Validator) ToAppError() *AppError {
 	appErr := NewError(ErrValidationFailed, "Validation failed")
 	appErr.Details = strings.Join(messages, "; ")
 	_ = appErr.WithContext("validation_errors", v.errors)
-	
+
 	return appErr
 }
 
@@ -81,7 +81,7 @@ func (v *Validator) RequiredField(field, value string) *Validator {
 // MinLength validates minimum string length
 func (v *Validator) MinLength(field, value string, min int) *Validator {
 	if len(value) < min {
-		v.AddError(field, "min_length", 
+		v.AddError(field, "min_length",
 			fmt.Sprintf("Must be at least %d characters long", min), value)
 	}
 	return v
@@ -90,7 +90,7 @@ func (v *Validator) MinLength(field, value string, min int) *Validator {
 // MaxLength validates maximum string length
 func (v *Validator) MaxLength(field, value string, max int) *Validator {
 	if len(value) > max {
-		v.AddError(field, "max_length", 
+		v.AddError(field, "max_length",
 			fmt.Sprintf("Must be at most %d characters long", max), value)
 	}
 	return v
@@ -101,7 +101,7 @@ func (v *Validator) ValidateEmail(field, email string) *Validator {
 	if email == "" {
 		return v
 	}
-	
+
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(email) {
 		v.AddError(field, "email_format", "Invalid email format", email)
@@ -114,7 +114,7 @@ func (v *Validator) ValidateURL(field, url string) *Validator {
 	if url == "" {
 		return v
 	}
-	
+
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		v.AddError(field, "url_format", "URL must start with http:// or https://", url)
 	}
@@ -125,7 +125,7 @@ func (v *Validator) ValidateURL(field, url string) *Validator {
 func (v *Validator) ValidatePositiveInt(field string, value interface{}) *Validator {
 	var intVal int
 	var err error
-	
+
 	switch val := value.(type) {
 	case int:
 		intVal = val
@@ -141,7 +141,7 @@ func (v *Validator) ValidatePositiveInt(field string, value interface{}) *Valida
 		v.AddError(field, "integer_format", "Must be a valid integer", value)
 		return v
 	}
-	
+
 	if intVal <= 0 {
 		v.AddError(field, "positive_integer", "Must be a positive integer", value)
 	}
@@ -153,14 +153,14 @@ func (v *Validator) ValidateEnum(field, value string, allowedValues []string) *V
 	if value == "" {
 		return v
 	}
-	
+
 	for _, allowed := range allowedValues {
 		if value == allowed {
 			return v
 		}
 	}
-	
-	v.AddError(field, "enum", 
+
+	v.AddError(field, "enum",
 		fmt.Sprintf("Must be one of: %s", strings.Join(allowedValues, ", ")), value)
 	return v
 }
@@ -170,13 +170,13 @@ func (v *Validator) ValidateRegex(field, value, pattern, errorMessage string) *V
 	if value == "" {
 		return v
 	}
-	
+
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		v.AddError(field, "regex_compile", "Invalid regex pattern", pattern)
 		return v
 	}
-	
+
 	if !regex.MatchString(value) {
 		v.AddError(field, "regex_match", errorMessage, value)
 	}
@@ -188,19 +188,19 @@ func (v *Validator) ValidateGitLabUsername(field, username string) *Validator {
 	if username == "" {
 		return v
 	}
-	
+
 	// GitLab username rules
 	if len(username) > 100 {
 		v.AddError(field, "username_length", "Username too long (max 100 characters)", username)
 	}
-	
+
 	// Check for valid characters (alphanumeric, underscore, hyphen, dot)
 	validUsernameRegex := regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 	if !validUsernameRegex.MatchString(username) {
-		v.AddError(field, "username_format", 
+		v.AddError(field, "username_format",
 			"Username can only contain letters, numbers, underscores, hyphens, and dots", username)
 	}
-	
+
 	return v
 }
 
@@ -209,30 +209,30 @@ func (v *Validator) ValidateGitBranchName(field, branchName string) *Validator {
 	if branchName == "" {
 		return v
 	}
-	
+
 	if len(branchName) > 255 {
 		v.AddError(field, "branch_length", "Branch name too long (max 255 characters)", branchName)
 	}
-	
+
 	// Git branch name rules
 	if strings.HasPrefix(branchName, "-") || strings.HasPrefix(branchName, ".") {
 		v.AddError(field, "branch_prefix", "Branch name cannot start with - or .", branchName)
 	}
-	
+
 	if strings.Contains(branchName, "..") {
 		v.AddError(field, "branch_dots", "Branch name cannot contain consecutive dots", branchName)
 	}
-	
+
 	// Check for invalid characters
 	invalidChars := []string{" ", "~", "^", ":", "?", "*", "[", "]", "\\"}
 	for _, char := range invalidChars {
 		if strings.Contains(branchName, char) {
-			v.AddError(field, "branch_chars", 
+			v.AddError(field, "branch_chars",
 				fmt.Sprintf("Branch name cannot contain '%s'", char), branchName)
 			break
 		}
 	}
-	
+
 	return v
 }
 
@@ -241,20 +241,20 @@ func (v *Validator) ValidateFilePath(field, filePath string) *Validator {
 	if filePath == "" {
 		return v
 	}
-	
+
 	if len(filePath) > 4096 {
 		v.AddError(field, "path_length", "File path too long (max 4096 characters)", filePath)
 	}
-	
+
 	// Check for directory traversal
 	if strings.Contains(filePath, "..") {
 		v.AddError(field, "path_traversal", "File path cannot contain directory traversal", filePath)
 	}
-	
+
 	if strings.HasPrefix(filePath, "/") {
 		v.AddError(field, "path_absolute", "File path cannot be absolute", filePath)
 	}
-	
+
 	// Check for control characters
 	for _, r := range filePath {
 		if r < 32 || r == 127 {
@@ -262,7 +262,7 @@ func (v *Validator) ValidateFilePath(field, filePath string) *Validator {
 			break
 		}
 	}
-	
+
 	return v
 }
 
@@ -270,7 +270,7 @@ func (v *Validator) ValidateFilePath(field, filePath string) *Validator {
 func (v *Validator) ValidateYAMLStructure(field string, content map[string]interface{}, requiredFields []string) *Validator {
 	for _, required := range requiredFields {
 		if _, exists := content[required]; !exists {
-			v.AddError(field, "yaml_required_field", 
+			v.AddError(field, "yaml_required_field",
 				fmt.Sprintf("Required YAML field '%s' is missing", required), "")
 		}
 	}
@@ -280,7 +280,7 @@ func (v *Validator) ValidateYAMLStructure(field string, content map[string]inter
 // Validate webhook payload structure for security
 func ValidateWebhookPayload(payload map[string]interface{}) *AppError {
 	validator := NewValidator()
-	
+
 	// Check for required top-level fields
 	if payload == nil {
 		return NewValidationError("payload", "Payload is null")
@@ -301,28 +301,28 @@ func ValidateWebhookPayload(payload map[string]interface{}) *AppError {
 			} else {
 				validator.AddError("object_attributes.iid", "required", "MR IID is required")
 			}
-			
+
 			// Validate title if present
 			if title, exists := objectAttrsMap["title"]; exists {
 				if titleStr, ok := title.(string); ok {
 					validator.MaxLength("object_attributes.title", titleStr, 255)
-					
+
 					// Basic XSS prevention
-					if strings.Contains(strings.ToLower(titleStr), "<script") || 
-					   strings.Contains(strings.ToLower(titleStr), "javascript:") {
-						validator.AddError("object_attributes.title", "security", 
+					if strings.Contains(strings.ToLower(titleStr), "<script") ||
+						strings.Contains(strings.ToLower(titleStr), "javascript:") {
+						validator.AddError("object_attributes.title", "security",
 							"Title contains potentially malicious content")
 					}
 				}
 			}
-			
+
 			// Validate branch names
 			if sourceBranch, exists := objectAttrsMap["source_branch"]; exists {
 				if branchStr, ok := sourceBranch.(string); ok {
 					validator.ValidateGitBranchName("object_attributes.source_branch", branchStr)
 				}
 			}
-			
+
 			if targetBranch, exists := objectAttrsMap["target_branch"]; exists {
 				if branchStr, ok := targetBranch.(string); ok {
 					validator.ValidateGitBranchName("object_attributes.target_branch", branchStr)

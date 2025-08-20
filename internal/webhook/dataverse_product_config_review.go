@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	fiber "github.com/gofiber/fiber/v2"
@@ -60,14 +61,6 @@ func (h *DataProductConfigMrReviewHandler) HandleWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate payload size (prevent abuse)
-	if c.Context().Request.Header.ContentLength() > 1024*1024 { // 1MB limit
-		logging.Warn("Payload too large: %d bytes", c.Context().Request.Header.ContentLength())
-		return c.Status(413).JSON(fiber.Map{
-			"error": "Payload too large (max 1MB)",
-		})
-	}
-
 	// Parse webhook payload
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
@@ -116,8 +109,8 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 				Type:   shared.ManualReview,
 				Reason: "Could not fetch MR changes from GitLab API",
 			},
-			RuleResults:   []shared.RuleResult{},
-			ExecutionTime: 0,
+			FileValidations: make(map[string]*shared.FileValidationSummary),
+			ExecutionTime:   0,
 		}, nil
 	}
 
@@ -138,8 +131,7 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 	// Log rule evaluation completion
 	logging.MRInfo(mrID, "Rule evaluation completed",
 		zap.String("decision", string(result.FinalDecision.Type)),
-		zap.Int("rules_evaluated", len(result.RuleResults)))
-
+		zap.Int("files_evaluated", result.TotalFiles))
 	return result, nil
 }
 
@@ -259,28 +251,247 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		"event_type":       "merge_request",
 		"decision":         result.FinalDecision,
 		"execution_time":   result.ExecutionTime.String(),
-		"rules_evaluated":  len(result.RuleResults),
+		"rules_evaluated":  result.TotalFiles,
 		"mr_approved":      approved,
 		"project_id":       mrInfo.ProjectID,
 		"mr_iid":           mrInfo.MRIID,
 	})
 }
 
-// validateWebhookPayload performs essential security validation on webhook payload
+// validateWebhookPayload performs security validation on webhook payload
 func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[string]interface{}) error {
-	// Basic payload structure validation
+	// Check for required top-level fields
 	if payload == nil {
 		return fmt.Errorf("payload is nil")
 	}
 
-	// Ensure required sections exist (ExtractMRInfo will do detailed validation)
-	if _, ok := payload["object_attributes"]; !ok {
+	// Validate object_attributes section
+	objectAttrs, ok := payload["object_attributes"]
+	if !ok {
 		return fmt.Errorf("missing object_attributes")
 	}
+	
+	objectAttrsMap, ok := objectAttrs.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("object_attributes must be an object")
+	}
 
-	if _, ok := payload["project"]; !ok {
+	// Validate project section
+	project, ok := payload["project"]
+	if !ok {
 		return fmt.Errorf("missing project")
+	}
+	
+	projectMap, ok := project.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("project must be an object")
+	}
+
+	// Validate project ID (must be positive integer)
+	if projectID, exists := projectMap["id"]; exists {
+		switch v := projectID.(type) {
+		case float64:
+			if v <= 0 {
+				return fmt.Errorf("project ID must be positive")
+			}
+		case int:
+			if v <= 0 {
+				return fmt.Errorf("project ID must be positive")
+			}
+		case string:
+			// Try to parse string as integer
+			if id, err := strconv.Atoi(v); err != nil || id <= 0 {
+				return fmt.Errorf("project ID must be a positive integer")
+			}
+		default:
+			return fmt.Errorf("project ID must be a number")
+		}
+	} else {
+		return fmt.Errorf("project ID is required")
+	}
+
+	// Validate MR IID (must be positive integer)
+	if mrIID, exists := objectAttrsMap["iid"]; exists {
+		switch v := mrIID.(type) {
+		case float64:
+			if v <= 0 {
+				return fmt.Errorf("MR IID must be positive")
+			}
+		case int:
+			if v <= 0 {
+				return fmt.Errorf("MR IID must be positive")
+			}
+		case string:
+			// Try to parse string as integer
+			if id, err := strconv.Atoi(v); err != nil || id <= 0 {
+				return fmt.Errorf("MR IID must be a positive integer")
+			}
+		default:
+			return fmt.Errorf("MR IID must be a number")
+		}
+	} else {
+		return fmt.Errorf("MR IID is required")
+	}
+
+	// Validate title (prevent XSS and excessive length)
+	if title, exists := objectAttrsMap["title"]; exists {
+		if titleStr, ok := title.(string); ok {
+			if len(titleStr) > 255 {
+				return fmt.Errorf("title too long (max 255 characters)")
+			}
+			// Basic XSS prevention - reject titles with HTML/script content
+			if strings.Contains(strings.ToLower(titleStr), "<script") || 
+			   strings.Contains(strings.ToLower(titleStr), "javascript:") {
+				return fmt.Errorf("title contains potentially malicious content")
+			}
+		}
+	}
+
+	// Validate author field if present
+	if user, exists := payload["user"]; exists {
+		if userMap, ok := user.(map[string]interface{}); ok {
+			if username, exists := userMap["username"]; exists {
+				if usernameStr, ok := username.(string); ok {
+					if len(usernameStr) > 100 {
+						return fmt.Errorf("username too long (max 100 characters)")
+					}
+					// Basic validation - usernames should be alphanumeric with some special chars
+					if !isValidUsername(usernameStr) {
+						return fmt.Errorf("invalid username format")
+					}
+				}
+			}
+		}
+	}
+
+	// Validate branch names if present
+	if sourceBranch, exists := objectAttrsMap["source_branch"]; exists {
+		if branchStr, ok := sourceBranch.(string); ok {
+			if len(branchStr) > 255 {
+				return fmt.Errorf("source branch name too long (max 255 characters)")
+			}
+			if !isValidBranchName(branchStr) {
+				return fmt.Errorf("invalid source branch name")
+			}
+		}
+	}
+
+	if targetBranch, exists := objectAttrsMap["target_branch"]; exists {
+		if branchStr, ok := targetBranch.(string); ok {
+			if len(branchStr) > 255 {
+				return fmt.Errorf("target branch name too long (max 255 characters)")
+			}
+			if !isValidBranchName(branchStr) {
+				return fmt.Errorf("invalid target branch name")
+			}
+		}
 	}
 
 	return nil
+}
+
+// isValidUsername validates username format
+func isValidUsername(username string) bool {
+	if username == "" || len(username) > 100 {
+		return false
+	}
+	// Allow alphanumeric, underscore, hyphen, dot
+	for _, r := range username {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || 
+			 (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidBranchName validates Git branch name format
+func isValidBranchName(branch string) bool {
+	if branch == "" || len(branch) > 255 {
+		return false
+	}
+	
+	// Git branch names have specific rules
+	// Cannot start with -, ., or contain ..
+	if strings.HasPrefix(branch, "-") || strings.HasPrefix(branch, ".") || 
+	   strings.Contains(branch, "..") {
+		return false
+	}
+	
+	// Cannot contain control characters, space, ~, ^, :, ?, *, [
+	invalidChars := []string{" ", "~", "^", ":", "?", "*", "[", "]", "\\"}
+	for _, invalid := range invalidChars {
+		if strings.Contains(branch, invalid) {
+			return false
+		}
+	}
+	
+	return true
+}
+
+// validateMRContext performs additional validation on the MR context
+func (h *DataProductConfigMrReviewHandler) validateMRContext(mrCtx *shared.MRContext) error {
+	if mrCtx == nil {
+		return fmt.Errorf("MR context is nil")
+	}
+	
+	if mrCtx.ProjectID <= 0 {
+		return fmt.Errorf("invalid project ID: %d", mrCtx.ProjectID)
+	}
+	
+	if mrCtx.MRIID <= 0 {
+		return fmt.Errorf("invalid MR IID: %d", mrCtx.MRIID)
+	}
+	
+	if mrCtx.MRInfo == nil {
+		return fmt.Errorf("MR info is nil")
+	}
+	
+	// Validate file paths in changes
+	for i, change := range mrCtx.Changes {
+		if err := h.validateFileChange(change); err != nil {
+			return fmt.Errorf("invalid file change at index %d: %w", i, err)
+		}
+	}
+	
+	return nil
+}
+
+// validateFileChange validates individual file changes
+func (h *DataProductConfigMrReviewHandler) validateFileChange(change gitlab.FileChange) error {
+	// Validate file paths
+	if change.NewPath != "" && !isValidFilePath(change.NewPath) {
+		return fmt.Errorf("invalid new file path: %s", change.NewPath)
+	}
+	
+	if change.OldPath != "" && !isValidFilePath(change.OldPath) {
+		return fmt.Errorf("invalid old file path: %s", change.OldPath)
+	}
+	
+	return nil
+}
+
+// isValidFilePath validates file path format
+func isValidFilePath(path string) bool {
+	if path == "" {
+		return true // Empty paths are allowed for new/deleted files
+	}
+	
+	if len(path) > 4096 {
+		return false // Path too long
+	}
+	
+	// Check for directory traversal attempts
+	if strings.Contains(path, "..") || strings.HasPrefix(path, "/") {
+		return false
+	}
+	
+	// Check for control characters
+	for _, r := range path {
+		if r < 32 || r == 127 {
+			return false
+		}
+	}
+	
+	return true
 }

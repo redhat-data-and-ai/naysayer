@@ -37,20 +37,27 @@ func (m *MockRuleManagerForApproval) EvaluateAll(ctx *shared.MRContext) *shared.
 			Summary: "✅ Test approval",
 			Details: "Mock rule evaluation for testing approval workflow",
 		},
-		RuleResults: []shared.RuleResult{
-			{
-				RuleName: "warehouse_rule",
-				Decision: shared.Decision{
-					Type:   shared.Approve,
-					Reason: "Mock warehouse approval",
+		FileValidations: map[string]*shared.FileValidationSummary{
+			"dataproducts/agg/test/prod/product.yaml": {
+				FilePath:     "dataproducts/agg/test/prod/product.yaml",
+				TotalLines:   50,
+				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 50}},
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName: "warehouse_rule",
+						Decision: shared.Approve,
+						Reason:   "Mock warehouse approval",
+						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 50}},
+					},
 				},
-				Metadata: map[string]any{
-					"analyzed_files":    []string{"dataproducts/agg/test/prod/product.yaml"},
-					"warehouse_changes": []interface{}{"LARGE -> MEDIUM"},
-				},
+				FileDecision: shared.Approve,
 			},
 		},
 		ExecutionTime: time.Millisecond * 100,
+		TotalFiles:    1,
+		ApprovedFiles: 1,
+		ReviewFiles:   0,
+		UncoveredFiles: 0,
 	}
 }
 
@@ -101,20 +108,12 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 						Type:   shared.Approve,
 						Reason: "Warehouse decreases detected",
 					},
-					RuleResults: []shared.RuleResult{
-						{
-							RuleName: "warehouse_rule",
-							Decision: shared.Decision{
-								Type:   shared.Approve,
-								Reason: "Safe warehouse changes",
-							},
-							Metadata: map[string]any{
-								"analyzed_files":    []string{"test/product.yaml"},
-								"warehouse_changes": []interface{}{"LARGE->MEDIUM"},
-							},
-						},
-					},
-					ExecutionTime: time.Millisecond * 150,
+					FileValidations: map[string]*shared.FileValidationSummary{},
+					ExecutionTime:   time.Millisecond * 150,
+					TotalFiles:      0,
+					ApprovedFiles:   0,
+					ReviewFiles:     0,
+					UncoveredFiles:  0,
 				}
 			},
 		},
@@ -126,20 +125,27 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Warehouse decreases detected",
 		},
-		RuleResults: []shared.RuleResult{
-			{
-				RuleName: "warehouse_rule",
-				Decision: shared.Decision{
-					Type:   shared.Approve,
-					Reason: "Safe warehouse changes",
+		FileValidations: map[string]*shared.FileValidationSummary{
+			"test/product.yaml": {
+				FilePath:     "test/product.yaml",
+				TotalLines:   30,
+				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 30}},
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName: "warehouse_rule",
+						Decision: shared.Approve,
+						Reason:   "Safe warehouse changes",
+						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 30}},
+					},
 				},
-				Metadata: map[string]any{
-					"analyzed_files":    []string{"test/product.yaml"},
-					"warehouse_changes": []interface{}{"LARGE->MEDIUM"},
-				},
+				FileDecision: shared.Approve,
 			},
 		},
 		ExecutionTime: time.Millisecond * 150,
+		TotalFiles:    1,
+		ApprovedFiles: 1,
+		ReviewFiles:   0,
+		UncoveredFiles: 0,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -191,7 +197,11 @@ func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults:   []shared.RuleResult{},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -246,7 +256,11 @@ func TestHandleApprovalWithComments_CommentFailsContinues(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults:   []shared.RuleResult{},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -303,7 +317,11 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults:   []shared.RuleResult{},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -350,7 +368,11 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 			Type:   shared.Approve,
 			Reason: "Test approval",
 		},
-		RuleResults:   []shared.RuleResult{},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
 		ExecutionTime: time.Millisecond * 100,
 	}
 
@@ -421,20 +443,27 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 						Type:   shared.Approve,
 						Reason: "Safe warehouse changes detected",
 					},
-					RuleResults: []shared.RuleResult{
-						{
-							RuleName: "warehouse_rule",
-							Decision: shared.Decision{
-								Type:   shared.Approve,
-								Reason: "All warehouse changes are decreases",
+					FileValidations: map[string]*shared.FileValidationSummary{
+						"dataproducts/agg/test/prod/product.yaml": {
+							FilePath:     "dataproducts/agg/test/prod/product.yaml",
+							TotalLines:   50,
+							CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 50}},
+							RuleResults: []shared.LineValidationResult{
+								{
+									RuleName: "warehouse_rule",
+									Decision: shared.Approve,
+									Reason:   "All warehouse changes are decreases",
+									LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 50}},
+								},
 							},
-							Metadata: map[string]any{
-								"analyzed_files":    []string{"dataproducts/agg/test/prod/product.yaml"},
-								"warehouse_changes": []interface{}{"LARGE->MEDIUM"},
-							},
+							FileDecision: shared.Approve,
 						},
 					},
 					ExecutionTime: time.Millisecond * 200,
+					TotalFiles:    1,
+					ApprovedFiles: 1,
+					ReviewFiles:   0,
+					UncoveredFiles: 0,
 				}
 			},
 		},
