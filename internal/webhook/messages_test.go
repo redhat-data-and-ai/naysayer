@@ -61,6 +61,92 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 	assert.Contains(t, comment, "🤖 *Automated by NAYSAYER v1.0.0*")
 }
 
+func TestBuildApprovalComment_ContainsIdentifier(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "basic",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.Approve,
+			Reason: "All changes approved",
+		},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      1,
+		ApprovedFiles:   1,
+		ExecutionTime:   time.Millisecond * 100,
+	}
+
+	mrInfo := &gitlab.MRInfo{
+		ProjectID: 123,
+		MRIID:     456,
+		Author:    "test-user",
+		Title:     "Test MR",
+	}
+
+	comment := builder.BuildApprovalComment(result, mrInfo)
+
+	// Should contain the hidden identifier for approval comments
+	assert.Contains(t, comment, "<!-- naysayer-comment-id: approval -->")
+	assert.Contains(t, comment, "Auto-approved after CI pipeline success")
+}
+
+func TestBuildManualReviewComment_ContainsIdentifier(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "detailed",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.ManualReview,
+			Reason: "High-risk changes detected",
+		},
+		FileValidations: map[string]*shared.FileValidationSummary{
+			"test/product.yaml": {
+				FilePath:     "test/product.yaml",
+				TotalLines:   20,
+				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 20}},
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName: "warehouse_rule",
+						Decision: shared.ManualReview,
+						Reason:   "High-risk warehouse changes",
+						LineRanges: []shared.LineRange{{StartLine: 10, EndLine: 15}},
+					},
+				},
+				FileDecision: shared.ManualReview,
+			},
+		},
+		TotalFiles:     1,
+		ApprovedFiles:  0,
+		ReviewFiles:    1,
+		UncoveredFiles: 0,
+		ExecutionTime:  time.Millisecond * 200,
+	}
+
+	mrInfo := &gitlab.MRInfo{
+		ProjectID: 123,
+		MRIID:     456,
+		Author:    "test-user",
+		Title:     "Test MR with high-risk changes",
+	}
+
+	comment := builder.BuildManualReviewComment(result, mrInfo)
+
+	// Should contain the hidden identifier for manual review comments
+	assert.Contains(t, comment, "<!-- naysayer-comment-id: manual-review -->")
+	assert.Contains(t, comment, "Manual review required")
+	assert.Contains(t, comment, "High-risk changes detected")
+}
+
 func TestBuildApprovalComment_DetailedVerbosity(t *testing.T) {
 	cfg := &config.Config{
 		Comments: config.CommentsConfig{

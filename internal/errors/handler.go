@@ -144,7 +144,6 @@ func (h *Handler) sanitizeResponse(response ErrorResponse, appErr *AppError) Err
 	// Map of sensitive error codes to safe messages
 	safeMessages := map[ErrorCode]string{
 		ErrGitLabAuth:         "Unable to access GitLab API",
-		ErrTrillAuth:          "External service authentication failed",
 		ErrInternalServer:     "Internal server error",
 		ErrDatabaseConnection: "Database temporarily unavailable",
 		ErrConfigurationError: "Service configuration error",

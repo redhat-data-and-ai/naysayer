@@ -143,13 +143,24 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
 
-		logging.MRInfo(mrInfo.MRIID, "Adding approval comment", zap.String("comment", comment))
+		logging.MRInfo(mrInfo.MRIID, "Adding/updating approval comment")
 
-		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
-			logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
-			// Continue with approval even if comment fails - comment is nice-to-have
+		// Use smart comment handling (update existing or create new)
+		if h.config.Comments.UpdateExistingComments {
+			if err := h.gitlabClient.AddOrUpdateMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment, "approval"); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add/update comment", err)
+				// Continue with approval even if comment fails - comment is nice-to-have
+			} else {
+				logging.MRInfo(mrInfo.MRIID, "Added/updated approval comment")
+			}
 		} else {
-			logging.MRInfo(mrInfo.MRIID, "Added approval comment")
+			// Legacy behavior: always create new comment
+			if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add comment", err)
+				// Continue with approval even if comment fails - comment is nice-to-have
+			} else {
+				logging.MRInfo(mrInfo.MRIID, "Added approval comment")
+			}
 		}
 	} else {
 		logging.MRInfo(mrInfo.MRIID, "Skipping comment (comments disabled)")
@@ -181,13 +192,24 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
 
-		logging.MRInfo(mrInfo.MRIID, "Adding manual review comment", zap.String("comment", comment))
+		logging.MRInfo(mrInfo.MRIID, "Adding/updating manual review comment")
 
-		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
-			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
-			// Continue without error - comment is nice-to-have
+		// Use smart comment handling (update existing or create new)
+		if h.config.Comments.UpdateExistingComments {
+			if err := h.gitlabClient.AddOrUpdateMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment, "manual-review"); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add/update manual review comment", err)
+				// Continue without error - comment is nice-to-have
+			} else {
+				logging.MRInfo(mrInfo.MRIID, "Added/updated manual review comment")
+			}
 		} else {
-			logging.MRInfo(mrInfo.MRIID, "Added manual review comment")
+			// Legacy behavior: always create new comment
+			if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
+				// Continue without error - comment is nice-to-have
+			} else {
+				logging.MRInfo(mrInfo.MRIID, "Added manual review comment")
+			}
 		}
 	} else {
 		logging.MRInfo(mrInfo.MRIID, "Skipping manual review comment (comments disabled)")
@@ -209,7 +231,24 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 
 	logging.MRInfo(mrInfo.MRIID, "Processing MR event",
 		zap.Int("project_id", mrInfo.ProjectID),
-		zap.String("author", mrInfo.Author))
+		zap.String("author", mrInfo.Author),
+		zap.String("state", mrInfo.State))
+
+	// Skip rule evaluation if MR is not open
+	if mrInfo.State != "opened" {
+		logging.MRInfo(mrInfo.MRIID, "Skipping rule evaluation for non-open MR", 
+			zap.String("state", mrInfo.State))
+		
+		return c.JSON(fiber.Map{
+			"webhook_response": "processed",
+			"event_type":       "merge_request",
+			"decision":         "skipped",
+			"reason":           fmt.Sprintf("MR state is '%s', only processing open MRs", mrInfo.State),
+			"mr_approved":      false,
+			"project_id":       mrInfo.ProjectID,
+			"mr_iid":           mrInfo.MRIID,
+		})
+	}
 
 	// Fast evaluation using rule manager
 	result, err := h.evaluateRules(mrInfo.ProjectID, mrInfo.MRIID, mrInfo)
@@ -384,6 +423,25 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 			if !isValidBranchName(branchStr) {
 				return fmt.Errorf("invalid target branch name")
 			}
+		}
+	}
+
+	// Validate state field if present
+	if state, exists := objectAttrsMap["state"]; exists {
+		if stateStr, ok := state.(string); ok {
+			validStates := []string{"opened", "closed", "merged"}
+			isValid := false
+			for _, validState := range validStates {
+				if stateStr == validState {
+					isValid = true
+					break
+				}
+			}
+			if !isValid {
+				return fmt.Errorf("invalid MR state: %s", stateStr)
+			}
+		} else {
+			return fmt.Errorf("state must be a string")
 		}
 	}
 

@@ -133,7 +133,7 @@ func (c *Client) FetchMRChanges(projectID, mrIID int) ([]FileChange, error) {
 // ExtractMRInfo extracts merge request information from webhook payload
 func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 	var projectID, mrIID int
-	var title, author, sourceBranch, targetBranch string
+	var title, author, sourceBranch, targetBranch, state string
 
 	// Extract from object_attributes
 	if objectAttrs, ok := payload["object_attributes"].(map[string]interface{}); ok {
@@ -158,6 +158,10 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 
 		if targetVal, ok := objectAttrs["target_branch"].(string); ok {
 			targetBranch = targetVal
+		}
+
+		if stateVal, ok := objectAttrs["state"].(string); ok {
+			state = stateVal
 		}
 	}
 
@@ -193,6 +197,7 @@ func ExtractMRInfo(payload map[string]interface{}) (*MRInfo, error) {
 		Author:       author,
 		SourceBranch: sourceBranch,
 		TargetBranch: targetBranch,
+		State:        state,
 	}, nil
 }
 
@@ -289,5 +294,166 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("approval failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
+
+// MRComment represents a GitLab merge request comment
+type MRComment struct {
+	ID        int                    `json:"id"`
+	Body      string                 `json:"body"`
+	CreatedAt string                 `json:"created_at"`
+	UpdatedAt string                 `json:"updated_at"`
+	Author    map[string]interface{} `json:"author"`
+}
+
+// listMRComments retrieves all comments for a merge request (internal use only)
+func (c *Client) listMRComments(projectID, mrIID int) ([]MRComment, error) {
+	// Use a larger page size to get more comments (GitLab API supports up to 100 per page)
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	fmt.Printf("DEBUG listMRComments: Fetching comments from URL: %s\n", url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create list comments request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list comments: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case 200:
+		var comments []MRComment
+		if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
+			return nil, fmt.Errorf("failed to decode comments response: %w", err)
+		}
+		fmt.Printf("DEBUG listMRComments: Successfully retrieved %d comments\n", len(comments))
+		return comments, nil
+	case 401:
+		return nil, fmt.Errorf("list comments failed: insufficient permissions")
+	case 404:
+		return nil, fmt.Errorf("list comments failed: MR not found")
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
+
+// UpdateMRComment updates an existing comment on a merge request
+func (c *Client) UpdateMRComment(projectID, mrIID, commentID int, newBody string) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes/%d",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID, commentID)
+
+	payload := map[string]string{
+		"body": newBody,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update comment payload: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("failed to create update comment request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to update comment: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case 200:
+		return nil // Success
+	case 401:
+		return fmt.Errorf("update comment failed: insufficient permissions")
+	case 404:
+		return fmt.Errorf("update comment failed: comment or MR not found")
+	case 403:
+		return fmt.Errorf("update comment failed: cannot edit this comment")
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update comment failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
+
+
+// FindLatestNaysayerComment searches for the most recent naysayer comment regardless of type
+func (c *Client) FindLatestNaysayerComment(projectID, mrIID int) (*MRComment, error) {
+	comments, err := c.listMRComments(projectID, mrIID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	fmt.Printf("DEBUG FindLatestNaysayerComment: Retrieved %d comments from GitLab API\n", len(comments))
+
+	// Look for any comment from naysayer bot (comments are already sorted by created_at desc)
+	// Since the HTML identifiers aren't actually being included in real comments,
+	// we'll just find the latest comment from the naysayer bot
+	for i, comment := range comments {
+		fmt.Printf("DEBUG FindLatestNaysayerComment: Comment %d - ID: %d, Author: %+v\n", i, comment.ID, comment.Author)
+		if c.isNaysayerBotAuthor(comment.Author) {
+			fmt.Printf("DEBUG FindLatestNaysayerComment: FOUND existing bot comment ID %d - will UPDATE\n", comment.ID)
+			return &comment, nil
+		}
+	}
+	
+	fmt.Printf("DEBUG FindLatestNaysayerComment: No bot comment found - will CREATE NEW\n")
+	return nil, nil // No naysayer comment found
+}
+
+// isNaysayerBotAuthor checks if the comment author is a naysayer bot
+func (c *Client) isNaysayerBotAuthor(author map[string]interface{}) bool {	
+	// Check username field first
+	if username, ok := author["username"].(string); ok {
+		// Match the exact pattern we found: project_<ID>_bot_<hash>
+		if strings.HasPrefix(username, "project_") && strings.Contains(username, "_bot_") {
+			return true
+		}
+		// Also check for the simpler naysayer-bot pattern
+		if strings.Contains(username, "naysayer-bot") {
+			return true
+		}
+	}
+	
+	// Check name field as fallback
+	if name, ok := author["name"].(string); ok {
+		if name == "naysayer-bot" {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// AddOrUpdateMRComment adds a new comment or updates the latest existing naysayer comment
+func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, commentType string) error {
+	fmt.Printf("DEBUG AddOrUpdateMRComment: Looking for existing comment...\n")
+	// Try to find the latest naysayer comment regardless of type
+	existingComment, err := c.FindLatestNaysayerComment(projectID, mrIID)
+	if err != nil {
+		fmt.Printf("DEBUG AddOrUpdateMRComment: Error finding existing comment: %v\n", err)
+		return fmt.Errorf("failed to search for existing naysayer comment: %w", err)
+	}
+
+	if existingComment != nil {
+		fmt.Printf("DEBUG AddOrUpdateMRComment: UPDATING existing comment ID %d\n", existingComment.ID)
+		// Update the latest naysayer comment
+		return c.UpdateMRComment(projectID, mrIID, existingComment.ID, commentBody)
+	} else {
+		fmt.Printf("DEBUG AddOrUpdateMRComment: CREATING new comment\n")
+		// Create new comment
+		return c.AddMRComment(projectID, mrIID, commentBody)
 	}
 }

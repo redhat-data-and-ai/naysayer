@@ -36,8 +36,9 @@ type WebhookConfig struct {
 
 // CommentsConfig holds MR comments and messages configuration
 type CommentsConfig struct {
-	EnableMRComments bool   // Enable/disable MR commenting
-	CommentVerbosity string // Comment verbosity level (basic, detailed, debug)
+	EnableMRComments       bool   // Enable/disable MR commenting
+	CommentVerbosity       string // Comment verbosity level (basic, detailed, debug)
+	UpdateExistingComments bool   // Update existing comments instead of creating new ones
 }
 
 // RulesConfig holds rule-specific configuration
@@ -104,8 +105,9 @@ func Load() *Config {
 			AllowedIPs: parseIPList(getEnv("WEBHOOK_ALLOWED_IPS", "")),
 		},
 		Comments: CommentsConfig{
-			EnableMRComments: getEnv("ENABLE_MR_COMMENTS", "true") == "true",
-			CommentVerbosity: getEnv("COMMENT_VERBOSITY", "detailed"),
+			EnableMRComments:       getEnv("ENABLE_MR_COMMENTS", "true") == "true",
+			CommentVerbosity:       getEnv("COMMENT_VERBOSITY", "detailed"),
+			UpdateExistingComments: getEnv("UPDATE_EXISTING_COMMENTS", "true") == "true",
 		},
 		Rules: RulesConfig{
 			EnabledRules:  parseStringList(getEnv("ENABLED_RULES", "")),
@@ -203,3 +205,4 @@ func parseStringList(s string) []string {
 	}
 	return result
 }
+

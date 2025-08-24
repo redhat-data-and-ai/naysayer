@@ -153,6 +153,7 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 		MRIID:     456,
 		Author:    "testuser",
 		Title:     "Test warehouse decrease",
+		State:     "opened",
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
@@ -210,6 +211,7 @@ func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 		MRIID:     456,
 		Author:    "testuser",
 		Title:     "Test MR",
+		State:     "opened",
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
@@ -269,6 +271,7 @@ func TestHandleApprovalWithComments_CommentFailsContinues(t *testing.T) {
 		MRIID:     456,
 		Author:    "testuser",
 		Title:     "Test MR",
+		State:     "opened",
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
@@ -330,6 +333,7 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 		MRIID:     456,
 		Author:    "testuser",
 		Title:     "Test MR",
+		State:     "opened",
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
@@ -381,6 +385,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 		MRIID:     456,
 		Author:    "testuser",
 		Title:     "Test MR",
+		State:     "opened",
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
@@ -480,6 +485,7 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 		"object_attributes": map[string]interface{}{
 			"iid":   123,
 			"title": "Test warehouse decrease",
+			"state": "opened",
 		},
 		"project": map[string]interface{}{
 			"id": 456,

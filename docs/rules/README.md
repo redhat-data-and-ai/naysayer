@@ -74,7 +74,7 @@ Understanding why MRs require review:
 ### 🔧 **Platform Engineers**
 Managing and configuring rules:
 - See [Rule Creation Guide](../RULE_CREATION_GUIDE.md) for implementation
-- See [Configuration Management](../CONFIG_MANAGEMENT.md) for settings
+- See [Development Setup Guide](../DEVELOPMENT_SETUP.md) for settings
 - Monitor rule performance and effectiveness
 
 ### 🛡️ **Security Teams**
@@ -198,8 +198,7 @@ When requesting help:
 Interested in creating new rules? See these guides:
 
 - 🎯 [Rule Creation Guide](../RULE_CREATION_GUIDE.md) - Complete implementation guide
-- 🧪 [Rule Testing Guide](../RULE_TESTING_GUIDE.md) - Testing strategies and patterns
-- 📡 [Rule Registration Guide](../RULE_REGISTRATION_GUIDE.md) - Integration and deployment
+- 🧪 [Development Setup Guide](../DEVELOPMENT_SETUP.md) - Testing strategies and patterns
 
 ### Contributing
 
@@ -214,10 +213,9 @@ To contribute to rule documentation:
 | **Topic** | **Document** | **Audience** |
 |-----------|--------------|--------------|
 | **Creating Rules** | [Rule Creation Guide](../RULE_CREATION_GUIDE.md) | Developers |
-| **Testing Rules** | [Rule Testing Guide](../RULE_TESTING_GUIDE.md) | Developers |
-| **System Architecture** | [Architecture Overview](../ARCHITECTURE.md) | Platform Engineers |
-| **Configuration** | [Configuration Management](../CONFIG_MANAGEMENT.md) | Operators |
-| **Security Policies** | [Security Guidelines](../SECURITY_GUIDELINES.md) | Security Teams |
+| **Development Setup** | [Development Setup Guide](../DEVELOPMENT_SETUP.md) | Developers |
+| **API Reference** | [API Reference](../API_REFERENCE.md) | Platform Engineers |
+| **Troubleshooting** | [Troubleshooting Guide](../TROUBLESHOOTING.md) | Operators |
 
 ---
 

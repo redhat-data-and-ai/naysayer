@@ -83,22 +83,22 @@ PORT=3000
 WAREHOUSE_RULE_ENABLED=true
 ```
 
-> **📖 Complete Configuration**: See [Configuration Guide](docs/CONFIGURATION.md) for all rule-specific settings.
+> **📖 Complete Configuration**: See [Development Setup Guide](docs/DEVELOPMENT_SETUP.md) for all rule-specific settings.
 
 ## 📚 Documentation
 
 ### 👥 For Users
 - 🏠 **[Rules Overview](docs/rules/README.md)** - Understand what gets validated
 - 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Fix common issues
-- ⚙️ **[Configuration Guide](docs/CONFIGURATION.md)** - Environment setup
+- ⚙️ **[Configuration Guide](docs/DEVELOPMENT_SETUP.md)** - Environment setup
 
 ### 👨‍💻 For Developers  
 - 🎯 **[Rule Creation Guide](docs/RULE_CREATION_GUIDE.md)** - Build new validation rules
-- 🧪 **[Rule Testing Guide](docs/RULE_TESTING_GUIDE.md)** - Testing strategies
+- 🧪 **[Rule Testing Guide](docs/DEVELOPMENT_SETUP.md)** - Testing strategies
 
 ### 🚀 For Operators
-- 🐳 **[Deployment Guide](docs/DEPLOYMENT.md)** - Production setup
-- 📊 **[Monitoring Guide](docs/MONITORING.md)** - Health checks and metrics
+- 🐳 **[Deployment Guide](DEPLOYMENT.md)** - Production setup
+- 📊 **[Monitoring Guide](MONITORING.md)** - Health checks and metrics
 
 ## 🛠️ Development
 
@@ -147,7 +147,7 @@ make lint fmt vet test
 ```bash
 # 1. Create from template
 mkdir internal/rules/myrule
-cp docs/templates/rule_templates/enhanced_basic_rule_template.go.template internal/rules/myrule/rule.go
+# Follow the Rule Creation Guide for detailed template usage
 
 # 2. Follow the Rule Creation Guide
 # See: docs/RULE_CREATION_GUIDE.md
@@ -169,7 +169,7 @@ cp docs/templates/rule_templates/enhanced_basic_rule_template.go.template intern
 
 ## 🚀 Deployment
 
-**Production**: See [Deployment Guide](docs/DEPLOYMENT.md) for complete Kubernetes/OpenShift setup
+**Production**: See [Deployment Guide](DEPLOYMENT.md) for complete Kubernetes/OpenShift setup
 
 **Container**: `quay.io/ddis/naysayer:latest`
 
@@ -178,13 +178,12 @@ cp docs/templates/rule_templates/enhanced_basic_rule_template.go.template intern
 ## 🤝 Contributing
 
 1. Read [Rule Creation Guide](docs/RULE_CREATION_GUIDE.md)
-2. Use [enhanced templates](docs/templates/rule_templates/)
-3. Follow [testing guidelines](docs/RULE_TESTING_GUIDE.md)
-4. Update documentation in `docs/rules/`
+2. Follow development guidelines and patterns
+3. Update documentation in `docs/rules/`
 
 ---
 
 **🚀 Ready to get started?** 
 - **Users**: Check [Rules Documentation](docs/rules/README.md) to understand what Naysayer validates
 - **Developers**: See [Rule Creation Guide](docs/RULE_CREATION_GUIDE.md) to build custom rules
-- **Operators**: Follow [Deployment Guide](docs/DEPLOYMENT.md) for production setup
+- **Operators**: Follow [Deployment Guide](DEPLOYMENT.md) for production setup

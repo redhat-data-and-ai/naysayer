@@ -35,9 +35,6 @@ const (
 	ErrYAMLParseFailed ErrorCode = "YAML_PARSE_FAILED"
 
 	// External service errors
-	ErrTrillServiceFailed ErrorCode = "TRILL_SERVICE_FAILED"
-	ErrTrillTimeout       ErrorCode = "TRILL_TIMEOUT"
-	ErrTrillAuth          ErrorCode = "TRILL_AUTH_FAILED"
 
 	// System errors
 	ErrDatabaseConnection ErrorCode = "DATABASE_CONNECTION_FAILED"
@@ -111,7 +108,7 @@ func (e *AppError) IsRetryable() bool {
 
 // IsTemporary indicates if this is a temporary error that might resolve itself
 func (e *AppError) IsTemporary() bool {
-	return e.Retry.Retryable || e.Code == ErrGitLabTimeout || e.Code == ErrTrillTimeout
+	return e.Retry.Retryable || e.Code == ErrGitLabTimeout
 }
 
 // NewError creates a new AppError with the given code and message
@@ -197,37 +194,20 @@ func NewGitLabError(operation string, statusCode int, responseBody string) *AppE
 	}
 }
 
-// NewTrillError creates a Trill service specific error
-func NewTrillError(operation string, cause error) *AppError {
-	return &AppError{
-		Code:       ErrTrillServiceFailed,
-		Message:    fmt.Sprintf("Trill %s failed", operation),
-		Details:    cause.Error(),
-		Severity:   SeverityHigh,
-		HTTPStatus: http.StatusServiceUnavailable,
-		Timestamp:  time.Now(),
-		Retry: RetryPolicy{
-			Retryable:     true,
-			MaxRetries:    3,
-			BackoffDelay:  time.Second * 5,
-			ExponentialBO: true,
-		},
-		Cause: cause,
-	}
-}
+
 
 // getDefaultHTTPStatus returns the default HTTP status code for an error code
 func getDefaultHTTPStatus(code ErrorCode) int {
 	switch code {
 	case ErrInvalidInput, ErrMissingField, ErrInvalidFormat, ErrValidationFailed:
 		return http.StatusBadRequest
-	case ErrGitLabAuth, ErrTrillAuth:
+	case ErrGitLabAuth:
 		return http.StatusUnauthorized
 	case ErrGitLabNotFound, ErrFileNotFound, ErrRuleNotFound:
 		return http.StatusNotFound
 	case ErrGitLabRateLimit:
 		return http.StatusTooManyRequests
-	case ErrTrillServiceFailed, ErrServiceUnavailable:
+	case ErrServiceUnavailable:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
@@ -251,14 +231,14 @@ func getHTTPStatusForGitLabError(gitlabStatus int) int {
 // getDefaultRetryPolicy returns the default retry policy for an error code
 func getDefaultRetryPolicy(code ErrorCode) RetryPolicy {
 	switch code {
-	case ErrGitLabTimeout, ErrTrillTimeout, ErrGitLabRateLimit:
+	case ErrGitLabTimeout, ErrGitLabRateLimit:
 		return RetryPolicy{
 			Retryable:     true,
 			MaxRetries:    3,
 			BackoffDelay:  time.Second * 2,
 			ExponentialBO: true,
 		}
-	case ErrGitLabAPIFailed, ErrTrillServiceFailed:
+	case ErrGitLabAPIFailed:
 		return RetryPolicy{
 			Retryable:     true,
 			MaxRetries:    2,

@@ -24,6 +24,9 @@ func NewMessageBuilder(cfg *config.Config) *MessageBuilder {
 func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) string {
 	var comment strings.Builder
 
+	// Hidden identifier for comment tracking
+	comment.WriteString("<!-- naysayer-comment-id: approval -->\n")
+	
 	// Header
 	comment.WriteString("✅ **Auto-approved after CI pipeline success**\n\n")
 
@@ -47,6 +50,9 @@ func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mr
 func (mb *MessageBuilder) BuildManualReviewComment(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) string {
 	var comment strings.Builder
 
+	// Hidden identifier for comment tracking
+	comment.WriteString("<!-- naysayer-comment-id: manual-review -->\n")
+	
 	// Header
 	comment.WriteString("⚠️ **Manual review required**\n\n")
 
