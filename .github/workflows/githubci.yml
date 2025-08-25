@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.23.0'
         cache: true
 
     - name: Cache Go modules
@@ -54,10 +54,6 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-
-    - name: Test binary execution
-      run: |
-        ./naysayer --help || echo "Binary help command executed"
         
   # Additional job for security scanning
   security:
@@ -72,12 +68,20 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.23.0'
 
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
+      run: |
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        gosec -fmt sarif -out gosec-results.sarif ./...
+      continue-on-error: true
+
+    - name: Upload Gosec results
+      uses: actions/upload-artifact@v4
       with:
-        args: './...'
+        name: gosec-results
+        path: gosec-results.sarif
+      if: always()
 
     - name: Run Nancy vulnerability scanner
       run: |

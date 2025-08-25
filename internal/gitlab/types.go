@@ -34,4 +34,5 @@ type MRInfo struct {
 	Author       string
 	SourceBranch string
 	TargetBranch string
+	State        string
 }

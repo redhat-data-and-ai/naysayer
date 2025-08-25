@@ -46,17 +46,7 @@ func GitLabRetryConfig() RetryConfig {
 	}
 }
 
-// TrillRetryConfig returns retry configuration optimized for Trill service calls
-func TrillRetryConfig() RetryConfig {
-	return RetryConfig{
-		MaxAttempts:      5,
-		InitialDelay:     time.Second * 5,
-		MaxDelay:         time.Minute * 2,
-		ExponentialBase:  1.5,
-		Jitter:           true,
-		RetryCondition:   TrillRetryCondition,
-	}
-}
+
 
 // DefaultRetryCondition determines if an error should be retried
 func DefaultRetryCondition(err error) bool {
@@ -93,25 +83,7 @@ func GitLabRetryCondition(err error) bool {
 	return IsTemporaryError(err)
 }
 
-// TrillRetryCondition determines if a Trill service error should be retried
-func TrillRetryCondition(err error) bool {
-	if err == nil {
-		return false
-	}
 
-	if appErr, ok := err.(*AppError); ok {
-		switch appErr.Code {
-		case ErrTrillServiceFailed, ErrTrillTimeout:
-			return true
-		case ErrTrillAuth:
-			return false // Don't retry auth errors
-		default:
-			return appErr.IsRetryable()
-		}
-	}
-
-	return IsTemporaryError(err)
-}
 
 // IsTemporaryError checks if an error appears to be temporary based on its message
 func IsTemporaryError(err error) bool {
@@ -296,13 +268,7 @@ func NewGitLabOperation(name string) *RetryableOperation {
 	}
 }
 
-// NewTrillOperation creates a retryable operation optimized for Trill service calls
-func NewTrillOperation(name string) *RetryableOperation {
-	return &RetryableOperation{
-		Name:   name,
-		Config: TrillRetryConfig(),
-	}
-}
+
 
 // Execute runs the operation with retry logic
 func (op *RetryableOperation) Execute(ctx context.Context, fn RetryableFunc) error {

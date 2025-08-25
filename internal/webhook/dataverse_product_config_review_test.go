@@ -92,6 +92,7 @@ func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
 			"title":         "Update warehouse configuration",
 			"source_branch": "feature/update",
 			"target_branch": "main",
+			"state":         "opened",
 		},
 		"project": map[string]interface{}{
 			"id": 456,
@@ -243,6 +244,7 @@ func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 			"title":         "Test MR",
 			"source_branch": "feature/test",
 			"target_branch": "main",
+			"state":         "opened",
 		},
 		"project": map[string]interface{}{
 			"id": 456,
@@ -287,6 +289,7 @@ func TestWebhookHandler_HandleWebhook_LargePayload(t *testing.T) {
 			"title":         "Large MR with many changes",
 			"source_branch": "feature/large-update",
 			"target_branch": "main",
+			"state":         "opened",
 			"description":   "This is a large MR with extensive changes across multiple files and directories for testing purposes.",
 		},
 		"project": map[string]interface{}{
