@@ -54,10 +54,6 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
-
-    - name: Test binary execution
-      run: |
-        ./naysayer --help || echo "Binary help command executed"
         
   # Additional job for security scanning
   security:
