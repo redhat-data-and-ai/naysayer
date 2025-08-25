@@ -312,8 +312,6 @@ func (c *Client) listMRComments(projectID, mrIID int) ([]MRComment, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
-	fmt.Printf("DEBUG listMRComments: Fetching comments from URL: %s\n", url)
-
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create list comments request: %w", err)
@@ -333,7 +331,6 @@ func (c *Client) listMRComments(projectID, mrIID int) ([]MRComment, error) {
 		if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
 			return nil, fmt.Errorf("failed to decode comments response: %w", err)
 		}
-		fmt.Printf("DEBUG listMRComments: Successfully retrieved %d comments\n", len(comments))
 		return comments, nil
 	case 401:
 		return nil, fmt.Errorf("list comments failed: insufficient permissions")
@@ -396,20 +393,15 @@ func (c *Client) FindLatestNaysayerComment(projectID, mrIID int) (*MRComment, er
 		return nil, fmt.Errorf("failed to list comments: %w", err)
 	}
 
-	fmt.Printf("DEBUG FindLatestNaysayerComment: Retrieved %d comments from GitLab API\n", len(comments))
-
 	// Look for any comment from naysayer bot (comments are already sorted by created_at desc)
 	// Since the HTML identifiers aren't actually being included in real comments,
 	// we'll just find the latest comment from the naysayer bot
-	for i, comment := range comments {
-		fmt.Printf("DEBUG FindLatestNaysayerComment: Comment %d - ID: %d, Author: %+v\n", i, comment.ID, comment.Author)
+	for _, comment := range comments {
 		if c.isNaysayerBotAuthor(comment.Author) {
-			fmt.Printf("DEBUG FindLatestNaysayerComment: FOUND existing bot comment ID %d - will UPDATE\n", comment.ID)
 			return &comment, nil
 		}
 	}
 	
-	fmt.Printf("DEBUG FindLatestNaysayerComment: No bot comment found - will CREATE NEW\n")
 	return nil, nil // No naysayer comment found
 }
 
@@ -439,20 +431,16 @@ func (c *Client) isNaysayerBotAuthor(author map[string]interface{}) bool {
 
 // AddOrUpdateMRComment adds a new comment or updates the latest existing naysayer comment
 func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, commentType string) error {
-	fmt.Printf("DEBUG AddOrUpdateMRComment: Looking for existing comment...\n")
 	// Try to find the latest naysayer comment regardless of type
 	existingComment, err := c.FindLatestNaysayerComment(projectID, mrIID)
 	if err != nil {
-		fmt.Printf("DEBUG AddOrUpdateMRComment: Error finding existing comment: %v\n", err)
 		return fmt.Errorf("failed to search for existing naysayer comment: %w", err)
 	}
 
 	if existingComment != nil {
-		fmt.Printf("DEBUG AddOrUpdateMRComment: UPDATING existing comment ID %d\n", existingComment.ID)
 		// Update the latest naysayer comment
 		return c.UpdateMRComment(projectID, mrIID, existingComment.ID, commentBody)
 	} else {
-		fmt.Printf("DEBUG AddOrUpdateMRComment: CREATING new comment\n")
 		// Create new comment
 		return c.AddMRComment(projectID, mrIID, commentBody)
 	}

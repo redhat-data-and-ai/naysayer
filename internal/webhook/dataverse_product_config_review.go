@@ -13,6 +13,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	MR_OPENED_STATE = "opened"
+)
+
 // DataProductConfigMrReviewHandler handles GitLab webhook requests
 type DataProductConfigMrReviewHandler struct {
 	gitlabClient *gitlab.Client
@@ -317,16 +321,8 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 	// Validate state field if present
 	if state, exists := objectAttrsMap["state"]; exists {
 		if stateStr, ok := state.(string); ok {
-			validStates := []string{"opened", "closed", "merged"}
-			isValid := false
-			for _, validState := range validStates {
-				if stateStr == validState {
-					isValid = true
-					break
-				}
-			}
-			if !isValid {
-				return fmt.Errorf("invalid MR state: %s", stateStr)
+			if stateStr != MR_OPENED_STATE {
+				return fmt.Errorf("MR state: %s. Naysayer only processes Open MRs.", stateStr)
 			}
 		} else {
 			return fmt.Errorf("state must be a string")
