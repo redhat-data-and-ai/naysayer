@@ -3,7 +3,7 @@ module github.com/redhat-data-and-ai/naysayer
 go 1.23.0
 
 require (
-	github.com/gofiber/fiber/v2 v2.52.6
+	github.com/gofiber/fiber/v2 v2.52.7
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
