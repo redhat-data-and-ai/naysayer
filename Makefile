@@ -29,6 +29,7 @@ help:
 # Build the binary
 build: lint fmt vet test
 	@echo "Building naysayer..."
+	go mod download && go mod tidy && go mod vendor
 	go build -o naysayer cmd/main.go
 	@echo "✅ Built naysayer binary"
 
@@ -67,7 +68,7 @@ vet:
 lint:
 	@echo "Running golangci-lint..."
 	@if command -v golangci-lint > /dev/null; then \
-		golangci-lint run ./...; \
+		golangci-lint run --skip-dirs=vendor ./...; \
 		echo "✅ Linting completed"; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with:"; \
@@ -78,7 +79,7 @@ lint:
 lint-fix:
 	@echo "Running golangci-lint with automatic fixes..."
 	@if command -v golangci-lint > /dev/null; then \
-		golangci-lint run --fix ./...; \
+		golangci-lint run --fix --skip-dirs=vendor ./...; \
 		echo "✅ Linting with fixes completed"; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with:"; \
