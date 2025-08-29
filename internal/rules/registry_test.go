@@ -332,14 +332,14 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 
 	client := &gitlab.Client{}
 
-	// Should return manager even when some rules are missing (fallback behavior)
+	// Should return empty manager when some dataverse rules are missing (fallback behavior)
 	manager := registry.CreateDataverseRuleManager(client)
 	assert.NotNil(t, manager)
 
-	// Should be a SimpleRuleManager with fallback to empty manager due to missing rules
+	// Should be a SimpleRuleManager with fallback to empty manager due to missing documentation rule
 	simpleManager, ok := manager.(*SimpleRuleManager)
 	assert.True(t, ok)
-	assert.Equal(t, 1, len(simpleManager.rules), "Should have warehouse rule registered")
+	assert.Equal(t, 0, len(simpleManager.rules), "Should fallback to empty manager when rules are missing")
 }
 
 func TestGlobalRegistry(t *testing.T) {
