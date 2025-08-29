@@ -14,39 +14,37 @@ type RetryableFunc func() error
 
 // RetryConfig defines retry configuration for operations
 type RetryConfig struct {
-	MaxAttempts      int
-	InitialDelay     time.Duration
-	MaxDelay         time.Duration
-	ExponentialBase  float64
-	Jitter           bool
-	RetryCondition   func(error) bool
+	MaxAttempts     int
+	InitialDelay    time.Duration
+	MaxDelay        time.Duration
+	ExponentialBase float64
+	Jitter          bool
+	RetryCondition  func(error) bool
 }
 
 // DefaultRetryConfig returns a sensible default retry configuration
 func DefaultRetryConfig() RetryConfig {
 	return RetryConfig{
-		MaxAttempts:      3,
-		InitialDelay:     time.Second,
-		MaxDelay:         time.Minute,
-		ExponentialBase:  2.0,
-		Jitter:           true,
-		RetryCondition:   DefaultRetryCondition,
+		MaxAttempts:     3,
+		InitialDelay:    time.Second,
+		MaxDelay:        time.Minute,
+		ExponentialBase: 2.0,
+		Jitter:          true,
+		RetryCondition:  DefaultRetryCondition,
 	}
 }
 
 // GitLabRetryConfig returns retry configuration optimized for GitLab API calls
 func GitLabRetryConfig() RetryConfig {
 	return RetryConfig{
-		MaxAttempts:      3,
-		InitialDelay:     time.Second * 2,
-		MaxDelay:         time.Second * 30,
-		ExponentialBase:  2.0,
-		Jitter:           true,
-		RetryCondition:   GitLabRetryCondition,
+		MaxAttempts:     3,
+		InitialDelay:    time.Second * 2,
+		MaxDelay:        time.Second * 30,
+		ExponentialBase: 2.0,
+		Jitter:          true,
+		RetryCondition:  GitLabRetryCondition,
 	}
 }
-
-
 
 // DefaultRetryCondition determines if an error should be retried
 func DefaultRetryCondition(err error) bool {
@@ -83,8 +81,6 @@ func GitLabRetryCondition(err error) bool {
 	return IsTemporaryError(err)
 }
 
-
-
 // IsTemporaryError checks if an error appears to be temporary based on its message
 func IsTemporaryError(err error) bool {
 	if err == nil {
@@ -117,11 +113,11 @@ func IsTemporaryError(err error) bool {
 
 // contains checks if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (s == substr || len(substr) == 0 || 
-		    (len(s) > len(substr) && (s[0:len(substr)] == substr || 
-		     s[len(s)-len(substr):] == substr || 
-		     indexOfSubstring(s, substr) != -1)))
+	return len(s) >= len(substr) &&
+		(s == substr || len(substr) == 0 ||
+			(len(s) > len(substr) && (s[0:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				indexOfSubstring(s, substr) != -1)))
 }
 
 // indexOfSubstring finds the index of a substring (case-insensitive)
@@ -140,7 +136,7 @@ func indexOfSubstring(s, substr string) int {
 // RetryWithContext executes a function with retry logic and context support
 func RetryWithContext(ctx context.Context, fn RetryableFunc, config RetryConfig) error {
 	var lastErr error
-	
+
 	for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
 		// Check if context is cancelled
 		if ctx.Err() != nil {
@@ -178,7 +174,7 @@ func RetryWithContext(ctx context.Context, fn RetryableFunc, config RetryConfig)
 
 		// Calculate delay with exponential backoff
 		delay := calculateDelay(attempt, config)
-		
+
 		logging.Warn("Operation failed, retrying",
 			zap.Error(err),
 			zap.Int("attempt", attempt),
@@ -217,7 +213,7 @@ func calculateDelay(attempt int, config RetryConfig) time.Duration {
 
 	// Calculate exponential backoff
 	delay := float64(config.InitialDelay) * math.Pow(config.ExponentialBase, float64(attempt-1))
-	
+
 	// Apply maximum delay limit
 	if time.Duration(delay) > config.MaxDelay {
 		delay = float64(config.MaxDelay)
@@ -228,7 +224,7 @@ func calculateDelay(attempt int, config RetryConfig) time.Duration {
 		// Add random jitter of ±25%
 		jitterAmount := delay * 0.25
 		delay = delay + (jitterAmount * (2*pseudoRandom() - 1))
-		
+
 		// Ensure delay is not negative
 		if delay < 0 {
 			delay = float64(config.InitialDelay)
@@ -268,17 +264,15 @@ func NewGitLabOperation(name string) *RetryableOperation {
 	}
 }
 
-
-
 // Execute runs the operation with retry logic
 func (op *RetryableOperation) Execute(ctx context.Context, fn RetryableFunc) error {
-			logging.Info("Starting retryable operation",
-			zap.String("operation", op.Name),
-			zap.Int("max_attempts", op.Config.MaxAttempts),
-		)
+	logging.Info("Starting retryable operation",
+		zap.String("operation", op.Name),
+		zap.Int("max_attempts", op.Config.MaxAttempts),
+	)
 
 	err := RetryWithContext(ctx, fn, op.Config)
-	
+
 	if err != nil {
 		logging.Error("Retryable operation failed",
 			zap.String("operation", op.Name),
@@ -297,6 +291,6 @@ func (op *RetryableOperation) Execute(ctx context.Context, fn RetryableFunc) err
 func (op *RetryableOperation) ExecuteWithTimeout(timeout time.Duration, fn RetryableFunc) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	return op.Execute(ctx, fn)
 }

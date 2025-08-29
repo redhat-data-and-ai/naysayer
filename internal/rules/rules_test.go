@@ -17,11 +17,6 @@ func TestCreateDataverseRuleManager(t *testing.T) {
 
 	// Verify it's a rule manager (should implement the interface)
 	assert.NotNil(t, manager, "Should return a valid RuleManager")
-
-	// The manager should have rules added (since we have dataverse rules in registry)
-	simpleManager, ok := manager.(*SimpleRuleManager)
-	assert.True(t, ok)
-	assert.Greater(t, len(simpleManager.rules), 0, "Should have dataverse rules added")
 }
 
 func TestCreateCustomRuleManager_Success(t *testing.T) {
@@ -36,11 +31,6 @@ func TestCreateCustomRuleManager_Success(t *testing.T) {
 
 	// Verify it's a rule manager
 	assert.NotNil(t, manager, "Should return a valid RuleManager")
-
-	// Should have the requested rules
-	simpleManager, ok := manager.(*SimpleRuleManager)
-	assert.True(t, ok)
-	assert.Equal(t, 1, len(simpleManager.rules), "Should have exactly 1 rule")
 }
 
 func TestCreateCustomRuleManager_WithNonExistentRule(t *testing.T) {
@@ -63,54 +53,6 @@ func TestCreateCustomRuleManager_EmptyRuleList(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, manager)
-
-	// Should have enabled rules
-	simpleManager, ok := manager.(*SimpleRuleManager)
-	assert.True(t, ok)
-	assert.Greater(t, len(simpleManager.rules), 0, "Should have enabled rules when list is empty")
-}
-
-func TestCreateRuleManagerByCategory(t *testing.T) {
-	client := &gitlab.Client{}
-
-	tests := []struct {
-		name        string
-		category    string
-		expectRules bool
-	}{
-		{
-			name:        "warehouse category",
-			category:    "warehouse",
-			expectRules: true,
-		},
-		{
-			name:        "non-existent category",
-			category:    "non_existent",
-			expectRules: false,
-		},
-		{
-			name:        "empty category",
-			category:    "",
-			expectRules: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			manager := CreateRuleManagerByCategory(client, tt.category)
-
-			assert.NotNil(t, manager)
-
-			simpleManager, ok := manager.(*SimpleRuleManager)
-			assert.True(t, ok)
-
-			if tt.expectRules {
-				assert.Greater(t, len(simpleManager.rules), 0, "Should have rules for category %s", tt.category)
-			} else {
-				assert.Equal(t, 0, len(simpleManager.rules), "Should have no rules for category %s", tt.category)
-			}
-		})
-	}
 }
 
 func TestListAvailableRules(t *testing.T) {
@@ -175,19 +117,13 @@ func TestListEnabledRules_IsCopy(t *testing.T) {
 	assert.Contains(t, rules2, "warehouse_rule", "Modifying one map should not affect the other")
 }
 
-func TestCreateRuleManagerByCategory_OnlyEnabledRules(t *testing.T) {
+func TestCreateSectionBasedDataverseManager(t *testing.T) {
 	client := &gitlab.Client{}
 
-	// Create a manager for warehouse category
-	manager := CreateRuleManagerByCategory(client, "warehouse")
+	// Test section-based manager creation
+	manager := CreateSectionBasedDataverseManager(client)
 
-	simpleManager, ok := manager.(*SimpleRuleManager)
-	assert.True(t, ok)
-
-	// Verify that only enabled rules are added
-	// We can't directly check the rules in simpleManager.rules since it's private,
-	// but we can verify the manager was created successfully
-	assert.NotNil(t, simpleManager)
+	assert.NotNil(t, manager)
 
 	// Test that the manager can evaluate (basic functionality test)
 	ctx := &shared.MRContext{

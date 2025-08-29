@@ -35,7 +35,7 @@ func (r *Rule) Name() string {
 
 // Description returns human-readable description
 func (r *Rule) Description() string {
-	return "Validates warehouse configuration files (product.yaml) - auto-approves size decreases, requires review for increases"
+	return "Validates warehouse size changes in product.yaml files - auto-approves size decreases, requires review for increases. Other sections handled by respective rules."
 }
 
 // SetMRContext implements ContextAwareRule interface
@@ -49,22 +49,25 @@ func (r *Rule) GetCoveredLines(filePath string, fileContent string) []shared.Lin
 		return nil // This rule doesn't apply to non-warehouse files
 	}
 
-	// Warehouse rule covers the entire warehouse file
-	totalLines := shared.CountLines(fileContent)
-	if totalLines == 0 {
-		return nil
+	// Check if file has content
+	if len(strings.TrimSpace(fileContent)) == 0 {
+		return nil // No content to validate
 	}
 
+	// For section-based validation, we return a placeholder range to indicate
+	// this rule wants to participate in validation. The actual section content
+	// will be provided by the section manager.
 	return []shared.LineRange{
 		{
 			StartLine: 1,
-			EndLine:   totalLines,
+			EndLine:   1, // Placeholder - actual lines handled by section manager
 			FilePath:  filePath,
 		},
 	}
 }
 
-// ValidateLines validates the specified line ranges in a warehouse file
+// ValidateLines validates warehouse configuration changes
+// When called by section-based validation, fileContent contains the warehouses section content
 func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
 	if !r.isWarehouseFile(filePath) {
 		return shared.Approve, "Not a warehouse file"
@@ -72,48 +75,34 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 
 	// If we don't have analyzer or MR context, fall back to simplified validation
 	if r.analyzer == nil || r.mrCtx == nil {
-
 		return shared.Approve, "Warehouse file validated (simplified validation - no context)"
 	}
 
-	// Use the analyzer to detect warehouse changes
+	// Use the analyzer to detect warehouse changes - but focus only on warehouse changes
 	changes, err := r.analyzer.AnalyzeChanges(r.mrCtx.ProjectID, r.mrCtx.MRIID, r.mrCtx.Changes)
 	if err != nil {
 		// If analysis fails, require manual review for safety
 		return shared.ManualReview, fmt.Sprintf("Warehouse analysis failed: %v", err)
 	}
 
-	// Check if this specific file has warehouse changes
-	fileHasChanges := false
+	// Check if this specific file has warehouse size changes (ignore non-warehouse changes)
 	var warehouseIncreases []WarehouseChange
 	var warehouseDecreases []WarehouseChange
-	var nonWarehouseChanges []WarehouseChange
 
 	for _, change := range changes {
 		// Check if this change affects the current file
 		if strings.Contains(change.FilePath, filePath) {
-			fileHasChanges = true
-
-			// Categorize the change
-			if change.FromSize == "N/A" && change.ToSize == "N/A" {
-				// Non-warehouse changes
-				nonWarehouseChanges = append(nonWarehouseChanges, change)
-			} else if change.IsDecrease {
-				warehouseDecreases = append(warehouseDecreases, change)
-			} else {
-				warehouseIncreases = append(warehouseIncreases, change)
+			// ONLY process actual warehouse size changes - ignore non-warehouse changes
+			if change.FromSize != "N/A" && change.ToSize != "N/A" {
+				if change.IsDecrease {
+					warehouseDecreases = append(warehouseDecreases, change)
+				} else {
+					warehouseIncreases = append(warehouseIncreases, change)
+				}
 			}
+			// Skip non-warehouse changes (FromSize == "N/A" && ToSize == "N/A")
+			// These will be handled by other rules (metadata_rule, etc.)
 		}
-	}
-
-	// If this file has no warehouse-related changes, approve it
-	if !fileHasChanges {
-		return shared.Approve, "No warehouse changes detected in this file"
-	}
-
-	// If there are non-warehouse changes, require manual review
-	if len(nonWarehouseChanges) > 0 {
-		return shared.ManualReview, "File contains changes beyond warehouse sizes - requires manual review"
 	}
 
 	// If there are warehouse size increases, require manual review
@@ -131,7 +120,7 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 		return shared.ManualReview, fmt.Sprintf("Warehouse size increase detected: %s", strings.Join(details, ", "))
 	}
 
-	// If only decreases or no changes, approve
+	// If there are warehouse size decreases, approve them
 	if len(warehouseDecreases) > 0 {
 		details := []string{}
 		for _, change := range warehouseDecreases {
@@ -141,7 +130,8 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 		return shared.Approve, fmt.Sprintf("Warehouse size decrease approved: %s", strings.Join(details, ", "))
 	}
 
-	return shared.Approve, "Warehouse file validated - no size changes detected"
+	// No warehouse size changes detected - approve (other rules will handle non-warehouse sections)
+	return shared.Approve, "No warehouse size changes detected - approved"
 }
 
 // isWarehouseFile checks if a file is a warehouse configuration file

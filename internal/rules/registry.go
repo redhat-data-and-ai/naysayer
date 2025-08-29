@@ -3,8 +3,10 @@ package rules
 import (
 	"fmt"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
@@ -53,27 +55,16 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "warehouse",
 	})
 
-	// Documentation auto-approval rule
+	// Section-based rules
+
 	_ = r.RegisterRule(&RuleInfo{
-		Name:        "documentation_auto_approval",
-		Description: "Automatically approves changes to documentation files (README.md, data_elements.md, promotion_checklist.md, developers.yaml)",
+		Name:        "metadata_rule",
+		Description: "Auto-approves documentation and metadata file changes",
 		Version:     "1.0.0",
 		Factory: func(client *gitlab.Client) shared.Rule {
-			return NewDocumentationAutoApprovalRule()
+			return common.NewMetadataRule()
 		},
 		Enabled:  true,
-		Category: "auto_approval",
-	})
-
-	// Service account comment auto-approval rule (placeholder)
-	_ = r.RegisterRule(&RuleInfo{
-		Name:        "service_account_comment_rule",
-		Description: "Placeholder for field-level auto-approval of service account comment changes (requires GitLab API integration)",
-		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
-			return NewServiceAccountCommentRule()
-		},
-		Enabled:  false, // Disabled until proper implementation with GitLab API
 		Category: "auto_approval",
 	})
 
@@ -139,7 +130,20 @@ func (r *RuleRegistry) ListRulesByCategory(category string) map[string]*RuleInfo
 
 // CreateRuleManager creates a rule manager with specified rules
 func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []string) (shared.RuleManager, error) {
-	manager := NewSimpleRuleManager()
+	// Load default rule configuration for section-based validation
+	ruleConfig, err := config.LoadRuleConfig("rules.yaml")
+	if err != nil {
+		logging.Warn("Failed to load rule config, using minimal configuration: %v", err)
+		// Create minimal config for fallback
+		ruleConfig = &config.RuleConfig{
+			Enabled:                 true,
+			RequireFullCoverage:     false,
+			ManualReviewOnUncovered: true,
+			Files:                   []config.FileRuleConfig{},
+		}
+	}
+
+	manager := NewSectionRuleManager(ruleConfig)
 
 	// If no specific rules requested, use all enabled rules
 	if len(ruleNames) == 0 {
@@ -169,7 +173,6 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 	// Include warehouse rule and auto-approval rules for complete dataverse workflow support
 	dataverseRules := []string{
 		"warehouse_rule",
-		"documentation_auto_approval",
 		// Note: service_account_comment_rule is registered but disabled in production
 		// because it requires GitLab API access to compare old vs new file content
 		// "service_account_comment_rule",
@@ -181,11 +184,46 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 	manager, err := r.CreateRuleManager(client, dataverseRules)
 	if err != nil {
 		logging.Error("Error creating dataverse rule manager: %v", err)
-		// Fallback to empty manager
-		return NewSimpleRuleManager()
+		// Fallback to empty section manager
+		ruleConfig := &config.RuleConfig{
+			Enabled:                 true,
+			RequireFullCoverage:     false,
+			ManualReviewOnUncovered: true,
+			Files:                   []config.FileRuleConfig{},
+		}
+		return NewSectionRuleManager(ruleConfig)
 	}
 
 	return manager
+}
+
+// CreateSectionBasedRuleManager creates a section-aware rule manager
+func (r *RuleRegistry) CreateSectionBasedRuleManager(client *gitlab.Client, ruleConfigPath string) (shared.RuleManager, error) {
+	// Load rule configuration
+	ruleConfig, err := config.LoadRuleConfig(ruleConfigPath)
+	if err != nil {
+		logging.Warn("Failed to load rule config, falling back to dataverse manager: %v", err)
+		return r.CreateDataverseRuleManager(client), nil
+	}
+
+	// If section-based validation is disabled, use dataverse manager
+	if !ruleConfig.Enabled {
+		logging.Info("Section-based validation disabled, using dataverse rule manager")
+		return r.CreateDataverseRuleManager(client), nil
+	}
+
+	// Create section-based manager
+	sectionManager := NewSectionRuleManager(ruleConfig)
+
+	// Add all enabled rules to the section manager
+	for _, info := range r.ListEnabledRules() {
+		rule := info.Factory(client)
+		sectionManager.AddRule(rule)
+		logging.Info("Added rule to section manager: %s", info.Name)
+	}
+
+	logging.Info("Created section-based rule manager with %d file configurations", len(ruleConfig.Files))
+	return sectionManager, nil
 }
 
 // Global registry instance

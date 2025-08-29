@@ -26,7 +26,7 @@ func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mr
 
 	// Hidden identifier for comment tracking
 	comment.WriteString("<!-- naysayer-comment-id: approval -->\n")
-	
+
 	// Header
 	comment.WriteString("✅ **Auto-approved after CI pipeline success**\n\n")
 
@@ -52,7 +52,7 @@ func (mb *MessageBuilder) BuildManualReviewComment(result *shared.RuleEvaluation
 
 	// Hidden identifier for comment tracking
 	comment.WriteString("<!-- naysayer-comment-id: manual-review -->\n")
-	
+
 	// Header
 	comment.WriteString("⚠️ **Manual review required**\n\n")
 
@@ -147,10 +147,10 @@ func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.F
 		for _, ruleResult := range fileValidation.RuleResults {
 			switch ruleResult.Decision {
 			case shared.Approve:
-				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName], 
+				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName],
 					fmt.Sprintf("✅ %s: %s", ruleResult.RuleName, ruleResult.Reason))
 			case shared.ManualReview:
-				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName], 
+				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName],
 					fmt.Sprintf("🚫 %s: %s", ruleResult.RuleName, ruleResult.Reason))
 			}
 		}
@@ -192,7 +192,7 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(fileValidations map[string]*
 
 		// Add line range information
 		if len(result.LineRanges) > 0 {
-			summary.WriteString(fmt.Sprintf("  - Covered lines: %d-%d\n", 
+			summary.WriteString(fmt.Sprintf("  - Covered lines: %d-%d\n",
 				result.LineRanges[0].StartLine, result.LineRanges[0].EndLine))
 		}
 	}
@@ -206,7 +206,7 @@ func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) strin
 
 	for filePath, fileValidation := range result.FileValidations {
 		summary.WriteString(fmt.Sprintf("• %s", filePath))
-		
+
 		// Add decision status
 		switch fileValidation.FileDecision {
 		case shared.Approve:
@@ -214,12 +214,12 @@ func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) strin
 		case shared.ManualReview:
 			summary.WriteString(" 🚫")
 		}
-		
+
 		// Add line coverage info
 		if len(fileValidation.UncoveredLines) > 0 {
 			summary.WriteString(fmt.Sprintf(" (%d uncovered lines)", len(fileValidation.UncoveredLines)))
 		}
-		
+
 		summary.WriteString("\n")
 	}
 
@@ -234,13 +234,13 @@ func (mb *MessageBuilder) buildDetailedFilesSummary(result *shared.RuleEvaluatio
 		summary.WriteString(fmt.Sprintf("**File: %s**\n", filePath))
 		summary.WriteString(fmt.Sprintf("• Total lines: %d\n", fileValidation.TotalLines))
 		summary.WriteString(fmt.Sprintf("• Covered lines: %d\n", len(fileValidation.CoveredLines)))
-		
+
 		if len(fileValidation.UncoveredLines) > 0 {
 			summary.WriteString(fmt.Sprintf("• Uncovered lines: %d\n", len(fileValidation.UncoveredLines)))
 		}
-		
+
 		summary.WriteString(fmt.Sprintf("• Decision: %s\n", fileValidation.FileDecision))
-		
+
 		// List rules that validated this file
 		if len(fileValidation.RuleResults) > 0 {
 			summary.WriteString("• Rules applied:\n")
@@ -248,7 +248,7 @@ func (mb *MessageBuilder) buildDetailedFilesSummary(result *shared.RuleEvaluatio
 				summary.WriteString(fmt.Sprintf("  - %s: %s\n", ruleResult.RuleName, ruleResult.Reason))
 			}
 		}
-		
+
 		summary.WriteString("\n")
 	}
 

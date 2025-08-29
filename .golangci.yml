@@ -2,10 +2,10 @@ run:
   skip-dirs:
     - vendor
   timeout: 5m
-
 issues:
   exclude-rules:
     # Exclude some linters from running on tests files.
     - path: _test\.go
       linters:
         - errcheck
+

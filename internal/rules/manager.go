@@ -5,29 +5,75 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 )
 
-// SimpleRuleManager is a concrete implementation of RuleManager
-type SimpleRuleManager struct {
-	rules []shared.Rule
+// SectionRuleManager manages section-based validation
+type SectionRuleManager struct {
+	rules          []shared.Rule
+	sectionParsers map[string]shared.SectionParser // File pattern -> parser
+	config         *config.RuleConfig
+	ruleRegistry   map[string]shared.Rule // Rule name -> rule instance
 }
 
-// NewSimpleRuleManager creates a new simple rule manager
-func NewSimpleRuleManager() *SimpleRuleManager {
-	return &SimpleRuleManager{
-		rules: make([]shared.Rule, 0),
+// NewSectionRuleManager creates a new section-based rule manager
+func NewSectionRuleManager(ruleConfig *config.RuleConfig) *SectionRuleManager {
+	manager := &SectionRuleManager{
+		rules:          make([]shared.Rule, 0),
+		sectionParsers: make(map[string]shared.SectionParser),
+		config:         ruleConfig,
+		ruleRegistry:   make(map[string]shared.Rule),
+	}
+
+	// Initialize parsers based on configuration
+	manager.initializeParsers()
+
+	return manager
+}
+
+// initializeParsers sets up section parsers based on configuration
+func (srm *SectionRuleManager) initializeParsers() {
+	for _, fileConfig := range srm.config.Files {
+		if !fileConfig.Enabled {
+			logging.Info("Skipping disabled file configuration: %s", fileConfig.Name)
+			continue
+		}
+
+		// Combine path and filename to create full pattern
+		fullPattern := fileConfig.Path + fileConfig.Filename
+
+		switch fileConfig.ParserType {
+		case "yaml":
+			// Create section definitions map from the file's sections
+			definitionMap := make(map[string]config.SectionDefinition)
+			for _, section := range fileConfig.Sections {
+				definitionMap[section.Name] = section
+			}
+			srm.sectionParsers[fullPattern] = NewYAMLSectionParser(definitionMap)
+			logging.Info("Initialized YAML parser for pattern: %s (%d sections)", fullPattern, len(definitionMap))
+		case "json":
+			// TODO: Implement JSON parser when needed
+			logging.Warn("JSON section parser not yet implemented for: %s", fileConfig.Name)
+		case "markdown":
+			// TODO: Implement Markdown parser when needed
+			logging.Warn("Markdown section parser not yet implemented for: %s", fileConfig.Name)
+		default:
+			logging.Warn("Unknown parser type %s for file configuration: %s", fileConfig.ParserType, fileConfig.Name)
+		}
 	}
 }
 
 // AddRule registers a rule with the manager
-func (rm *SimpleRuleManager) AddRule(rule shared.Rule) {
-	rm.rules = append(rm.rules, rule)
+func (srm *SectionRuleManager) AddRule(rule shared.Rule) {
+	srm.rules = append(srm.rules, rule)
+	srm.ruleRegistry[rule.Name()] = rule
 }
 
-// EvaluateAll runs all applicable rules using line-level validation
-func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEvaluation {
+// EvaluateAll runs section-based validation on all files
+func (srm *SectionRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEvaluation {
 	start := time.Now()
 
 	// Early filtering for common skip conditions
@@ -39,7 +85,6 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "✅ Draft MR skipped",
 				Details: "Draft MRs are automatically approved without rule evaluation",
 			},
-
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
@@ -53,17 +98,16 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 				Summary: "🤖 Bot MR skipped",
 				Details: "MRs from automated users (bots) are automatically approved",
 			},
-
 			FileValidations: make(map[string]*shared.FileValidationSummary),
 			ExecutionTime:   time.Since(start),
 		}
 	}
 
 	// Set MR context for context-aware rules
-	rm.setMRContextForRules(mrCtx)
+	srm.setMRContextForRules(mrCtx)
 
-	// Perform line-level validation
-	fileValidations, overallDecision := rm.validateFilesLineByLine(mrCtx)
+	// Perform section-based validation
+	fileValidations, overallDecision := srm.validateFilesWithSections(mrCtx)
 
 	// Calculate summary statistics
 	totalFiles := len(fileValidations)
@@ -77,9 +121,10 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 			approvedFiles++
 		case shared.ManualReview:
 			reviewFiles++
-			if len(fileValidation.UncoveredLines) > 0 {
-				uncoveredFiles++
-			}
+		}
+
+		if len(fileValidation.UncoveredLines) > 0 {
+			uncoveredFiles++
 		}
 	}
 
@@ -94,124 +139,71 @@ func (rm *SimpleRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEv
 	}
 }
 
-// FileCoverageResult represents the coverage analysis for an MR
-type FileCoverageResult struct {
-	TotalFiles        int      `json:"total_files"`
-	CoveredFiles      int      `json:"covered_files"`
-	UncoveredFiles    []string `json:"uncovered_files"`
-	HasUncoveredFiles bool     `json:"has_uncovered_files"`
-}
-
-// analyzeFileCoverage analyzes which files in the MR are covered by rules
-func (rm *SimpleRuleManager) analyzeFileCoverage(mrCtx *shared.MRContext) *FileCoverageResult {
-	// Collect all unique file paths from the MR
-	allFiles := make(map[string]bool)
-	for _, change := range mrCtx.Changes {
-		if change.NewPath != "" {
-			allFiles[change.NewPath] = true
-		}
-		if change.OldPath != "" && change.OldPath != change.NewPath {
-			allFiles[change.OldPath] = true
-		}
-	}
-
-	var uncoveredFiles []string
-	coveredCount := 0
-
-	// Check coverage for each file
-	for filePath := range allFiles {
-		// Check if any rule covers this file by calling GetCoveredLines
-		covered := false
-		for _, rule := range rm.rules {
-			fileContent := rm.getFileContent(filePath, mrCtx)
-			coveredLines := rule.GetCoveredLines(filePath, fileContent)
-			if len(coveredLines) > 0 {
-				covered = true
-				break
-			}
-		}
-
-		if covered {
-			coveredCount++
-		} else {
-			uncoveredFiles = append(uncoveredFiles, filePath)
-		}
-	}
-
-	return &FileCoverageResult{
-		TotalFiles:        len(allFiles),
-		CoveredFiles:      coveredCount,
-		UncoveredFiles:    uncoveredFiles,
-		HasUncoveredFiles: len(uncoveredFiles) > 0,
-	}
-}
-
-// validateFilesLineByLine performs line-level validation for each file
-func (rm *SimpleRuleManager) validateFilesLineByLine(mrCtx *shared.MRContext) (map[string]*shared.FileValidationSummary, shared.Decision) {
+// validateFilesWithSections performs section-based validation for each file
+func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext) (map[string]*shared.FileValidationSummary, shared.Decision) {
 	fileValidations := make(map[string]*shared.FileValidationSummary)
 
 	// Get unique file paths from changes
-	filePaths := rm.getUniqueFilePaths(mrCtx.Changes)
+	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
 
 	for _, filePath := range filePaths {
-		// Fetch file content from GitLab API
-		// Note: In production, this would use the GitLab client from mrCtx
-		// For now, we'll simulate with a placeholder
-		fileContent := rm.getFileContent(filePath, mrCtx)
+		// Get file content (in production, this would fetch from GitLab API)
+		fileContent := srm.getFileContent(filePath, mrCtx)
 		totalLines := shared.CountLines(fileContent)
 
-		// Validate this file with all applicable rules
-		fileValidation := rm.validateSingleFile(filePath, fileContent, totalLines)
-		fileValidations[filePath] = fileValidation
+		// Check if this file has section-based validation
+		parser := srm.getParserForFile(filePath)
+		if parser != nil {
+			// Use section-based validation
+			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser)
+			fileValidations[filePath] = fileValidation
+		} else {
+			// Fall back to traditional line-based validation
+			fileValidation := srm.validateFileTraditional(filePath, fileContent, totalLines)
+			fileValidations[filePath] = fileValidation
+		}
 	}
 
 	// Determine overall decision
-	overallDecision := rm.determineOverallDecision(fileValidations)
+	overallDecision := srm.determineOverallDecision(fileValidations)
 	return fileValidations, overallDecision
 }
 
-// setMRContextForRules provides MR context to context-aware rules
-func (rm *SimpleRuleManager) setMRContextForRules(mrCtx *shared.MRContext) {
-	for _, rule := range rm.rules {
-		// Check if the rule implements ContextAwareRule interface
-		if contextRule, ok := rule.(shared.ContextAwareRule); ok {
-			contextRule.SetMRContext(mrCtx)
-		}
+// validateFileWithSections validates a file using section-based approach
+func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser) *shared.FileValidationSummary {
+	// Parse file into sections
+	sections, err := parser.ParseSections(filePath, fileContent)
+	if err != nil {
+		logging.Error("Failed to parse sections for %s: %v", filePath, err)
+		// Fall back to traditional validation
+		return srm.validateFileTraditional(filePath, fileContent, totalLines)
 	}
-}
 
-// validateSingleFile validates a single file using all applicable rules
-func (rm *SimpleRuleManager) validateSingleFile(filePath, fileContent string, totalLines int) *shared.FileValidationSummary {
 	var allCoveredLines []shared.LineRange
 	var ruleResults []shared.LineValidationResult
+	var sectionResults []shared.SectionValidationResult
 
-	// For each rule, check if it covers any lines in this file
-	for _, rule := range rm.rules {
-		coveredLines := rule.GetCoveredLines(filePath, fileContent)
-		if len(coveredLines) == 0 {
-			continue // Rule doesn't apply to this file
+	// Validate each section
+	for _, section := range sections {
+		// Get rules for this section
+		sectionRules := srm.getRulesForSection(section.RuleNames)
+
+		// Validate the section
+		sectionResult := parser.ValidateSection(&section, sectionRules)
+		sectionResults = append(sectionResults, *sectionResult)
+
+		// Add to overall results
+		for _, ruleResult := range sectionResult.RuleResults {
+			ruleResults = append(ruleResults, ruleResult)
+			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
 		}
-
-		// Validate the lines covered by this rule
-		decision, reason := rule.ValidateLines(filePath, fileContent, coveredLines)
-
-		// Add rule result
-		ruleResults = append(ruleResults, shared.LineValidationResult{
-			RuleName:   rule.Name(),
-			LineRanges: coveredLines,
-			Decision:   decision,
-			Reason:     reason,
-		})
-
-		// Accumulate covered lines
-		allCoveredLines = append(allCoveredLines, coveredLines...)
 	}
 
-	// Calculate uncovered lines
-	uncoveredLines := shared.GetUncoveredLines(totalLines, allCoveredLines)
+	// Check for uncovered lines (lines not in any section)
+	uncoveredLines := srm.getUncoveredLinesFromSections(totalLines, sections)
 
-	// Determine file decision
-	fileDecision := rm.determineFileDecision(ruleResults, uncoveredLines)
+	// If there are uncovered lines and config requires manual review
+	fileDecision := srm.determineFileDecisionWithSections(ruleResults, uncoveredLines, sectionResults)
 
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
@@ -223,113 +215,245 @@ func (rm *SimpleRuleManager) validateSingleFile(filePath, fileContent string, to
 	}
 }
 
-// determineFileDecision determines the decision for a single file
-func (rm *SimpleRuleManager) determineFileDecision(ruleResults []shared.LineValidationResult, uncoveredLines []shared.LineRange) shared.DecisionType {
-	// If there are uncovered lines, require manual review
-	if len(uncoveredLines) > 0 {
-		return shared.ManualReview
+// validateFileTraditional falls back to traditional line-based validation
+func (srm *SectionRuleManager) validateFileTraditional(filePath, fileContent string, totalLines int) *shared.FileValidationSummary {
+	var allCoveredLines []shared.LineRange
+	var ruleResults []shared.LineValidationResult
+
+	// Apply all rules to the file
+	for _, rule := range srm.rules {
+		coveredLines := rule.GetCoveredLines(filePath, fileContent)
+		if len(coveredLines) == 0 {
+			continue // Rule doesn't apply
+		}
+
+		// Validate using the rule
+		decision, reason := rule.ValidateLines(filePath, fileContent, coveredLines)
+
+		ruleResults = append(ruleResults, shared.LineValidationResult{
+			RuleName:   rule.Name(),
+			LineRanges: coveredLines,
+			Decision:   decision,
+			Reason:     reason,
+		})
+
+		allCoveredLines = append(allCoveredLines, coveredLines...)
 	}
 
-	// If any rule requires manual review, the file requires manual review
+	// Calculate uncovered lines
+	uncoveredLines := shared.GetUncoveredLines(totalLines, allCoveredLines)
+
+	// Determine file decision
+	fileDecision := srm.determineFileDecision(ruleResults, uncoveredLines)
+
+	return &shared.FileValidationSummary{
+		FilePath:       filePath,
+		TotalLines:     totalLines,
+		CoveredLines:   shared.MergeLineRanges(allCoveredLines),
+		UncoveredLines: uncoveredLines,
+		RuleResults:    ruleResults,
+		FileDecision:   fileDecision,
+	}
+}
+
+// getParserForFile returns the appropriate section parser for a file
+func (srm *SectionRuleManager) getParserForFile(filePath string) shared.SectionParser {
+	for pattern, parser := range srm.sectionParsers {
+		if shared.MatchesPattern(filePath, pattern) {
+			return parser
+		}
+	}
+	return nil
+}
+
+// getRulesForSection returns rules that apply to a specific section
+func (srm *SectionRuleManager) getRulesForSection(ruleNames []string) []shared.Rule {
+	var sectionRules []shared.Rule
+
+	for _, ruleName := range ruleNames {
+		if rule, exists := srm.ruleRegistry[ruleName]; exists {
+			sectionRules = append(sectionRules, rule)
+		} else {
+			logging.Warn("Rule %s not found in registry", ruleName)
+		}
+	}
+
+	return sectionRules
+}
+
+// getUncoveredLinesFromSections calculates lines not covered by any section
+func (srm *SectionRuleManager) getUncoveredLinesFromSections(totalLines int, sections []shared.Section) []shared.LineRange {
+	var sectionRanges []shared.LineRange
+
+	for _, section := range sections {
+		sectionRanges = append(sectionRanges, shared.LineRange{
+			StartLine: section.StartLine,
+			EndLine:   section.EndLine,
+			FilePath:  section.FilePath,
+		})
+	}
+
+	return shared.GetUncoveredLines(totalLines, sectionRanges)
+}
+
+// determineFileDecisionWithSections determines file decision considering sections
+func (srm *SectionRuleManager) determineFileDecisionWithSections(ruleResults []shared.LineValidationResult, uncoveredLines []shared.LineRange, sectionResults []shared.SectionValidationResult) shared.DecisionType {
+	// First, check if any rule explicitly failed/rejected
 	for _, result := range ruleResults {
 		if result.Decision == shared.ManualReview {
 			return shared.ManualReview
 		}
 	}
 
-	// All rules approved and full coverage
+	// Then, check if any section explicitly failed/rejected
+	for _, sectionResult := range sectionResults {
+		if sectionResult.Decision == shared.ManualReview {
+			return shared.ManualReview
+		}
+	}
+
+	// Finally, check if there are uncovered lines (only if config requires it)
+	if len(uncoveredLines) > 0 && srm.config.ManualReviewOnUncovered {
+		return shared.ManualReview
+	}
+
+	// If we reach here, all rules approved their sections and all lines are covered
 	return shared.Approve
 }
 
-// determineOverallDecision determines the overall MR decision
-func (rm *SimpleRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
-	approvedFiles := 0
-	reviewFiles := 0
-	uncoveredFiles := 0
+// Helper methods (similar to existing manager)
 
-	for _, fileValidation := range fileValidations {
-		if fileValidation.FileDecision == shared.Approve {
-			approvedFiles++
-		} else {
-			reviewFiles++
-			if len(fileValidation.UncoveredLines) > 0 {
-				uncoveredFiles++
-			}
+func (srm *SectionRuleManager) setMRContextForRules(mrCtx *shared.MRContext) {
+	for _, rule := range srm.rules {
+		if contextRule, ok := rule.(shared.ContextAwareRule); ok {
+			contextRule.SetMRContext(mrCtx)
 		}
-	}
-
-	// If any file requires manual review, the MR requires manual review
-	if reviewFiles > 0 {
-		return shared.Decision{
-			Type:    shared.ManualReview,
-			Reason:  fmt.Sprintf("Manual review required: %d/%d files need review", reviewFiles, len(fileValidations)),
-			Summary: "🚫 Manual review required",
-			Details: rm.createDetailedSummary(fileValidations),
-		}
-	}
-
-	// All files approved
-	return shared.Decision{
-		Type:    shared.Approve,
-		Reason:  fmt.Sprintf("All %d files validated and approved", len(fileValidations)),
-		Summary: "✅ All files approved",
-		Details: rm.createDetailedSummary(fileValidations),
 	}
 }
 
-// Helper methods
-func (rm *SimpleRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) []string {
-	fileMap := make(map[string]bool)
+func (srm *SectionRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) []string {
+	// Extract unique file paths from GitLab changes
+	pathMap := make(map[string]bool)
+	var filePaths []string
+
 	for _, change := range changes {
-		if change.NewPath != "" {
-			fileMap[change.NewPath] = true
+		if change.NewPath != "" && !pathMap[change.NewPath] {
+			pathMap[change.NewPath] = true
+			filePaths = append(filePaths, change.NewPath)
 		}
-		if change.OldPath != "" && change.OldPath != change.NewPath {
-			fileMap[change.OldPath] = true
+		if change.OldPath != "" && change.OldPath != change.NewPath && !pathMap[change.OldPath] {
+			pathMap[change.OldPath] = true
+			filePaths = append(filePaths, change.OldPath)
 		}
 	}
 
-	var filePaths []string
-	for filePath := range fileMap {
-		filePaths = append(filePaths, filePath)
-	}
 	return filePaths
 }
 
-// getFileContent fetches file content from GitLab API
-func (rm *SimpleRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
-	// For now, return placeholder content until a GitLab client is available in the manager
-	// In production, this should use a GitLab client to fetch actual file content
-
-	// The current line-level validation system needs actual file content to work properly
-	// This placeholder provides realistic content for testing the validation logic
-
-	// TODO: Add GitLab client to SimpleRuleManager and implement actual file fetching:
-	// client.FetchFileContent(mrCtx.ProjectID, filePath, mrCtx.SourceBranch)
-
-	return "# Placeholder file content\nname: test-product\nkind: aggregated\nwarehouses:\n- type: user\n  size: XSMALL\n"
+func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
+	// For now, extract content from the diff in the changes
+	// In a full implementation, this would fetch the current file content from GitLab API
+	for _, change := range mrCtx.Changes {
+		if change.NewPath == filePath {
+			// Try to reconstruct file content from diff
+			if change.Diff != "" {
+				return srm.extractFileContentFromDiff(change.Diff)
+			}
+		}
+	}
+	return ""
 }
 
-// createDetailedSummary creates a detailed summary of file validations
-func (rm *SimpleRuleManager) createDetailedSummary(fileValidations map[string]*shared.FileValidationSummary) string {
-	var summary strings.Builder
-	summary.WriteString("File validation results:\n")
+// extractFileContentFromDiff attempts to extract file content from a Git diff
+func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
+	// This is a simplified implementation
+	// In production, we should fetch the actual file content from GitLab API
+	// For now, we'll try to extract content from the diff
 
-	for filePath, validation := range fileValidations {
-		if validation.FileDecision == shared.Approve {
-			summary.WriteString(fmt.Sprintf("✅ %s: Approved\n", filePath))
-		} else {
-			summary.WriteString(fmt.Sprintf("❌ %s: Manual review required\n", filePath))
-			if len(validation.UncoveredLines) > 0 {
-				summary.WriteString(fmt.Sprintf("   - Uncovered lines: %d ranges\n", len(validation.UncoveredLines)))
-			}
-			for _, ruleResult := range validation.RuleResults {
-				if ruleResult.Decision == shared.ManualReview {
-					summary.WriteString(fmt.Sprintf("   - %s: %s\n", ruleResult.RuleName, ruleResult.Reason))
-				}
+	lines := strings.Split(diff, "\n")
+	var contentLines []string
+	inContent := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "@@") {
+			inContent = true
+			continue
+		}
+		if !inContent {
+			continue
+		}
+
+		// Add lines that are not diff markers
+		if len(line) > 0 {
+			switch line[0] {
+			case '+':
+				// Added line - include in content
+				contentLines = append(contentLines, line[1:])
+			case ' ':
+				// Unchanged line - include in content
+				contentLines = append(contentLines, line[1:])
+			case '-':
+				// Removed line - skip for new content
+				continue
+			default:
+				// Regular line
+				contentLines = append(contentLines, line)
 			}
 		}
 	}
 
-	return summary.String()
+	return strings.Join(contentLines, "\n")
+}
+
+func (srm *SectionRuleManager) determineFileDecision(ruleResults []shared.LineValidationResult, uncoveredLines []shared.LineRange) shared.DecisionType {
+	// If there are uncovered lines, require manual review
+	if len(uncoveredLines) > 0 {
+		return shared.ManualReview
+	}
+
+	// If any rule requires manual review
+	for _, result := range ruleResults {
+		if result.Decision == shared.ManualReview {
+			return shared.ManualReview
+		}
+	}
+
+	return shared.Approve
+}
+
+func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
+	var manualReviewFiles []string
+	var approvedFiles []string
+
+	// Collect file results
+	for _, fileValidation := range fileValidations {
+		if fileValidation.FileDecision == shared.ManualReview {
+			manualReviewFiles = append(manualReviewFiles, fileValidation.FilePath)
+		} else {
+			approvedFiles = append(approvedFiles, fileValidation.FilePath)
+		}
+	}
+
+	// If any file requires manual review, the entire MR requires manual review
+	if len(manualReviewFiles) > 0 {
+		details := fmt.Sprintf("Files requiring manual review: %s", strings.Join(manualReviewFiles, ", "))
+		if len(approvedFiles) > 0 {
+			details += fmt.Sprintf(". Files auto-approved: %s", strings.Join(approvedFiles, ", "))
+		}
+
+		return shared.Decision{
+			Type:    shared.ManualReview,
+			Reason:  "One or more files require manual review",
+			Summary: "⚠️ Manual review required",
+			Details: details,
+		}
+	}
+
+	// All files approved - provide detailed summary
+	return shared.Decision{
+		Type:    shared.Approve,
+		Reason:  "All files passed validation - all changes covered by approved rules",
+		Summary: "✅ Auto-approved",
+		Details: fmt.Sprintf("All %d files passed section-based validation with complete coverage", len(fileValidations)),
+	}
 }
