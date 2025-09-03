@@ -53,6 +53,30 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "warehouse",
 	})
 
+	// Documentation auto-approval rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "documentation_auto_approval",
+		Description: "Automatically approves changes to documentation files (README.md, data_elements.md, promotion_checklist.md, developers.yaml)",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			return NewDocumentationAutoApprovalRule()
+		},
+		Enabled:  true,
+		Category: "auto_approval",
+	})
+
+	// Service account comment auto-approval rule (placeholder)
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "service_account_comment_rule",
+		Description: "Placeholder for field-level auto-approval of service account comment changes (requires GitLab API integration)",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			return NewServiceAccountCommentRule()
+		},
+		Enabled:  false, // Disabled until proper implementation with GitLab API
+		Category: "auto_approval",
+	})
+
 }
 
 // RegisterRule registers a new rule in the registry
@@ -142,11 +166,15 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
 func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.RuleManager {
-	// For dataverse, we only have the warehouse rule implemented
+	// Include warehouse rule and auto-approval rules for complete dataverse workflow support
 	dataverseRules := []string{
 		"warehouse_rule",
+		"documentation_auto_approval",
+		// Note: service_account_comment_rule is registered but disabled in production
+		// because it requires GitLab API access to compare old vs new file content
+		// "service_account_comment_rule",
 		// TODO: Add back when implemented:
-		// "migrations_rule",
+		// "migrations_rule", 
 		// "naming_conventions_rule",
 	}
 
