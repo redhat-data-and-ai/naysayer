@@ -63,20 +63,20 @@ files:
           - metadata_rule
         description: "Full file metadata validation"
 
-  # Service account configuration files (disabled until rule is implemented)
-  # - name: "service_accounts"
-  #   path: "serviceaccounts/**/"
-  #   filename: "*.{yaml,yml}"
-  #   parser_type: yaml
-  #   description: "Service account configuration files"
-  #   enabled: true
-  #   sections:
-  #     - name: serviceaccount
-  #       yaml_path: .
-  #       required: true
-  #       rule_names:
-  #         - serviceaccount_rule
-  #       description: "Service account configuration validation"
+  # Service account configuration files
+  - name: "service_accounts"
+    path: "**/"
+    filename: "*{serviceaccount,service-account,_astro_*_appuser}.{yaml,yml}"
+    parser_type: yaml
+    description: "Service account configuration files (including Astro service accounts)"
+    enabled: true
+    sections:
+      - name: serviceaccount
+        yaml_path: .
+        required: true
+        rule_names:
+          - service_account_rule
+        description: "Service account configuration validation - auto-approves Astro service accounts (**_astro_<env>_appuser.yaml/yml) when name field matches filename"
 
 require_full_coverage: false
 manual_review_on_uncovered: true

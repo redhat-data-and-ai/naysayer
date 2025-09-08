@@ -68,6 +68,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "auto_approval",
 	})
 
+	// Service account rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "service_account_rule",
+		Description: "Auto-approves Astro service account files (**_astro_<env>_appuser.yaml/yml) when name field matches filename. Other service account files require manual review.",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			return NewServiceAccountRule(client)
+		},
+		Enabled:  true,
+		Category: "service_account",
+	})
+
 }
 
 // RegisterRule registers a new rule in the registry
