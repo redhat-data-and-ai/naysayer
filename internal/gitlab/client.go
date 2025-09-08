@@ -297,6 +297,41 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	}
 }
 
+// ResetNaysayerApproval revokes naysayer's approval for a merge request
+// This is called when naysayer changes its decision from approve to manual review
+func (c *Client) ResetNaysayerApproval(projectID, mrIID int) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/unapprove",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("{}")))
+	if err != nil {
+		return fmt.Errorf("failed to create reset approval request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to reset naysayer approval: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case 201:
+		return nil // Success
+	case 401:
+		return fmt.Errorf("reset approval failed: insufficient permissions")
+	case 404:
+		return fmt.Errorf("reset approval failed: MR not found")
+	case 405:
+		return fmt.Errorf("reset approval failed: MR not approved or cannot be reset")
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("reset approval failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
+
 // MRComment represents a GitLab merge request comment
 type MRComment struct {
 	ID        int                    `json:"id"`
@@ -306,8 +341,8 @@ type MRComment struct {
 	Author    map[string]interface{} `json:"author"`
 }
 
-// listMRComments retrieves all comments for a merge request (internal use only)
-func (c *Client) listMRComments(projectID, mrIID int) ([]MRComment, error) {
+// ListMRComments retrieves all comments for a merge request
+func (c *Client) ListMRComments(projectID, mrIID int) ([]MRComment, error) {
 	// Use a larger page size to get more comments (GitLab API supports up to 100 per page)
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
@@ -385,63 +420,124 @@ func (c *Client) UpdateMRComment(projectID, mrIID, commentID int, newBody string
 	}
 }
 
-
-// FindLatestNaysayerComment searches for the most recent naysayer comment regardless of type
-func (c *Client) FindLatestNaysayerComment(projectID, mrIID int) (*MRComment, error) {
-	comments, err := c.listMRComments(projectID, mrIID)
+// FindLatestNaysayerComment searches for the most recent comment from the current naysayer bot instance
+// If commentType is provided, only returns comments of that type. If empty, returns any naysayer comment.
+func (c *Client) FindLatestNaysayerComment(projectID, mrIID int, commentType ...string) (*MRComment, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list comments: %w", err)
 	}
 
-	// Look for any comment from naysayer bot (comments are already sorted by created_at desc)
-	// Since the HTML identifiers aren't actually being included in real comments,
-	// we'll just find the latest comment from the naysayer bot
+	// Get current bot username (fallback to any naysayer bot if fails)
+	currentBotUsername, _ := c.GetCurrentBotUsername()
+
+	// Determine if we need to filter by comment type
+	filterByType := len(commentType) > 0 && commentType[0] != ""
+
+	// Find the latest matching comment (comments are sorted by created_at desc)
 	for _, comment := range comments {
-		if c.isNaysayerBotAuthor(comment.Author) {
+		// Check if comment is from our bot and matches type (if specified)
+		if c.isOurBotComment(comment.Author, currentBotUsername) &&
+			(!filterByType || c.matchesCommentType(comment.Body, commentType[0])) {
 			return &comment, nil
 		}
 	}
-	
-	return nil, nil // No naysayer comment found
+
+	return nil, nil // No matching comment found
 }
 
-// isNaysayerBotAuthor checks if the comment author is a naysayer bot
-func (c *Client) isNaysayerBotAuthor(author map[string]interface{}) bool {	
-	// Check username field first
-	if username, ok := author["username"].(string); ok {
-		// Match the exact pattern we found: project_<ID>_bot_<hash>
-		if strings.HasPrefix(username, "project_") && strings.Contains(username, "_bot_") {
-			return true
-		}
-		// Also check for the simpler naysayer-bot pattern
-		if strings.Contains(username, "naysayer-bot") {
-			return true
-		}
+// isOurBotComment checks if a comment is from our bot instance
+func (c *Client) isOurBotComment(author map[string]interface{}, currentBotUsername string) bool {
+	if currentBotUsername != "" {
+		return author["username"] == currentBotUsername
 	}
-	
+	return c.IsNaysayerBotAuthor(author)
+}
+
+// matchesCommentType checks if a comment body matches the expected comment type
+func (c *Client) matchesCommentType(body, commentType string) bool {
+	switch commentType {
+	case "approval":
+		return strings.Contains(body, "<!-- naysayer-comment-id: approval -->")
+	case "manual-review":
+		return strings.Contains(body, "<!-- naysayer-comment-id: manual-review -->")
+	default:
+		// For unknown types, match any naysayer comment
+		return strings.Contains(body, "<!-- naysayer-comment-id:")
+	}
+}
+
+// GetCurrentBotUsername identifies the current bot's username by calling GitLab API
+func (c *Client) GetCurrentBotUsername() (string, error) {
+	url := fmt.Sprintf("%s/api/v4/user", strings.TrimRight(c.config.BaseURL, "/"))
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create user info request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user info: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("user info request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var userInfo map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return "", fmt.Errorf("failed to decode user info response: %w", err)
+	}
+
+	if username, ok := userInfo["username"].(string); ok {
+		return username, nil
+	}
+
+	return "", fmt.Errorf("username not found in user info response")
+}
+
+// IsNaysayerBotAuthor checks if the comment author is a naysayer bot
+func (c *Client) IsNaysayerBotAuthor(author map[string]interface{}) bool {
+	// Check username patterns
+	if username, ok := author["username"].(string); ok {
+		return (strings.HasPrefix(username, "project_") && strings.Contains(username, "_bot_")) ||
+			strings.Contains(username, "naysayer-bot")
+	}
+
 	// Check name field as fallback
 	if name, ok := author["name"].(string); ok {
-		if name == "naysayer-bot" {
-			return true
-		}
+		return name == "naysayer-bot"
 	}
-	
+
 	return false
 }
 
-// AddOrUpdateMRComment adds a new comment or updates the latest existing naysayer comment
+// AddOrUpdateMRComment adds a new comment or updates the latest existing naysayer comment of the same type
 func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, commentType string) error {
-	// Try to find the latest naysayer comment regardless of type
-	existingComment, err := c.FindLatestNaysayerComment(projectID, mrIID)
+	// Find the latest naysayer comment of the same type
+	existingComment, err := c.FindLatestNaysayerComment(projectID, mrIID, commentType)
 	if err != nil {
-		return fmt.Errorf("failed to search for existing naysayer comment: %w", err)
+		return fmt.Errorf("failed to search for existing comment: %w", err)
 	}
 
+	// Update existing comment or create new one
 	if existingComment != nil {
-		// Update the latest naysayer comment
-		return c.UpdateMRComment(projectID, mrIID, existingComment.ID, commentBody)
-	} else {
-		// Create new comment
-		return c.AddMRComment(projectID, mrIID, commentBody)
+		if err := c.UpdateMRComment(projectID, mrIID, existingComment.ID, commentBody); err != nil {
+			// If update fails due to permissions, fallback to creating new comment
+			if strings.Contains(err.Error(), "cannot edit this comment") ||
+				strings.Contains(err.Error(), "insufficient permissions") {
+				return c.AddMRComment(projectID, mrIID, commentBody)
+			}
+			return err
+		}
+		return nil
 	}
+
+	// No existing comment found, create new one
+	return c.AddMRComment(projectID, mrIID, commentBody)
 }

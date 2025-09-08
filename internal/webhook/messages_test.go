@@ -31,20 +31,20 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName: "warehouse_rule",
-						Decision: shared.Approve,
-						Reason:   "Warehouse decreases detected",
+						RuleName:   "warehouse_rule",
+						Decision:   shared.Approve,
+						Reason:     "Warehouse decreases detected",
 						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 					},
 				},
 				FileDecision: shared.Approve,
 			},
 		},
-		TotalFiles:    1,
-		ApprovedFiles: 1,
-		ReviewFiles:   0,
+		TotalFiles:     1,
+		ApprovedFiles:  1,
+		ReviewFiles:    0,
 		UncoveredFiles: 0,
-		ExecutionTime: time.Millisecond * 150,
+		ExecutionTime:  time.Millisecond * 150,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -116,9 +116,9 @@ func TestBuildManualReviewComment_ContainsIdentifier(t *testing.T) {
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 20}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName: "warehouse_rule",
-						Decision: shared.ManualReview,
-						Reason:   "High-risk warehouse changes",
+						RuleName:   "warehouse_rule",
+						Decision:   shared.ManualReview,
+						Reason:     "High-risk warehouse changes",
 						LineRanges: []shared.LineRange{{StartLine: 10, EndLine: 15}},
 					},
 				},
@@ -205,20 +205,20 @@ func TestBuildManualReviewComment(t *testing.T) {
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName: "warehouse_rule",
-						Decision: shared.ManualReview,
-						Reason:   "Warehouse size increase detected",
+						RuleName:   "warehouse_rule",
+						Decision:   shared.ManualReview,
+						Reason:     "Warehouse size increase detected",
 						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 					},
 				},
 				FileDecision: shared.ManualReview,
 			},
 		},
-		TotalFiles:    1,
-		ApprovedFiles: 0,
-		ReviewFiles:   1,
+		TotalFiles:     1,
+		ApprovedFiles:  0,
+		ReviewFiles:    1,
 		UncoveredFiles: 0,
-		ExecutionTime: time.Millisecond * 200,
+		ExecutionTime:  time.Millisecond * 200,
 	}
 
 	mrInfo := &gitlab.MRInfo{

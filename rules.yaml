@@ -1,0 +1,82 @@
+# Rule-Based Validation Configuration
+# 
+# This file defines which validation rules apply to which sections of different file types.
+# It is the single source of truth for rule configuration - modify this file to change behavior.
+# 
+# Configuration structure:
+# - enabled: Enable/disable rule-based validation
+# - files: Array of file configurations with separated path and filename patterns
+# - require_full_coverage: Require all lines to be covered by sections
+# - manual_review_on_uncovered: Require manual review for uncovered changes
+
+enabled: true
+
+files:
+  # Data product configuration files
+  - name: "product_configs"
+    path: "**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    description: "Data product configuration files"
+    enabled: true
+    sections:
+      - name: warehouses
+        yaml_path: warehouses
+        required: true
+        rule_names:
+          - warehouse_rule
+        description: "Data warehouses configuration - validates size changes and warehouse settings"
+      - name: dbt
+        yaml_path: service_account.dbt
+        required: true
+        rule_names:
+          - metadata_rule
+        description: "DBT configuration validation"
+
+  # Documentation and metadata files (using yaml parser for simplicity)
+  - name: "documentation_files"
+    path: "**/"
+    filename: "*.md"
+    parser_type: yaml
+    description: "Markdown documentation files"
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        required: false
+        rule_names:
+          - metadata_rule
+        description: "Full file metadata validation"
+
+  # YAML configuration files (developers, changelog, etc.)
+  - name: "yaml_metadata_files"
+    path: "**/"
+    filename: "developers.{yaml,yml}"
+    parser_type: yaml
+    description: "YAML metadata files"
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        required: false
+        rule_names:
+          - metadata_rule
+        description: "Full file metadata validation"
+
+  # Service account configuration files (disabled until rule is implemented)
+  # - name: "service_accounts"
+  #   path: "serviceaccounts/**/"
+  #   filename: "*.{yaml,yml}"
+  #   parser_type: yaml
+  #   description: "Service account configuration files"
+  #   enabled: true
+  #   sections:
+  #     - name: serviceaccount
+  #       yaml_path: .
+  #       required: true
+  #       rule_names:
+  #         - serviceaccount_rule
+  #       description: "Service account configuration validation"
+
+require_full_coverage: false
+manual_review_on_uncovered: true

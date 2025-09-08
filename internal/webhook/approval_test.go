@@ -44,19 +44,19 @@ func (m *MockRuleManagerForApproval) EvaluateAll(ctx *shared.MRContext) *shared.
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 50}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName: "warehouse_rule",
-						Decision: shared.Approve,
-						Reason:   "Mock warehouse approval",
+						RuleName:   "warehouse_rule",
+						Decision:   shared.Approve,
+						Reason:     "Mock warehouse approval",
 						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 50}},
 					},
 				},
 				FileDecision: shared.Approve,
 			},
 		},
-		ExecutionTime: time.Millisecond * 100,
-		TotalFiles:    1,
-		ApprovedFiles: 1,
-		ReviewFiles:   0,
+		ExecutionTime:  time.Millisecond * 100,
+		TotalFiles:     1,
+		ApprovedFiles:  1,
+		ReviewFiles:    0,
 		UncoveredFiles: 0,
 	}
 }
@@ -132,19 +132,19 @@ func TestHandleApprovalWithComments_Success(t *testing.T) {
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName: "warehouse_rule",
-						Decision: shared.Approve,
-						Reason:   "Safe warehouse changes",
+						RuleName:   "warehouse_rule",
+						Decision:   shared.Approve,
+						Reason:     "Safe warehouse changes",
 						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 					},
 				},
 				FileDecision: shared.Approve,
 			},
 		},
-		ExecutionTime: time.Millisecond * 150,
-		TotalFiles:    1,
-		ApprovedFiles: 1,
-		ReviewFiles:   0,
+		ExecutionTime:  time.Millisecond * 150,
+		TotalFiles:     1,
+		ApprovedFiles:  1,
+		ReviewFiles:    0,
 		UncoveredFiles: 0,
 	}
 
@@ -203,7 +203,7 @@ func TestHandleApprovalWithComments_CommentsDisabled(t *testing.T) {
 		ApprovedFiles:   0,
 		ReviewFiles:     0,
 		UncoveredFiles:  0,
-		ExecutionTime: time.Millisecond * 100,
+		ExecutionTime:   time.Millisecond * 100,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -263,7 +263,7 @@ func TestHandleApprovalWithComments_CommentFailsContinues(t *testing.T) {
 		ApprovedFiles:   0,
 		ReviewFiles:     0,
 		UncoveredFiles:  0,
-		ExecutionTime: time.Millisecond * 100,
+		ExecutionTime:   time.Millisecond * 100,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -325,7 +325,7 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 		ApprovedFiles:   0,
 		ReviewFiles:     0,
 		UncoveredFiles:  0,
-		ExecutionTime: time.Millisecond * 100,
+		ExecutionTime:   time.Millisecond * 100,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -377,7 +377,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 		ApprovedFiles:   0,
 		ReviewFiles:     0,
 		UncoveredFiles:  0,
-		ExecutionTime: time.Millisecond * 100,
+		ExecutionTime:   time.Millisecond * 100,
 	}
 
 	mrInfo := &gitlab.MRInfo{
@@ -455,19 +455,19 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 							CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 50}},
 							RuleResults: []shared.LineValidationResult{
 								{
-									RuleName: "warehouse_rule",
-									Decision: shared.Approve,
-									Reason:   "All warehouse changes are decreases",
+									RuleName:   "warehouse_rule",
+									Decision:   shared.Approve,
+									Reason:     "All warehouse changes are decreases",
 									LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 50}},
 								},
 							},
 							FileDecision: shared.Approve,
 						},
 					},
-					ExecutionTime: time.Millisecond * 200,
-					TotalFiles:    1,
-					ApprovedFiles: 1,
-					ReviewFiles:   0,
+					ExecutionTime:  time.Millisecond * 200,
+					TotalFiles:     1,
+					ApprovedFiles:  1,
+					ReviewFiles:    0,
 					UncoveredFiles: 0,
 				}
 			},

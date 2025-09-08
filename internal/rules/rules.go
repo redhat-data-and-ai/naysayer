@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 )
@@ -18,20 +19,28 @@ func CreateCustomRuleManager(gitlabClient *gitlab.Client, ruleNames []string) (s
 	return registry.CreateRuleManager(gitlabClient, ruleNames)
 }
 
-// CreateRuleManagerByCategory creates a rule manager with rules from a specific category
-func CreateRuleManagerByCategory(gitlabClient *gitlab.Client, category string) shared.RuleManager {
-	registry := GetGlobalRegistry()
-	manager := NewSimpleRuleManager()
+// LoadRuleConfigFromPath loads rule configuration from a file path
+func LoadRuleConfigFromPath(configPath string) (*config.RuleConfig, error) {
+	return config.LoadRuleConfig(configPath)
+}
 
-	rules := registry.ListRulesByCategory(category)
-	for _, info := range rules {
-		if info.Enabled {
-			rule := info.Factory(gitlabClient)
-			manager.AddRule(rule)
-		}
+// NewSectionRuleManagerFromConfig creates a new section-based rule manager from config
+func NewSectionRuleManagerFromConfig(ruleConfig *config.RuleConfig) shared.RuleManager {
+	return NewSectionRuleManager(ruleConfig)
+}
+
+// CreateSectionBasedDataverseManager creates a section-aware manager for dataverse workflows
+func CreateSectionBasedDataverseManager(client *gitlab.Client) shared.RuleManager {
+	registry := GetGlobalRegistry()
+
+	// Try to create section-based manager first
+	sectionManager, err := registry.CreateSectionBasedRuleManager(client, "rules.yaml")
+	if err != nil {
+		// Fall back to dataverse manager
+		return registry.CreateDataverseRuleManager(client)
 	}
 
-	return manager
+	return sectionManager
 }
 
 // ListAvailableRules returns information about all available rules

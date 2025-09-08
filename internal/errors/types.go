@@ -194,8 +194,6 @@ func NewGitLabError(operation string, statusCode int, responseBody string) *AppE
 	}
 }
 
-
-
 // getDefaultHTTPStatus returns the default HTTP status code for an error code
 func getDefaultHTTPStatus(code ErrorCode) int {
 	switch code {

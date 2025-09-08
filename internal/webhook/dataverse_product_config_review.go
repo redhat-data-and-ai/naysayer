@@ -31,7 +31,7 @@ func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigM
 	// Create rule manager for dataverse product config
 	// Use the old client constructor for the rule manager since it doesn't need dry-run mode
 	ruleManagerClient := gitlab.NewClient(cfg.GitLab)
-	manager := rules.CreateDataverseRuleManager(ruleManagerClient)
+	manager := rules.CreateSectionBasedDataverseManager(ruleManagerClient)
 
 	// Log security configuration
 	logging.Info("Webhook security: %s", cfg.WebhookSecurityMode())
@@ -191,6 +191,15 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) error {
 	messageBuilder := NewMessageBuilder(h.config)
 
+	// Reset any previous naysayer approval since manual review is now required
+	logging.MRInfo(mrInfo.MRIID, "Resetting any previous naysayer approval")
+	if err := h.gitlabClient.ResetNaysayerApproval(mrInfo.ProjectID, mrInfo.MRIID); err != nil {
+		// Log warning but continue - reset might fail if not previously approved by naysayer
+		logging.MRWarn(mrInfo.MRIID, "Could not reset previous naysayer approval (may not have been approved)", zap.Error(err))
+	} else {
+		logging.MRInfo(mrInfo.MRIID, "Successfully reset previous naysayer approval")
+	}
+
 	// Add informational comment to MR if enabled
 	if h.config.Comments.EnableMRComments {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
@@ -239,9 +248,9 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 
 	// Skip rule evaluation if MR is not open
 	if mrInfo.State != "opened" {
-		logging.MRInfo(mrInfo.MRIID, "Skipping rule evaluation for non-open MR", 
+		logging.MRInfo(mrInfo.MRIID, "Skipping rule evaluation for non-open MR",
 			zap.String("state", mrInfo.State))
-		
+
 		return c.JSON(fiber.Map{
 			"webhook_response": "processed",
 			"event_type":       "merge_request",
@@ -312,7 +321,7 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 	if !ok {
 		return fmt.Errorf("missing object_attributes")
 	}
-	
+
 	objectAttrsMap, ok := objectAttrs.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("object_attributes must be an object")
