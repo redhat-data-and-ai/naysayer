@@ -76,19 +76,7 @@ func (srm *SectionRuleManager) AddRule(rule shared.Rule) {
 func (srm *SectionRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.RuleEvaluation {
 	start := time.Now()
 
-	// Early filtering for common skip conditions
-	if shared.IsDraftMR(mrCtx) {
-		return &shared.RuleEvaluation{
-			FinalDecision: shared.Decision{
-				Type:    shared.Approve,
-				Reason:  "Draft MR - auto-approved",
-				Summary: "✅ Draft MR skipped",
-				Details: "Draft MRs are automatically approved without rule evaluation",
-			},
-			FileValidations: make(map[string]*shared.FileValidationSummary),
-			ExecutionTime:   time.Since(start),
-		}
-	}
+	// Note: Draft MR filtering is now handled at the webhook level to avoid any processing
 
 	if shared.IsAutomatedUser(mrCtx) {
 		return &shared.RuleEvaluation{
