@@ -262,6 +262,23 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		})
 	}
 
+	// Skip rule evaluation for draft MRs - no comments, no approval, no processing
+	mrCtx := &shared.MRContext{MRInfo: mrInfo}
+	if shared.IsDraftMR(mrCtx) {
+		logging.MRInfo(mrInfo.MRIID, "Skipping rule evaluation for draft MR",
+			zap.String("title", mrInfo.Title))
+
+		return c.JSON(fiber.Map{
+			"webhook_response": "processed",
+			"event_type":       "merge_request",
+			"decision":         "skipped",
+			"reason":           "Draft MR - skipped processing to avoid bypassing validation rules",
+			"mr_approved":      false,
+			"project_id":       mrInfo.ProjectID,
+			"mr_iid":           mrInfo.MRIID,
+		})
+	}
+
 	// Fast evaluation using rule manager
 	result, err := h.evaluateRules(mrInfo.ProjectID, mrInfo.MRIID, mrInfo)
 	if err != nil {
@@ -331,7 +348,7 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 	if state, exists := objectAttrsMap["state"]; exists {
 		if stateStr, ok := state.(string); ok {
 			if stateStr != MR_OPENED_STATE {
-				return fmt.Errorf("MR state: %s. Naysayer only processes Open MRs.", stateStr)
+				return fmt.Errorf("MR state: %s. Naysayer only processes Open MRs", stateStr)
 			}
 		} else {
 			return fmt.Errorf("state must be a string")

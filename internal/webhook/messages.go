@@ -261,8 +261,6 @@ func (mb *MessageBuilder) BuildApprovalMessage(result *shared.RuleEvaluation) st
 	switch {
 	case mb.hasWarehouseChanges(result):
 		return "Auto-approved: Warehouse changes are safe (decreases only)"
-	case mb.isDraftMR(result):
-		return "Auto-approved: Draft MR with dataverse-safe changes"
 	case mb.isAutomatedUser(result):
 		return "Auto-approved: Automated user with passing CI"
 	case mb.hasOnlyDataverseFiles(result):
@@ -284,7 +282,7 @@ func (mb *MessageBuilder) hasWarehouseChanges(result *shared.RuleEvaluation) boo
 	return false
 }
 
-// isDraftMR checks if this was a draft MR approval
+// isDraftMR checks if this was a draft MR requiring manual review
 func (mb *MessageBuilder) isDraftMR(result *shared.RuleEvaluation) bool {
 	return strings.Contains(result.FinalDecision.Reason, "Draft MR")
 }

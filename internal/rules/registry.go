@@ -214,14 +214,12 @@ func (r *RuleRegistry) CreateSectionBasedRuleManager(client *gitlab.Client, rule
 	// Load rule configuration
 	ruleConfig, err := config.LoadRuleConfig(ruleConfigPath)
 	if err != nil {
-		logging.Warn("Failed to load rule config, falling back to dataverse manager: %v", err)
-		return r.CreateDataverseRuleManager(client), nil
+		return nil, fmt.Errorf("failed to load rule config: %w", err)
 	}
 
-	// If section-based validation is disabled, use dataverse manager
+	// If section-based validation is disabled, return error
 	if !ruleConfig.Enabled {
-		logging.Info("Section-based validation disabled, using dataverse rule manager")
-		return r.CreateDataverseRuleManager(client), nil
+		return nil, fmt.Errorf("section-based validation is disabled in configuration")
 	}
 
 	// Create section-based manager
