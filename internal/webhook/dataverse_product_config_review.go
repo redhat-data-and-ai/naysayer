@@ -31,7 +31,11 @@ func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigM
 	// Create rule manager for dataverse product config
 	// Use the old client constructor for the rule manager since it doesn't need dry-run mode
 	ruleManagerClient := gitlab.NewClient(cfg.GitLab)
-	manager := rules.CreateSectionBasedDataverseManager(ruleManagerClient)
+	manager, err := rules.CreateSectionBasedDataverseManager(ruleManagerClient)
+	if err != nil {
+		logging.Error("Failed to create section-based rule manager: %v", err)
+		panic(fmt.Sprintf("Critical error: cannot start without section-based validation: %v", err))
+	}
 
 	// Log security configuration
 	logging.Info("Webhook security: %s", cfg.WebhookSecurityMode())

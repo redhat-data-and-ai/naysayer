@@ -69,7 +69,7 @@ curl -X POST https://YOUR-NAYSAYER-DOMAIN/dataverse-product-config-review \
 | Cause | Solution |
 |-------|----------|
 | **Wrong webhook URL** | Verify URL: `/dataverse-product-config-review` not `/webhook` |
-| **SSL certificate issues** | See [SSL_WEBHOOK_SECURITY.md](SSL_WEBHOOK_SECURITY.md) |
+| **SSL certificate issues** | Check GitLab webhook SSL settings and certificate validity |
 | **Network/firewall blocking** | Check network policies, firewall rules |
 | **NAYSAYER pod not running** | `kubectl get pods -n ddis-asteroid--naysayer` |
 | **Service not exposing port** | `kubectl get service naysayer -o yaml` |
@@ -176,7 +176,10 @@ curl -I https://YOUR-NAYSAYER-DOMAIN
 ```
 
 **Solutions:**
-See detailed solutions in [SSL_WEBHOOK_SECURITY.md](SSL_WEBHOOK_SECURITY.md)
+1. Verify GitLab webhook SSL configuration
+2. Check certificate validity and trust chain
+3. Ensure proper TLS/SSL protocol versions
+4. Test webhook endpoint with curl over HTTPS
 
 ### **Problem: NAYSAYER receives HTTP instead of HTTPS**
 
@@ -476,10 +479,9 @@ Include this information when seeking help or filing issues.
 
 ## 🔗 **Related Documentation**
 
-- [USER_SETUP_GUIDE.md](USER_SETUP_GUIDE.md) - Initial setup guide
-- [SSL_WEBHOOK_SECURITY.md](SSL_WEBHOOK_SECURITY.md) - SSL troubleshooting
-- [API_REFERENCE.md](API_REFERENCE.md) - API endpoints and responses
-- [KUBERNETES_DEPLOYMENT.md](../KUBERNETES_DEPLOYMENT.md) - Deployment guide
+- [Development Setup Guide](DEVELOPMENT_SETUP.md) - Initial setup guide
+- [API Reference](API_REFERENCE.md) - API endpoints and responses
+- [Deployment Guide](../DEPLOYMENT.md) - Production deployment guide
 
 ---
 
@@ -527,11 +529,10 @@ grep "Rule.*applies.*false" logs/
 ### 📚 Rule Development Resources
 
 For detailed rule development help:
-- 🎯 [Rule Creation Guide](docs/RULE_CREATION_GUIDE.md) - Complete implementation guide
-- 🧪 [Rule Testing Guide](docs/RULE_TESTING_GUIDE.md) - Testing strategies
-- ⚡ [Rule Quick Reference](docs/RULE_QUICK_REFERENCE.md) - Common patterns and commands
-- 📁 [Rule Templates](docs/templates/rule_templates/) - Ready-to-use starting points
+- 🎯 [Rule Creation Guide](RULE_CREATION_GUIDE.md) - Complete implementation guide
+- 🧪 [Development Setup Guide](DEVELOPMENT_SETUP.md) - Testing strategies and development setup
+- 📁 [Adding New Rules Guide](ADDING_NEW_RULES.md) - Step-by-step rule creation
 
 ---
 
-🔧 **Remember**: Most webhook issues are related to SSL configuration, authentication, or webhook URL configuration. For rule development issues, start with the [Rule Quick Reference](docs/RULE_QUICK_REFERENCE.md) and use debug logging extensively! 
+🔧 **Remember**: Most webhook issues are related to SSL configuration, authentication, or webhook URL configuration. For rule development issues, start with the [Rule Creation Guide](RULE_CREATION_GUIDE.md) and use debug logging extensively! 

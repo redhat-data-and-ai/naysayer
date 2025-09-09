@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +17,60 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/webhook"
 	"github.com/stretchr/testify/assert"
 )
+
+func setupTestRulesFile() {
+	tempRulesContent := `enabled: true
+
+files:
+  - name: "product_files"
+    path: "**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    description: "Data product configuration files"
+    enabled: true
+    sections:
+      - name: warehouses
+        yaml_path: warehouses
+        required: true
+        rule_names:
+          - warehouse_rule
+        description: "Data warehouses configuration"
+  - name: "documentation_files"
+    path: "**/"
+    filename: "*.md"
+    parser_type: yaml
+    description: "Documentation files"
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        required: true
+        rule_names:
+          - metadata_rule
+        description: "Full file metadata validation"
+
+require_full_coverage: true
+manual_review_on_uncovered: true`
+	
+	err := os.WriteFile("rules.yaml", []byte(tempRulesContent), 0644)
+	if err != nil {
+		panic("Failed to create test rules file: " + err.Error())
+	}
+}
+
+func cleanupTestRulesFile() {
+	os.Remove("rules.yaml")
+}
+
+// createTestApplicationWithCleanup creates a test application and returns a cleanup function
+func createTestApplicationWithCleanup(t *testing.T) (*fiber.App, func()) {
+	setupTestRulesFile()
+	cleanup := func() {
+		cleanupTestRulesFile()
+	}
+	t.Cleanup(cleanup) // Automatically cleanup when test ends
+	return createTestApplication(), cleanup
+}
 
 // createTestApplication creates a Fiber application with the same configuration as main
 func createTestApplication() *fiber.App {
@@ -63,7 +118,7 @@ func createTestApplication() *fiber.App {
 }
 
 func TestApplication_HealthEndpoints(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	tests := []struct {
 		name         string
@@ -106,7 +161,7 @@ func TestApplication_HealthEndpoints(t *testing.T) {
 }
 
 func TestApplication_WebhookEndpoint(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	tests := []struct {
 		name         string
@@ -166,7 +221,7 @@ func TestApplication_WebhookEndpoint(t *testing.T) {
 }
 
 func TestApplication_UnknownRoutes(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	tests := []struct {
 		name         string
@@ -206,7 +261,7 @@ func TestApplication_UnknownRoutes(t *testing.T) {
 }
 
 func TestApplication_MethodNotAllowed(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	tests := []struct {
 		name         string
@@ -246,7 +301,7 @@ func TestApplication_MethodNotAllowed(t *testing.T) {
 }
 
 func TestApplication_CORS_Headers(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	// Test CORS preflight request
 	req := httptest.NewRequest("OPTIONS", "/health", nil)
@@ -261,7 +316,7 @@ func TestApplication_CORS_Headers(t *testing.T) {
 }
 
 func TestApplication_ErrorHandling(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	// Test error handling with a simple invalid route
 	req := httptest.NewRequest("GET", "/invalid-route", nil)
@@ -280,7 +335,7 @@ func TestApplication_ErrorHandling(t *testing.T) {
 }
 
 func TestApplication_HealthCheck_Integration(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	// Test health endpoint response structure
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -302,7 +357,7 @@ func TestApplication_HealthCheck_Integration(t *testing.T) {
 }
 
 func TestApplication_RouteConfiguration(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	// Test that all routes from main.go are properly configured
 	expectedRoutes := map[string]string{
@@ -338,7 +393,7 @@ func TestApplication_RouteConfiguration(t *testing.T) {
 }
 
 func TestApplication_Middleware_Integration(t *testing.T) {
-	app := createTestApplication()
+	app, _ := createTestApplicationWithCleanup(t)
 
 	// Test that middleware is working
 	req := httptest.NewRequest("GET", "/health", nil)
