@@ -33,11 +33,17 @@ func NewSectionRuleManagerFromConfig(ruleConfig *config.RuleConfig) shared.RuleM
 func CreateSectionBasedDataverseManager(client *gitlab.Client) shared.RuleManager {
 	registry := GetGlobalRegistry()
 
-	// Try to create section-based manager first
+	// Only use section-based manager - no fallbacks
 	sectionManager, err := registry.CreateSectionBasedRuleManager(client, "rules.yaml")
 	if err != nil {
-		// Fall back to dataverse manager
-		return registry.CreateDataverseRuleManager(client)
+		// Return a minimal manager that requires manual review for all files
+		ruleConfig := &config.RuleConfig{
+			Enabled:                 true,
+			RequireFullCoverage:     false,
+			ManualReviewOnUncovered: true,
+			Files:                   []config.FileRuleConfig{},
+		}
+		return NewSectionRuleManager(ruleConfig)
 	}
 
 	return sectionManager

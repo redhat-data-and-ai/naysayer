@@ -146,8 +146,8 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser)
 			fileValidations[filePath] = fileValidation
 		} else {
-			// Fall back to traditional line-based validation
-			fileValidation := srm.validateFileTraditional(filePath, fileContent, totalLines)
+			// No section-based parser available - require manual review
+			fileValidation := srm.createManualReviewValidation(filePath, totalLines, "No section-based validation configured for this file type")
 			fileValidations[filePath] = fileValidation
 		}
 	}
@@ -163,8 +163,8 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	sections, err := parser.ParseSections(filePath, fileContent)
 	if err != nil {
 		logging.Error("Failed to parse sections for %s: %v", filePath, err)
-		// Fall back to traditional validation
-		return srm.validateFileTraditional(filePath, fileContent, totalLines)
+		// Return manual review for parsing failures
+		return srm.createManualReviewValidation(filePath, totalLines, fmt.Sprintf("Failed to parse file sections: %v", err))
 	}
 
 	var allCoveredLines []shared.LineRange
@@ -203,44 +203,15 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	}
 }
 
-// validateFileTraditional falls back to traditional line-based validation
-func (srm *SectionRuleManager) validateFileTraditional(filePath, fileContent string, totalLines int) *shared.FileValidationSummary {
-	var allCoveredLines []shared.LineRange
-	var ruleResults []shared.LineValidationResult
-
-	// Apply all rules to the file
-	for _, rule := range srm.rules {
-		coveredLines := rule.GetCoveredLines(filePath, fileContent)
-		if len(coveredLines) == 0 {
-			continue // Rule doesn't apply
-		}
-
-		// Validate using the rule
-		decision, reason := rule.ValidateLines(filePath, fileContent, coveredLines)
-
-		ruleResults = append(ruleResults, shared.LineValidationResult{
-			RuleName:   rule.Name(),
-			LineRanges: coveredLines,
-			Decision:   decision,
-			Reason:     reason,
-		})
-
-		allCoveredLines = append(allCoveredLines, coveredLines...)
-	}
-
-	// Calculate uncovered lines
-	uncoveredLines := shared.GetUncoveredLines(totalLines, allCoveredLines)
-
-	// Determine file decision
-	fileDecision := srm.determineFileDecision(ruleResults, uncoveredLines)
-
+// createManualReviewValidation creates a validation summary requiring manual review
+func (srm *SectionRuleManager) createManualReviewValidation(filePath string, totalLines int, reason string) *shared.FileValidationSummary {
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
 		TotalLines:     totalLines,
-		CoveredLines:   shared.MergeLineRanges(allCoveredLines),
-		UncoveredLines: uncoveredLines,
-		RuleResults:    ruleResults,
-		FileDecision:   fileDecision,
+		CoveredLines:   []shared.LineRange{}, // No lines covered
+		UncoveredLines: []shared.LineRange{{StartLine: 1, EndLine: totalLines, FilePath: filePath}}, // All lines uncovered
+		RuleResults:    []shared.LineValidationResult{}, // No rule results
+		FileDecision:   shared.ManualReview,
 	}
 }
 
@@ -393,21 +364,6 @@ func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
 	return strings.Join(contentLines, "\n")
 }
 
-func (srm *SectionRuleManager) determineFileDecision(ruleResults []shared.LineValidationResult, uncoveredLines []shared.LineRange) shared.DecisionType {
-	// If there are uncovered lines, require manual review
-	if len(uncoveredLines) > 0 {
-		return shared.ManualReview
-	}
-
-	// If any rule requires manual review
-	for _, result := range ruleResults {
-		if result.Decision == shared.ManualReview {
-			return shared.ManualReview
-		}
-	}
-
-	return shared.Approve
-}
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
 	var manualReviewFiles []string
