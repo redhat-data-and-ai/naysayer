@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -67,7 +68,50 @@ func createTestConfig() *config.Config {
 	}
 }
 
+func setupTestRulesFile(t *testing.T) {
+	tempRulesContent := `enabled: true
+
+files:
+  - name: "product_files"
+    path: "**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    description: "Data product configuration files"
+    enabled: true
+    sections:
+      - name: warehouses
+        yaml_path: warehouses
+        required: true
+        rule_names:
+          - warehouse_rule
+        description: "Data warehouses configuration"
+  - name: "documentation_files"
+    path: "**/"
+    filename: "*.md"
+    parser_type: yaml
+    description: "Documentation files"
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        required: true
+        rule_names:
+          - metadata_rule
+        description: "Full file metadata validation"
+
+require_full_coverage: true
+manual_review_on_uncovered: true`
+	
+	err := os.WriteFile("rules.yaml", []byte(tempRulesContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test rules file: %v", err)
+	}
+	t.Cleanup(func() { os.Remove("rules.yaml") })
+}
+
 func TestNewWebhookHandler(t *testing.T) {
+	setupTestRulesFile(t)
+
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -78,6 +122,7 @@ func TestNewWebhookHandler(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -127,6 +172,7 @@ func TestWebhookHandler_HandleWebhook_Success(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_InvalidContentType(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -148,6 +194,7 @@ func TestWebhookHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_InvalidJSON(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -169,6 +216,7 @@ func TestWebhookHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_NonMREvent(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -197,6 +245,7 @@ func TestWebhookHandler_HandleWebhook_NonMREvent(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_InvalidMRInfo(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -231,6 +280,7 @@ func TestWebhookHandler_HandleWebhook_InvalidMRInfo(t *testing.T) {
 func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 	// Test that the webhook handler correctly handles GitLab API failures
 	// by returning a manual review decision when it can't fetch MR changes
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -275,6 +325,7 @@ func TestWebhookHandler_HandleWebhook_APIFailureHandling(t *testing.T) {
 }
 
 func TestWebhookHandler_HandleWebhook_LargePayload(t *testing.T) {
+	setupTestRulesFile(t)
 	cfg := createTestConfig()
 	handler := NewDataProductConfigMrReviewHandler(cfg)
 
@@ -357,6 +408,7 @@ func TestWebhookHandler_ContentTypeVariations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setupTestRulesFile(t)
 			cfg := createTestConfig()
 			handler := NewDataProductConfigMrReviewHandler(cfg)
 

@@ -214,12 +214,12 @@ func (r *RuleRegistry) CreateSectionBasedRuleManager(client *gitlab.Client, rule
 	// Load rule configuration
 	ruleConfig, err := config.LoadRuleConfig(ruleConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load rule config: %w", err)
+		return nil, fmt.Errorf("failed to load rule config from %s: %w", ruleConfigPath, err)
 	}
 
-	// If section-based validation is disabled, return error
+	// Section-based validation must be enabled
 	if !ruleConfig.Enabled {
-		return nil, fmt.Errorf("section-based validation is disabled in configuration")
+		return nil, fmt.Errorf("section-based validation is disabled in configuration - this is required for operation")
 	}
 
 	// Create section-based manager

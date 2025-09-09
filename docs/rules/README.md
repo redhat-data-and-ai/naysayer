@@ -8,9 +8,21 @@ This directory contains detailed documentation for each validation rule implemen
 
 ### 🏢 [Warehouse Rule](WAREHOUSE_RULE.md)
 **Validates**: Data product warehouse configurations  
-**Triggers on**: `dataproducts/*/product.yaml` files  
-**Purpose**: Cost control and configuration integrity  
-**Key behavior**: Auto-approves size reductions, requires approval for increases
+**Triggers on**: `**/product.{yaml,yml}` files with warehouse sections  
+**Purpose**: Cost control and budget governance  
+**Key behavior**: Auto-approves cost reductions (~$50k/month savings), requires approval for increases
+
+### 🔒 [Service Account Rule](SERVICE_ACCOUNT_RULE.md)
+**Validates**: Service account configurations and security policies  
+**Triggers on**: `**/*serviceaccount*.{yaml,yml}`, `**/*_astro_*_appuser.{yaml,yml}`  
+**Purpose**: Security compliance and identity management  
+**Key behavior**: Auto-approves Astro service accounts, requires security review for manual accounts
+
+### 📄 [Metadata Rule](METADATA_RULE.md)
+**Validates**: Documentation and metadata files  
+**Triggers on**: `**/*.md`, `**/developers.{yaml,yml}`, documentation files  
+**Purpose**: Development velocity and documentation quality  
+**Key behavior**: Auto-approves all documentation and metadata changes (zero risk)
 
 ## 🎯 Quick Problem Resolution
 
@@ -25,22 +37,24 @@ This directory contains detailed documentation for each validation rule implemen
 
 | **File Pattern** | **Rule** | **Common Issues** | **Quick Fix** |
 |------------------|----------|-------------------|---------------|
-| `dataproducts/*/product.yaml` | [Warehouse](WAREHOUSE_RULE.md) | Size increases, YAML syntax | Use `XSMALL`/`SMALL`/`MEDIUM`/`LARGE`, validate YAML |
+| `**/product.{yaml,yml}` | [Warehouse](WAREHOUSE_RULE.md) | Size increases, YAML syntax | Use `XSMALL`/`SMALL`/`MEDIUM`/`LARGE`, validate YAML |
+| `**/*serviceaccount*.{yaml,yml}` | [Service Account](SERVICE_ACCOUNT_RULE.md) | Non-Astro accounts, domain violations | Use Astro patterns, @redhat.com emails |
+| `**/*.md`, docs files | [Metadata](METADATA_RULE.md) | File access issues | Check file permissions, valid UTF-8 encoding |
 
 ## ⚙️ Rule System Overview
 
-### How Rules Work
+### Section-Based Architecture
 
-```mermaid
-graph TD
-    A[GitLab MR Created] --> B[Naysayer Webhook Triggered]
-    B --> C{Files Match Rule Patterns?}
-    C -->|No| D[Skip Validation]
-    C -->|Yes| E[Run Applicable Rules]
-    E --> F{All Rules Approve?}
-    F -->|Yes| G[✅ Auto-Approve MR]
-    F -->|No| H[⚠️ Manual Review Required]
-```
+NAYSAYER uses a **Section-Based Validation Architecture** where rules can target specific sections of files rather than entire files. This provides:
+
+- **🎯 Granular Control**: Rules validate specific YAML sections (e.g., `warehouses`, `service_account.dbt`)
+- **⚡ Performance**: Only relevant sections are parsed and validated  
+- **🔧 Configurability**: Rules and sections are configured through `rules.yaml`
+- **📊 Coverage Tracking**: Ensures all sections are covered by appropriate rules
+
+> **🏗️ Complete Details**: For architecture deep-dive, implementation patterns, and technical details, see:
+> - **[Section-Based Architecture Guide](../SECTION_BASED_ARCHITECTURE.md)** - Complete architecture overview
+> - **[Rule Creation Guide](../RULE_CREATION_GUIDE.md)** - Implementation guide for developers
 
 ### Decision Logic
 
@@ -90,6 +104,8 @@ Understanding security controls:
 | **Rule** | **Status** | **Auto-Approval Rate** | **Common Issues** |
 |----------|------------|------------------------|-------------------|
 | 🏢 **Warehouse** | ✅ Active | ~85% | Size increases (15%) |
+| 🔒 **Service Account** | ✅ Active | ~70% | Non-Astro accounts (30%) |
+| 📄 **Metadata** | ✅ Active | ~100% | File access issues (<1%) |
 
 ### Performance Metrics
 
@@ -195,10 +211,11 @@ When requesting help:
 
 ### For Rule Authors
 
-Interested in creating new rules? See these guides:
+Interested in creating new rules? 
 
-- 🎯 [Rule Creation Guide](../RULE_CREATION_GUIDE.md) - Complete implementation guide
-- 🧪 [Development Setup Guide](../DEVELOPMENT_SETUP.md) - Testing strategies and patterns
+- 🎯 **[Rule Creation Guide](../RULE_CREATION_GUIDE.md)** - Complete step-by-step implementation guide
+- 🧪 **[Development Setup Guide](../DEVELOPMENT_SETUP.md)** - Testing strategies and development patterns
+- 🏗️ **[Section-Based Architecture](../SECTION_BASED_ARCHITECTURE.md)** - Architecture overview and design principles
 
 ### Contributing
 
@@ -212,6 +229,7 @@ To contribute to rule documentation:
 
 | **Topic** | **Document** | **Audience** |
 |-----------|--------------|--------------|
+| **Section-Based Architecture** | [Section-Based Architecture](../SECTION_BASED_ARCHITECTURE.md) | All |
 | **Creating Rules** | [Rule Creation Guide](../RULE_CREATION_GUIDE.md) | Developers |
 | **Development Setup** | [Development Setup Guide](../DEVELOPMENT_SETUP.md) | Developers |
 | **API Reference** | [API Reference](../API_REFERENCE.md) | Platform Engineers |

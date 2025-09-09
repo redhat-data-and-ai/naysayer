@@ -146,8 +146,8 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser)
 			fileValidations[filePath] = fileValidation
 		} else {
-			// No section-based parser available - require manual review
-			fileValidation := srm.createManualReviewValidation(filePath, totalLines, "No section-based validation configured for this file type")
+			// No section configuration found - require manual review
+			fileValidation := srm.createManualReviewValidation(filePath, totalLines, "No section-based validation configuration found for this file type")
 			fileValidations[filePath] = fileValidation
 		}
 	}
@@ -163,7 +163,7 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	sections, err := parser.ParseSections(filePath, fileContent)
 	if err != nil {
 		logging.Error("Failed to parse sections for %s: %v", filePath, err)
-		// Return manual review for parsing failures
+		// Section parsing failed - require manual review
 		return srm.createManualReviewValidation(filePath, totalLines, fmt.Sprintf("Failed to parse file sections: %v", err))
 	}
 
@@ -203,15 +203,22 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	}
 }
 
-// createManualReviewValidation creates a validation summary requiring manual review
+// createManualReviewValidation creates a validation summary that requires manual review
 func (srm *SectionRuleManager) createManualReviewValidation(filePath string, totalLines int, reason string) *shared.FileValidationSummary {
+	// Create uncovered lines for the entire file
+	uncoveredLines := []shared.LineRange{{
+		StartLine: 1,
+		EndLine:   totalLines,
+		FilePath:  filePath,
+	}}
+
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
 		TotalLines:     totalLines,
 		CoveredLines:   []shared.LineRange{}, // No lines covered
-		UncoveredLines: []shared.LineRange{{StartLine: 1, EndLine: totalLines, FilePath: filePath}}, // All lines uncovered
+		UncoveredLines: uncoveredLines,       // Entire file uncovered
 		RuleResults:    []shared.LineValidationResult{}, // No rule results
-		FileDecision:   shared.ManualReview,
+		FileDecision:   shared.ManualReview, // Require manual review
 	}
 }
 

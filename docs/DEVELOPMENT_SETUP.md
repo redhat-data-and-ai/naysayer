@@ -536,9 +536,8 @@ go mod tidy
 ## 🔗 **Related Documentation**
 
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contributing guidelines
-- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Comprehensive testing strategies
-- [DEBUGGING_GUIDE.md](DEBUGGING_GUIDE.md) - Debugging techniques
-- [EXTENDING_RULES.md](../EXTENDING_RULES.md) - Rule development
+- [Troubleshooting Guide](TROUBLESHOOTING.md) - Comprehensive debugging and testing strategies
+- [Rule Creation Guide](RULE_CREATION_GUIDE.md) - Rule development and creation
 
 ## 🎯 **Next Steps**
 
@@ -546,9 +545,9 @@ Once your development environment is set up:
 
 1. **Explore the codebase** - Start with `internal/webhook/` and `internal/rules/`
 2. **Run existing tests** - `make dev-test` to understand current functionality
-3. **Create a simple rule** - Follow [EXTENDING_RULES.md](../EXTENDING_RULES.md)
+3. **Create a simple rule** - Follow [Rule Creation Guide](RULE_CREATION_GUIDE.md)
 4. **Set up webhook testing** - Use ngrok for real GitLab integration
-5. **Read the architecture** - Review [CODE_WALKTHROUGH.md](../CODE_WALKTHROUGH.md)
+5. **Read the architecture** - Review [Section-Based Architecture](SECTION_BASED_ARCHITECTURE.md)
 
 ---
 

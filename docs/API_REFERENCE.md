@@ -2,9 +2,11 @@
 
 ## 🌐 **API Endpoints Overview**
 
-NAYSAYER provides several HTTP endpoints for webhook processing, health monitoring, and status checking.
+NAYSAYER provides HTTP endpoints for webhook processing, health monitoring, and status checking.
 
 **Base URL**: `https://your-naysayer-domain.com`
+
+> **🏗️ Architecture Details**: For system architecture and validation flow, see [Section-Based Architecture Guide](SECTION_BASED_ARCHITECTURE.md)
 
 ## 📡 **Webhook Endpoints**
 
@@ -199,32 +201,14 @@ curl -s https://your-naysayer-domain.com/ready | jq '.'
 - `200 OK` - Service is ready to accept traffic
 - `503 Service Unavailable` - Service is not ready (missing configuration)
 
-## 🔧 **Configuration & Environment**
+## ⚙️ **Configuration**
 
-### **Analysis Modes**
+NAYSAYER is configured through environment variables and a `rules.yaml` file.
 
-The `analysis_mode` field in health responses indicates current capabilities:
+> **📋 Configuration Details**: For complete configuration options and examples, see:
+> - [Development Setup Guide](DEVELOPMENT_SETUP.md) - Environment variables and setup
+> - [Section-Based Architecture Guide](SECTION_BASED_ARCHITECTURE.md) - rules.yaml configuration
 
-| Mode | Description | Cause |
-|------|-------------|-------|
-| `"Full analysis enabled"` | All features available | Valid GitLab token configured |
-| `"Limited (no GitLab token)"` | Basic webhook processing only | No GitLab token configured |
-
-### **Security Modes**
-
-The `security_mode` field indicates webhook security configuration:
-
-| Mode | Description |
-|------|-------------|
-| `"Token verification available"` | Webhook secret configured |
-| `"No secret configured"` | No webhook secret set |
-
-### **SSL Status Messages**
-
-| Status | Meaning |
-|--------|---------|
-| `"✅ SSL properly configured"` | HTTPS request detected |
-| `"⚠️ Request received over HTTP - GitLab SSL verification will reject HTTP webhooks"` | HTTP request (potential issue) |
 
 ## 🔍 **Error Handling**
 
@@ -262,63 +246,20 @@ The `security_mode` field indicates webhook security configuration:
 | `500` | Internal Server Error | Unexpected application error |
 | `503` | Service Unavailable | Service not ready (readiness check) |
 
-## 📊 **Monitoring & Observability**
+## 📊 **Monitoring**
 
-### **Structured Logging**
+NAYSAYER uses structured JSON logging with key fields: `mr_id`, `project_id`, `execution_time`, `decision`.
 
-NAYSAYER uses structured JSON logging with these key fields:
+> **📊 Monitoring Details**: For complete logging configuration and monitoring setup, see [Development Setup Guide](DEVELOPMENT_SETUP.md)
 
-**Example Log Entry**:
-```json
-{
-  "level": "info",
-  "ts": 1642234567.123,
-  "caller": "webhook/handler.go:45",
-  "msg": "Processing MR event",
-  "component": "NAYSAYER",
-  "service": "naysayer",
-  "mr_id": 456,
-  "project_id": 789,
-  "author": "developer",
-  "execution_time": "125ms",
-  "decision": "auto_approve"
-}
-```
-
-**Log Levels**:
-- `debug` - Detailed debugging information
-- `info` - General information messages
-- `warn` - Warning conditions
-- `error` - Error conditions
-
-### **Key Metrics Fields**
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| `mr_id` | Merge request IID | `456` |
-| `project_id` | GitLab project ID | `789` |
-| `execution_time` | Processing duration | `"125ms"` |
-| `decision` | Rule decision type | `"auto_approve"`, `"manual_review"` |
-| `file_changes` | Number of files changed | `3` |
-| `rules_evaluated` | Number of rules processed | `1` |
-
-## 🧪 **Testing & Development**
-
-### **Manual Testing Commands**
+## 🧪 **Testing**
 
 **Test Health Endpoint**:
 ```bash
 curl -f https://your-naysayer-domain.com/health
-echo $?  # Should be 0 for success
 ```
 
-**Test Readiness**:
-```bash
-curl -f https://your-naysayer-domain.com/ready
-echo $?  # Should be 0 if ready
-```
-
-**Test Webhook with Minimal Payload**:
+**Test Webhook**:
 ```bash
 curl -X POST https://your-naysayer-domain.com/dataverse-product-config-review \
   -H "Content-Type: application/json" \
@@ -326,128 +267,25 @@ curl -X POST https://your-naysayer-domain.com/dataverse-product-config-review \
   -d '{"object_kind": "merge_request", "object_attributes": {"id": 123, "iid": 456}}'
 ```
 
-### **Webhook Payload Examples**
+> **🧪 Development & Testing**: For comprehensive testing strategies and examples, see [Development Setup Guide](DEVELOPMENT_SETUP.md)
 
-**Minimal Valid Payload**:
-```json
-{
-  "object_kind": "merge_request",
-  "object_attributes": {
-    "id": 123,
-    "iid": 456,
-    "state": "opened"
-  },
-  "project": {
-    "id": 789
-  }
-}
-```
+## 🔐 **Security**
 
-**Complete Warehouse Change Payload**:
-```json
-{
-  "object_kind": "merge_request",
-  "object_attributes": {
-    "id": 123,
-    "iid": 456,
-    "title": "Reduce warehouse size for cost optimization",
-    "state": "opened",
-    "target_branch": "main",
-    "source_branch": "feature/warehouse-reduction",
-    "author": {
-      "username": "cost-optimizer"
-    }
-  },
-  "project": {
-    "id": 789,
-    "name": "dataproduct-config",
-    "web_url": "https://gitlab.com/company/dataproduct-config"
-  },
-  "changes": {
-    "total": 2
-  }
-}
-```
+NAYSAYER validates:
+- **Content-Type**: Must be `application/json`
+- **Event Type**: Must be `merge_request` events only
+- **Payload Structure**: Must contain required GitLab webhook fields
+- **SSL/TLS**: Logs warnings for HTTP requests
 
-## 🔐 **Security Considerations**
-
-### **Request Validation**
-
-NAYSAYER validates incoming requests:
-1. **Content-Type**: Must be `application/json`
-2. **Event Type**: Must be `merge_request` events only
-3. **Payload Structure**: Must contain required GitLab webhook fields
-4. **SSL/TLS**: Logs warnings for HTTP requests when SSL verification is expected
-
-### **Authentication Flow**
-
-```
-GitLab Webhook → NAYSAYER → GitLab API
-       ↓              ↓           ↑
-   (optional)    (validates)  (authenticates)
- webhook secret   payload     with token
-```
-
-### **Rate Limiting**
-
-NAYSAYER does not implement built-in rate limiting. Consider implementing rate limiting at the load balancer or proxy level for production deployments.
+> **🔒 Security Details**: For complete security considerations, see [Troubleshooting Guide](TROUBLESHOOTING.md)
 
 ## 🔗 **Related Documentation**
 
-- [USER_SETUP_GUIDE.md](USER_SETUP_GUIDE.md) - Setup and configuration
-- [SSL_WEBHOOK_SECURITY.md](SSL_WEBHOOK_SECURITY.md) - SSL requirements
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues and debugging
-- [KUBERNETES_DEPLOYMENT.md](../KUBERNETES_DEPLOYMENT.md) - Deployment guide
-
-## 📝 **API Usage Examples**
-
-### **Health Check Monitoring Script**
-```bash
-#!/bin/bash
-NAYSAYER_URL="https://your-naysayer-domain.com"
-
-# Check health
-if curl -f -s "$NAYSAYER_URL/health" > /dev/null; then
-  echo "✅ NAYSAYER is healthy"
-else
-  echo "❌ NAYSAYER health check failed"
-  exit 1
-fi
-
-# Check readiness
-if curl -f -s "$NAYSAYER_URL/ready" > /dev/null; then
-  echo "✅ NAYSAYER is ready"
-else
-  echo "⚠️ NAYSAYER is not ready"
-  exit 1
-fi
-```
-
-### **Webhook Debugging Script**
-```bash
-#!/bin/bash
-WEBHOOK_URL="https://your-naysayer-domain.com/dataverse-product-config-review"
-
-# Test webhook endpoint
-response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-  -X POST "$WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -H "X-Gitlab-Event: Merge Request Hook" \
-  -d '{"object_kind": "merge_request", "object_attributes": {"id": 123}}')
-
-body=$(echo "$response" | sed -E 's/HTTPSTATUS\:[0-9]{3}$//')
-status=$(echo "$response" | tr -d '\n' | sed -E 's/.*HTTPSTATUS:([0-9]{3})$/\1/')
-
-echo "Status: $status"
-echo "Response: $body"
-
-if [ "$status" -eq 200 ]; then
-  echo "✅ Webhook endpoint is working"
-else
-  echo "❌ Webhook endpoint failed"
-fi
-```
+- **[Development Setup Guide](DEVELOPMENT_SETUP.md)** - Setup, configuration, and testing
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and debugging
+- **[Section-Based Architecture](SECTION_BASED_ARCHITECTURE.md)** - System architecture
+- **[Deployment Guide](../DEPLOYMENT.md)** - Production deployment
 
 ---
 
-📡 **This API reference covers all public endpoints and their expected behaviors. For implementation details, see the source code in the `internal/webhook/` directory.** 
+📡 **This API reference covers all public endpoints. For detailed examples and monitoring scripts, see the Development Setup Guide.** 
