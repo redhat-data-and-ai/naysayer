@@ -1,82 +1,78 @@
 # Rule-Based Validation Configuration
-# 
-# This file defines which validation rules apply to which sections of different file types.
-# It is the single source of truth for rule configuration - modify this file to change behavior.
-# 
-# Configuration structure:
-# - enabled: Enable/disable rule-based validation
-# - files: Array of file configurations with separated path and filename patterns
-# - require_full_coverage: Require all lines to be covered by sections
-# - manual_review_on_uncovered: Require manual review for uncovered changes
 
 enabled: true
 
 files:
-  # Data product configuration files
+  # Product configs - section-based validation with strategic auto-approvals
   - name: "product_configs"
     path: "**/"
     filename: "product.{yaml,yml}"
     parser_type: yaml
-    description: "Data product configuration files"
-    enabled: true
     sections:
+      # Critical sections - manual review required
       - name: warehouses
         yaml_path: warehouses
-        required: true
-        rule_names:
-          - warehouse_rule
-        description: "Data warehouses configuration - validates size changes and warehouse settings"
+        rule_names: [warehouse_rule]
+        auto_approve: false
       - name: dbt
         yaml_path: service_account.dbt
-        required: true
-        rule_names:
-          - metadata_rule
-        description: "DBT configuration validation"
+        rule_names: [metadata_rule]
+        auto_approve: false
+      
+      # Low-risk sections - auto-approve after validation
+      - name: description
+        yaml_path: description
+        rule_names: [metadata_rule]
+        auto_approve: true
+      
+      # Safe sections - immediate auto-approval
+      - name: documentation_url
+        yaml_path: documentation.url
+        auto_approve: true
+      - name: changelog
+        yaml_path: changelog
+        auto_approve: true
 
-  # Documentation and metadata files (using yaml parser for simplicity)
+  # Simple file types - leverage auto-approve for low-risk files
   - name: "documentation_files"
     path: "**/"
     filename: "*.md"
-    parser_type: yaml
-    description: "Markdown documentation files"
-    enabled: true
+    parser_type: markdown
     sections:
       - name: full_file
         yaml_path: .
-        required: false
-        rule_names:
-          - metadata_rule
-        description: "Full file metadata validation"
+        auto_approve: true
 
-  # Service account configuration files
-  - name: "service_account_files"
+  # Service accounts - split complex pattern for clarity
+  - name: "astro_service_accounts"
     path: "**/"
-    filename: "*{serviceaccount,service-account,_astro_*_appuser}.{yaml,yml}"
+    filename: "*_astro_*_appuser.{yaml,yml}"
     parser_type: yaml
-    description: "Service account configuration files (including Astro service accounts)"
-    enabled: true
     sections:
       - name: serviceaccount
         yaml_path: .
-        required: true
-        rule_names:
-          - service_account_rule
-        description: "Service account validation - auto-approves Astro service accounts (**_astro_<env>_appuser.yaml/yml) when name field matches filename, requires manual review for others"
+        rule_names: [service_account_rule]
+        auto_approve: true
+        
+  - name: "other_service_accounts"
+    path: "**/"
+    filename: "*serviceaccount*.{yaml,yml}"
+    parser_type: yaml
+    sections:
+      - name: serviceaccount
+        yaml_path: .
+        rule_names: [service_account_rule]
+        auto_approve: false
 
-  # YAML configuration files (developers, changelog, etc.)
   - name: "yaml_metadata_files"
     path: "**/"
     filename: "developers.{yaml,yml}"
     parser_type: yaml
-    description: "YAML metadata files"
-    enabled: true
     sections:
       - name: full_file
         yaml_path: .
-        required: false
-        rule_names:
-          - metadata_rule
-        description: "Full file metadata validation"
+        rule_names: [metadata_rule]
+        auto_approve: true
 
 require_full_coverage: false
 manual_review_on_uncovered: true

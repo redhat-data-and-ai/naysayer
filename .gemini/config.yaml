@@ -1,0 +1,24 @@
+have_fun: true
+code_review:
+  disable: false
+  comment_severity_threshold: MEDIUM
+  max_review_comments: 10
+  pull_request_opened:
+    help: true
+    summary: true
+    code_review: true
+  focus_areas:
+    - "security"
+    - "performance" 
+    - "maintainability"
+    - "testing"
+ignore_patterns: 
+  - "vendor/**"
+  - "*.log"
+  - "coverage.out"
+  - ".gemini/**"
+language_specific:
+  go:
+    focus_on_error_handling: true
+    check_test_coverage: true
+    validate_interfaces: true

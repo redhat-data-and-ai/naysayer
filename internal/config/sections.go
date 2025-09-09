@@ -14,18 +14,20 @@ type SectionDefinition struct {
 	YAMLPath    string   `yaml:"yaml_path"`   // YAML path to section (e.g., "spec.warehouse")
 	Required    bool     `yaml:"required"`    // Is this section required in the file?
 	RuleNames   []string `yaml:"rule_names"`  // Rules that should validate this section
+	AutoApprove bool     `yaml:"auto_approve"` // Auto-approve this section if rules pass (or no rules)
 	Description string   `yaml:"description"` // Human-readable description
 }
 
 // FileRuleConfig defines sections and rules for a specific file type
 type FileRuleConfig struct {
-	Name        string              `yaml:"name"`        // Unique identifier for this file type
-	Path        string              `yaml:"path"`        // Directory path pattern (e.g., "**/" or "serviceaccounts/**/")
-	Filename    string              `yaml:"filename"`    // Filename pattern (e.g., "product.{yaml,yml}")
-	ParserType  string              `yaml:"parser_type"` // Parser to use (yaml, json, etc.)
-	Description string              `yaml:"description"` // Description of this file type
-	Enabled     bool                `yaml:"enabled"`     // Enable/disable this file type
-	Sections    []SectionDefinition `yaml:"sections"`    // Sections within this file type
+	Name          string              `yaml:"name"`           // Unique identifier for this file type
+	Path          string              `yaml:"path"`           // Directory path pattern (e.g., "**/" or "serviceaccounts/**/")
+	Filename      string              `yaml:"filename"`       // Filename pattern (e.g., "product.{yaml,yml}")
+	ParserType    string              `yaml:"parser_type"`    // Parser to use (yaml, json, etc.)
+	Description   string              `yaml:"description"`    // Description of this file type
+	Enabled       bool                `yaml:"enabled"`        // Enable/disable this file type
+	DefaultAction string              `yaml:"default_action"` // Default action for unconfigured sections (manual_review, auto_approve)
+	Sections      []SectionDefinition `yaml:"sections"`       // Sections within this file type
 }
 
 // RuleConfig holds the complete rule configuration for all file types
@@ -141,6 +143,14 @@ func ValidateRuleConfig(config *RuleConfig) error {
 			return fmt.Errorf("file configuration %s missing parser type", fileConfig.Name)
 		}
 
+		// Validate default_action if specified
+		if fileConfig.DefaultAction != "" && 
+		   fileConfig.DefaultAction != "manual_review" && 
+		   fileConfig.DefaultAction != "auto_approve" {
+			return fmt.Errorf("invalid default_action '%s' for file config '%s'. Must be 'manual_review' or 'auto_approve'", 
+				fileConfig.DefaultAction, fileConfig.Name)
+		}
+
 		if len(fileConfig.Sections) == 0 {
 			return fmt.Errorf("file configuration %s has no section definitions", fileConfig.Name)
 		}
@@ -152,8 +162,10 @@ func ValidateRuleConfig(config *RuleConfig) error {
 			if section.YAMLPath == "" {
 				return fmt.Errorf("section %s missing YAML path in file configuration %s", section.Name, fileConfig.Name)
 			}
-			if len(section.RuleNames) == 0 {
-				return fmt.Errorf("section %s has no rules defined in file configuration %s", section.Name, fileConfig.Name)
+			
+			// Auto-approve sections can have no rules, but warn if auto_approve is set with no rules
+			if len(section.RuleNames) == 0 && !section.AutoApprove {
+				return fmt.Errorf("section %s has no rules defined and auto_approve is false in file configuration %s", section.Name, fileConfig.Name)
 			}
 		}
 	}

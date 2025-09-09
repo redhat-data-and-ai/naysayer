@@ -16,16 +16,17 @@ const (
 
 // Section represents a logical section within a file
 type Section struct {
-	Name      string                 `json:"name"`       // e.g., "warehouse", "consumers", "serviceaccount"
-	StartLine int                    `json:"start_line"` // Section start line (1-based)
-	EndLine   int                    `json:"end_line"`   // Section end line (1-based)
-	Content   string                 `json:"content"`    // Raw section content
-	Type      SectionType            `json:"type"`       // Section content type
-	Fields    map[string]interface{} `json:"fields"`     // Parsed fields for this section
-	FilePath  string                 `json:"file_path"`  // Parent file path
-	YAMLPath  string                 `json:"yaml_path"`  // YAML path (e.g., "spec.warehouse")
-	Required  bool                   `json:"required"`   // Is this section required?
-	RuleNames []string               `json:"rule_names"` // Rules that apply to this section
+	Name        string                 `json:"name"`         // e.g., "warehouse", "consumers", "serviceaccount"
+	StartLine   int                    `json:"start_line"`   // Section start line (1-based)
+	EndLine     int                    `json:"end_line"`     // Section end line (1-based)
+	Content     string                 `json:"content"`      // Raw section content
+	Type        SectionType            `json:"type"`         // Section content type
+	Fields      map[string]interface{} `json:"fields"`       // Parsed fields for this section
+	FilePath    string                 `json:"file_path"`    // Parent file path
+	YAMLPath    string                 `json:"yaml_path"`    // YAML path (e.g., "spec.warehouse")
+	Required    bool                   `json:"required"`     // Is this section required?
+	RuleNames   []string               `json:"rule_names"`   // Rules that apply to this section
+	AutoApprove bool                   `json:"auto_approve"` // Auto-approve this section if rules pass
 }
 
 // SectionValidationResult represents validation result for a specific section

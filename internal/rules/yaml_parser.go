@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
 )
@@ -80,16 +81,17 @@ func (p *YAMLSectionParser) extractSection(definition config.SectionDefinition, 
 	}
 
 	section := &shared.Section{
-		Name:      definition.Name,
-		StartLine: startLine,
-		EndLine:   endLine,
-		Content:   sectionContent,
-		Type:      shared.YAMLSection,
-		Fields:    fields,
-		FilePath:  p.filePath,
-		YAMLPath:  definition.YAMLPath,
-		Required:  definition.Required,
-		RuleNames: definition.RuleNames,
+		Name:        definition.Name,
+		StartLine:   startLine,
+		EndLine:     endLine,
+		Content:     sectionContent,
+		Type:        shared.YAMLSection,
+		Fields:      fields,
+		FilePath:    p.filePath,
+		YAMLPath:    definition.YAMLPath,
+		Required:    definition.Required,
+		RuleNames:   definition.RuleNames,
+		AutoApprove: definition.AutoApprove,
 	}
 
 	return section, nil
@@ -248,36 +250,81 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 		},
 	}
 
-	// Apply each rule to the section
-	for _, rule := range rules {
-		// Check if this rule applies to this section
-		coveredLines := rule.GetCoveredLines(section.FilePath, section.Content)
-		if len(coveredLines) == 0 {
-			continue // Rule doesn't apply
-		}
+	// Step 1: Run any configured rules first
+	hasRules := len(rules) > 0
+	rulesPassed := true
+	var lastRuleReason string
 
-		// Validate using the rule
-		decision, reason := rule.ValidateLines(section.FilePath, section.Content, lineRanges)
+	if hasRules {
+		// Apply each rule to the section
+		for _, rule := range rules {
+			// Check if this rule applies to this section
+			coveredLines := rule.GetCoveredLines(section.FilePath, section.Content)
+			if len(coveredLines) == 0 {
+				continue // Rule doesn't apply
+			}
 
-		result.AppliedRules = append(result.AppliedRules, rule.Name())
-		result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
-			RuleName:   rule.Name(),
-			LineRanges: lineRanges,
-			Decision:   decision,
-			Reason:     reason,
-		})
+			// Validate using the rule
+			decision, reason := rule.ValidateLines(section.FilePath, section.Content, lineRanges)
 
-		// If any rule requires manual review, the section requires manual review
-		if decision == shared.ManualReview {
-			result.Decision = shared.ManualReview
-			result.Reason = fmt.Sprintf("Rule %s requires manual review: %s", rule.Name(), reason)
+			result.AppliedRules = append(result.AppliedRules, rule.Name())
+			result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
+				RuleName:   rule.Name(),
+				LineRanges: lineRanges,
+				Decision:   decision,
+				Reason:     reason,
+			})
+
+			lastRuleReason = reason
+
+			// If any rule requires manual review, rules failed
+			if decision == shared.ManualReview {
+				rulesPassed = false
+				result.Decision = shared.ManualReview
+				result.Reason = fmt.Sprintf("Rule validation failed: %s", reason)
+				break // Stop on first rule failure
+			}
 		}
 	}
 
-	// If no rules were applied, this might be an issue
-	if len(result.AppliedRules) == 0 {
-		result.Decision = shared.ManualReview
-		result.Reason = "No applicable rules found for this section"
+	// Step 2: Apply auto-approve logic
+	if section.AutoApprove {
+		if !hasRules {
+			// No rules + auto-approve = immediate approval
+			result.Decision = shared.Approve
+			result.Reason = fmt.Sprintf("Auto-approved: %s (no validation required)", section.Name)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no rules required)", 
+				section.Name, section.FilePath, section.StartLine, section.EndLine)
+		} else if rulesPassed && len(result.AppliedRules) > 0 {
+			// Rules passed + auto-approve = auto-approved
+			result.Decision = shared.Approve
+			result.Reason = fmt.Sprintf("Auto-approved: %s (validation passed)", lastRuleReason)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (rules: %v passed)", 
+				section.Name, section.FilePath, section.StartLine, section.EndLine, result.AppliedRules)
+		} else if len(result.AppliedRules) == 0 {
+			// No applicable rules but auto-approve enabled
+			result.Decision = shared.Approve
+			result.Reason = fmt.Sprintf("Auto-approved: %s (no applicable rules)", section.Name)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no applicable rules)", 
+				section.Name, section.FilePath, section.StartLine, section.EndLine)
+		}
+		// If rules failed, decision remains ManualReview (set above)
+		if result.Decision == shared.ManualReview {
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d failed auto-approve (rules failed: %s)", 
+				section.Name, section.FilePath, section.StartLine, section.EndLine, result.Reason)
+		}
+	} else {
+		// Not auto-approve section
+		if !hasRules || len(result.AppliedRules) == 0 {
+			// No rules and not auto-approve = manual review
+			result.Decision = shared.ManualReview
+			result.Reason = fmt.Sprintf("No validation rules configured for %s - manual review required", section.Name)
+		} else if rulesPassed {
+			// Rules passed, normal approval
+			result.Decision = shared.Approve
+			result.Reason = lastRuleReason
+		}
+		// If rules failed, decision already set to ManualReview above
 	}
 
 	return result
