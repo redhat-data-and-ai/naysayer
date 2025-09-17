@@ -51,7 +51,7 @@ files:
 
 require_full_coverage: true
 manual_review_on_uncovered: true`
-	
+
 	err := os.WriteFile("rules.yaml", []byte(tempRulesContent), 0644)
 	if err != nil {
 		panic("Failed to create test rules file: " + err.Error())

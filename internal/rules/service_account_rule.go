@@ -52,11 +52,11 @@ func (r *ServiceAccountRule) ValidateLines(filePath string, fileContent string, 
 
 	// Only auto-approve Astro service accounts, all others require manual review
 	saType := r.getServiceAccountType(filePath)
-	
+
 	if saType == "astro" {
 		return r.validateAstroServiceAccount(filePath, fileContent)
 	}
-	
+
 	// All non-Astro service accounts require manual review
 	logging.Info("Non-Astro service account file %s requires manual review", filePath)
 	return shared.ManualReview, "Only Astro service account files (*_astro_*.yaml/yml) are auto-approved - other service account files require manual review"
@@ -70,13 +70,13 @@ func (r *ServiceAccountRule) isServiceAccountFile(filePath string) bool {
 
 	lowerPath := strings.ToLower(filePath)
 	filename := filepath.Base(lowerPath)
-	
+
 	// Check for various service account patterns
-	return (strings.Contains(filename, "_astro_") || 
-			strings.Contains(filename, "serviceaccount") ||
-			strings.Contains(filename, "service-account") ||
-			strings.Contains(lowerPath, "serviceaccounts/")) &&
-		   (strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml"))
+	return (strings.Contains(filename, "_astro_") ||
+		strings.Contains(filename, "serviceaccount") ||
+		strings.Contains(filename, "service-account") ||
+		strings.Contains(lowerPath, "serviceaccounts/")) &&
+		(strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml"))
 }
 
 // getServiceAccountType determines the type of service account based on file path patterns
@@ -87,7 +87,7 @@ func (r *ServiceAccountRule) getServiceAccountType(filePath string) string {
 
 	lowerPath := strings.ToLower(filePath)
 	filename := filepath.Base(lowerPath)
-	
+
 	// Check for Astro service account pattern: **_astro_<env>_appuser.yaml/yml
 	if r.isAstroServiceAccountPattern(filename) {
 		return "astro"
@@ -96,7 +96,7 @@ func (r *ServiceAccountRule) getServiceAccountType(filePath string) string {
 	} else if strings.Contains(lowerPath, "serviceaccounts/") {
 		return "generic"
 	}
-	
+
 	return "generic"
 }
 
@@ -104,10 +104,10 @@ func (r *ServiceAccountRule) getServiceAccountType(filePath string) string {
 // Pattern: **_astro_<env>_appuser.yaml/yml
 func (r *ServiceAccountRule) isAstroServiceAccountPattern(filename string) bool {
 	lowerFilename := strings.ToLower(filename)
-	
+
 	// Must contain _astro_ and end with _appuser.yaml or _appuser.yml
-	return strings.Contains(lowerFilename, "_astro_") && 
-		   (strings.HasSuffix(lowerFilename, "_appuser.yaml") || strings.HasSuffix(lowerFilename, "_appuser.yml"))
+	return strings.Contains(lowerFilename, "_astro_") &&
+		(strings.HasSuffix(lowerFilename, "_appuser.yaml") || strings.HasSuffix(lowerFilename, "_appuser.yml"))
 }
 
 // validateAstroServiceAccount validates Astro-specific service account files
@@ -138,7 +138,7 @@ func (r *ServiceAccountRule) validateAstroServiceAccount(filePath string, fileCo
 
 	// Check if the name matches
 	if nameValue != expectedName {
-		return shared.ManualReview, 
+		return shared.ManualReview,
 			"Name field value '" + nameValue + "' does not match expected filename-based name '" + expectedName + "'"
 	}
 
@@ -146,19 +146,17 @@ func (r *ServiceAccountRule) validateAstroServiceAccount(filePath string, fileCo
 	return shared.Approve, "Astro service account file follows naming convention and name field matches filename"
 }
 
-
 // getExpectedNameFromFilename extracts the expected name from the filename by removing the extension
 func (r *ServiceAccountRule) getExpectedNameFromFilename(filePath string) string {
 	filename := filepath.Base(filePath)
 	lowerFilename := strings.ToLower(filename)
-	
+
 	// Remove .yaml or .yml extension (case insensitive)
 	if strings.HasSuffix(lowerFilename, ".yaml") {
 		return filename[:len(filename)-5] // Remove ".yaml"
 	} else if strings.HasSuffix(lowerFilename, ".yml") {
 		return filename[:len(filename)-4] // Remove ".yml"
 	}
-	
+
 	return ""
 }
-

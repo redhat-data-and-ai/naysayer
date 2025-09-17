@@ -215,10 +215,10 @@ func (srm *SectionRuleManager) createManualReviewValidation(filePath string, tot
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
 		TotalLines:     totalLines,
-		CoveredLines:   []shared.LineRange{}, // No lines covered
-		UncoveredLines: uncoveredLines,       // Entire file uncovered
+		CoveredLines:   []shared.LineRange{},            // No lines covered
+		UncoveredLines: uncoveredLines,                  // Entire file uncovered
 		RuleResults:    []shared.LineValidationResult{}, // No rule results
-		FileDecision:   shared.ManualReview, // Require manual review
+		FileDecision:   shared.ManualReview,             // Require manual review
 	}
 }
 
@@ -370,7 +370,6 @@ func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
 
 	return strings.Join(contentLines, "\n")
 }
-
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
 	var manualReviewFiles []string

@@ -293,24 +293,24 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 			// No rules + auto-approve = immediate approval
 			result.Decision = shared.Approve
 			result.Reason = fmt.Sprintf("Auto-approved: %s (no validation required)", section.Name)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no rules required)", 
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no rules required)",
 				section.Name, section.FilePath, section.StartLine, section.EndLine)
 		} else if rulesPassed && len(result.AppliedRules) > 0 {
 			// Rules passed + auto-approve = auto-approved
 			result.Decision = shared.Approve
 			result.Reason = fmt.Sprintf("Auto-approved: %s (validation passed)", lastRuleReason)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (rules: %v passed)", 
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (rules: %v passed)",
 				section.Name, section.FilePath, section.StartLine, section.EndLine, result.AppliedRules)
 		} else if len(result.AppliedRules) == 0 {
 			// No applicable rules but auto-approve enabled
 			result.Decision = shared.Approve
 			result.Reason = fmt.Sprintf("Auto-approved: %s (no applicable rules)", section.Name)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no applicable rules)", 
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no applicable rules)",
 				section.Name, section.FilePath, section.StartLine, section.EndLine)
 		}
 		// If rules failed, decision remains ManualReview (set above)
 		if result.Decision == shared.ManualReview {
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d failed auto-approve (rules failed: %s)", 
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d failed auto-approve (rules failed: %s)",
 				section.Name, section.FilePath, section.StartLine, section.EndLine, result.Reason)
 		}
 	} else {

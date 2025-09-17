@@ -189,7 +189,7 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 		// because it requires GitLab API access to compare old vs new file content
 		// "service_account_comment_rule",
 		// TODO: Add back when implemented:
-		// "migrations_rule", 
+		// "migrations_rule",
 		// "naming_conventions_rule",
 	}
 

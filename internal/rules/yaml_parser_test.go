@@ -36,9 +36,9 @@ func (m *AutoApproveMockRule) ValidateLines(filePath string, fileContent string,
 
 func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 	tests := []struct {
-		name            string
-		section         *shared.Section
-		rules           []shared.Rule
+		name             string
+		section          *shared.Section
+		rules            []shared.Rule
 		expectedDecision shared.DecisionType
 		expectedReason   string
 		expectAuditLog   bool
@@ -322,7 +322,7 @@ changelog:
 
 	for _, section := range sections {
 		result := parser.ValidateSection(&section, []shared.Rule{})
-		
+
 		if result.Decision == shared.Approve && section.AutoApprove {
 			autoApprovedCount++
 			assert.Contains(t, result.Reason, "Auto-approved")

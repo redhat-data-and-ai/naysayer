@@ -129,7 +129,7 @@ func TestCreateSectionBasedDataverseManager(t *testing.T) {
 		t.Skip("Skipping test - rules.yaml not found in test environment")
 		return
 	}
-	
+
 	assert.NotNil(t, manager)
 
 	// Test that the manager can evaluate (basic functionality test)

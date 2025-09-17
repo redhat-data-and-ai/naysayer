@@ -101,7 +101,7 @@ files:
 
 require_full_coverage: true
 manual_review_on_uncovered: true`
-	
+
 	err := os.WriteFile("rules.yaml", []byte(tempRulesContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test rules file: %v", err)

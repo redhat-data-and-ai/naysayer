@@ -10,12 +10,12 @@ import (
 
 // SectionDefinition defines how to identify and parse a section within a file
 type SectionDefinition struct {
-	Name        string   `yaml:"name"`        // Section identifier (e.g., "warehouse", "consumers")
-	YAMLPath    string   `yaml:"yaml_path"`   // YAML path to section (e.g., "spec.warehouse")
-	Required    bool     `yaml:"required"`    // Is this section required in the file?
-	RuleNames   []string `yaml:"rule_names"`  // Rules that should validate this section
+	Name        string   `yaml:"name"`         // Section identifier (e.g., "warehouse", "consumers")
+	YAMLPath    string   `yaml:"yaml_path"`    // YAML path to section (e.g., "spec.warehouse")
+	Required    bool     `yaml:"required"`     // Is this section required in the file?
+	RuleNames   []string `yaml:"rule_names"`   // Rules that should validate this section
 	AutoApprove bool     `yaml:"auto_approve"` // Auto-approve this section if rules pass (or no rules)
-	Description string   `yaml:"description"` // Human-readable description
+	Description string   `yaml:"description"`  // Human-readable description
 }
 
 // FileRuleConfig defines sections and rules for a specific file type
@@ -144,10 +144,10 @@ func ValidateRuleConfig(config *RuleConfig) error {
 		}
 
 		// Validate default_action if specified
-		if fileConfig.DefaultAction != "" && 
-		   fileConfig.DefaultAction != "manual_review" && 
-		   fileConfig.DefaultAction != "auto_approve" {
-			return fmt.Errorf("invalid default_action '%s' for file config '%s'. Must be 'manual_review' or 'auto_approve'", 
+		if fileConfig.DefaultAction != "" &&
+			fileConfig.DefaultAction != "manual_review" &&
+			fileConfig.DefaultAction != "auto_approve" {
+			return fmt.Errorf("invalid default_action '%s' for file config '%s'. Must be 'manual_review' or 'auto_approve'",
 				fileConfig.DefaultAction, fileConfig.Name)
 		}
 
@@ -162,7 +162,7 @@ func ValidateRuleConfig(config *RuleConfig) error {
 			if section.YAMLPath == "" {
 				return fmt.Errorf("section %s missing YAML path in file configuration %s", section.Name, fileConfig.Name)
 			}
-			
+
 			// Auto-approve sections can have no rules, but warn if auto_approve is set with no rules
 			if len(section.RuleNames) == 0 && !section.AutoApprove {
 				return fmt.Errorf("section %s has no rules defined and auto_approve is false in file configuration %s", section.Name, fileConfig.Name)
