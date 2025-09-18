@@ -22,12 +22,12 @@ func CreateCustomRuleManager(gitlabClient *gitlab.Client, ruleNames []string) (s
 }
 
 // LoadRuleConfigFromPath loads rule configuration from a file path
-func LoadRuleConfigFromPath(configPath string) (*config.RuleConfig, error) {
+func LoadRuleConfigFromPath(configPath string) (*config.GlobalRuleConfig, error) {
 	return config.LoadRuleConfig(configPath)
 }
 
 // NewSectionRuleManagerFromConfig creates a new section-based rule manager from config
-func NewSectionRuleManagerFromConfig(ruleConfig *config.RuleConfig) shared.RuleManager {
+func NewSectionRuleManagerFromConfig(ruleConfig *config.GlobalRuleConfig) shared.RuleManager {
 	return NewSectionRuleManager(ruleConfig)
 }
 

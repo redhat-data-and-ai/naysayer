@@ -22,36 +22,33 @@ func setupTestRulesFile() {
 	tempRulesContent := `enabled: true
 
 files:
-  - name: "product_files"
+  - name: "product_configs"
     path: "**/"
     filename: "product.{yaml,yml}"
     parser_type: yaml
-    description: "Data product configuration files"
     enabled: true
     sections:
       - name: warehouses
         yaml_path: warehouses
         required: true
-        rule_names:
-          - warehouse_rule
-        description: "Data warehouses configuration"
+        rule_configs:
+          - name: warehouse_rule
+            enabled: true
+        auto_approve: false
   - name: "documentation_files"
     path: "**/"
     filename: "*.md"
     parser_type: yaml
-    description: "Documentation files"
     enabled: true
     sections:
       - name: full_file
         yaml_path: .
         required: true
-        rule_names:
-          - metadata_rule
-        description: "Full file metadata validation"
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true`
 
-require_full_coverage: true
-manual_review_on_uncovered: true`
-	
 	err := os.WriteFile("rules.yaml", []byte(tempRulesContent), 0644)
 	if err != nil {
 		panic("Failed to create test rules file: " + err.Error())

@@ -10,11 +10,8 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"github.com/redhat-data-and-ai/naysayer/internal/utils"
 	"go.uber.org/zap"
-)
-
-const (
-	MR_OPENED_STATE = "opened"
 )
 
 // DataProductConfigMrReviewHandler handles GitLab webhook requests
@@ -251,7 +248,7 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		zap.String("state", mrInfo.State))
 
 	// Skip rule evaluation if MR is not open
-	if mrInfo.State != "opened" {
+	if mrInfo.State != utils.MRStateOpened {
 		logging.MRInfo(mrInfo.MRIID, "Skipping rule evaluation for non-open MR",
 			zap.String("state", mrInfo.State))
 
@@ -351,7 +348,7 @@ func (h *DataProductConfigMrReviewHandler) validateWebhookPayload(payload map[st
 	// Validate state field if present
 	if state, exists := objectAttrsMap["state"]; exists {
 		if stateStr, ok := state.(string); ok {
-			if stateStr != MR_OPENED_STATE {
+			if stateStr != utils.MRStateOpened {
 				return fmt.Errorf("MR state: %s. Naysayer only processes Open MRs", stateStr)
 			}
 		} else {

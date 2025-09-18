@@ -1,8 +1,8 @@
 package rules
 
 import (
-	"strings"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"strings"
 )
 
 // DocumentationAutoApprovalRule automatically approves changes to documentation files.
@@ -34,12 +34,12 @@ func (r *DocumentationAutoApprovalRule) GetCoveredLines(filePath string, fileCon
 	if !r.isDocumentationFile(filePath) {
 		return []shared.LineRange{}
 	}
-	
+
 	totalLines := shared.CountLines(fileContent)
 	if totalLines == 0 {
 		return []shared.LineRange{}
 	}
-	
+
 	return []shared.LineRange{
 		{
 			StartLine: 1,
@@ -61,10 +61,10 @@ func (r *DocumentationAutoApprovalRule) ValidateLines(filePath string, fileConte
 func (r *DocumentationAutoApprovalRule) isDocumentationFile(filePath string) bool {
 	// Convert to lowercase for case-insensitive comparison
 	lowerPath := strings.ToLower(filePath)
-	
+
 	// Check for documentation file patterns
 	return strings.HasSuffix(lowerPath, "readme.md") ||
-		   strings.HasSuffix(lowerPath, "data_elements.md") ||
-		   strings.HasSuffix(lowerPath, "promotion_checklist.md") ||
-		   strings.HasSuffix(lowerPath, "developers.yaml")
+		strings.HasSuffix(lowerPath, "data_elements.md") ||
+		strings.HasSuffix(lowerPath, "promotion_checklist.md") ||
+		strings.HasSuffix(lowerPath, "developers.yaml")
 }

@@ -15,12 +15,12 @@ import (
 type SectionRuleManager struct {
 	rules          []shared.Rule
 	sectionParsers map[string]shared.SectionParser // File pattern -> parser
-	config         *config.RuleConfig
+	config         *config.GlobalRuleConfig
 	ruleRegistry   map[string]shared.Rule // Rule name -> rule instance
 }
 
 // NewSectionRuleManager creates a new section-based rule manager
-func NewSectionRuleManager(ruleConfig *config.RuleConfig) *SectionRuleManager {
+func NewSectionRuleManager(ruleConfig *config.GlobalRuleConfig) *SectionRuleManager {
 	manager := &SectionRuleManager{
 		rules:          make([]shared.Rule, 0),
 		sectionParsers: make(map[string]shared.SectionParser),
@@ -139,13 +139,18 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 		fileContent := srm.getFileContent(filePath, mrCtx)
 		totalLines := shared.CountLines(fileContent)
 
+		// Extract changed lines from the diff for delta validation
+		changedLines := srm.getChangedLinesForFile(filePath, mrCtx)
+
 		// Check if this file has section-based validation
 		parser := srm.getParserForFile(filePath)
 		if parser != nil {
-			// Use section-based validation
-			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser)
+			logging.Info("Using section-based validation for file: %s", filePath)
+			// Use section-based validation with delta approach
+			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines)
 			fileValidations[filePath] = fileValidation
 		} else {
+			logging.Info("No parser found for file: %s - requiring manual review", filePath)
 			// No section configuration found - require manual review
 			fileValidation := srm.createManualReviewValidation(filePath, totalLines, "No section-based validation configuration found for this file type")
 			fileValidations[filePath] = fileValidation
@@ -157,8 +162,23 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	return fileValidations, overallDecision
 }
 
-// validateFileWithSections validates a file using section-based approach
-func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser) *shared.FileValidationSummary {
+// getChangedLinesForFile extracts changed line ranges for a specific file from MR context
+func (srm *SectionRuleManager) getChangedLinesForFile(filePath string, mrCtx *shared.MRContext) []shared.LineRange {
+	for _, change := range mrCtx.Changes {
+		if change.NewPath == filePath && change.Diff != "" {
+			changedLines := srm.extractChangedLinesFromDiff(change.Diff)
+			// Set file path for each line range
+			for i := range changedLines {
+				changedLines[i].FilePath = filePath
+			}
+			return changedLines
+		}
+	}
+	return []shared.LineRange{}
+}
+
+// validateFileWithSections validates a file using section-based approach with delta validation
+func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange) *shared.FileValidationSummary {
 	// Parse file into sections
 	sections, err := parser.ParseSections(filePath, fileContent)
 	if err != nil {
@@ -171,19 +191,42 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	var ruleResults []shared.LineValidationResult
 	var sectionResults []shared.SectionValidationResult
 
-	// Validate each section
-	for _, section := range sections {
-		// Get rules for this section
-		sectionRules := srm.getRulesForSection(section.RuleNames)
+	// Delta validation: only validate sections that were affected by changes
+	if len(changedLines) > 0 {
+		affectedSections := srm.getAffectedSections(sections, changedLines)
+		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
 
-		// Validate the section
-		sectionResult := parser.ValidateSection(&section, sectionRules)
-		sectionResults = append(sectionResults, *sectionResult)
+		// Validate only affected sections
+		for _, section := range affectedSections {
+			// Get enabled rules for this section
+			sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
 
-		// Add to overall results
-		for _, ruleResult := range sectionResult.RuleResults {
-			ruleResults = append(ruleResults, ruleResult)
-			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+			// Validate the section
+			sectionResult := parser.ValidateSection(&section, sectionRules)
+			sectionResults = append(sectionResults, *sectionResult)
+
+			// Add to overall results
+			for _, ruleResult := range sectionResult.RuleResults {
+				ruleResults = append(ruleResults, ruleResult)
+				allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+			}
+		}
+	} else {
+		// No changes detected - validate all sections (fallback)
+		logging.Info("No changes detected for %s, validating all sections", filePath)
+		for _, section := range sections {
+			// Get enabled rules for this section
+			sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
+
+			// Validate the section
+			sectionResult := parser.ValidateSection(&section, sectionRules)
+			sectionResults = append(sectionResults, *sectionResult)
+
+			// Add to overall results
+			for _, ruleResult := range sectionResult.RuleResults {
+				ruleResults = append(ruleResults, ruleResult)
+				allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+			}
 		}
 	}
 
@@ -215,10 +258,10 @@ func (srm *SectionRuleManager) createManualReviewValidation(filePath string, tot
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
 		TotalLines:     totalLines,
-		CoveredLines:   []shared.LineRange{}, // No lines covered
-		UncoveredLines: uncoveredLines,       // Entire file uncovered
+		CoveredLines:   []shared.LineRange{},            // No lines covered
+		UncoveredLines: uncoveredLines,                  // Entire file uncovered
 		RuleResults:    []shared.LineValidationResult{}, // No rule results
-		FileDecision:   shared.ManualReview, // Require manual review
+		FileDecision:   shared.ManualReview,             // Require manual review
 	}
 }
 
@@ -232,15 +275,20 @@ func (srm *SectionRuleManager) getParserForFile(filePath string) shared.SectionP
 	return nil
 }
 
-// getRulesForSection returns rules that apply to a specific section
-func (srm *SectionRuleManager) getRulesForSection(ruleNames []string) []shared.Rule {
+// getEnabledRulesForSection returns enabled rules that apply to a specific section
+func (srm *SectionRuleManager) getEnabledRulesForSection(ruleConfigs []config.RuleConfig) []shared.Rule {
 	var sectionRules []shared.Rule
 
-	for _, ruleName := range ruleNames {
-		if rule, exists := srm.ruleRegistry[ruleName]; exists {
+	for _, ruleConfig := range ruleConfigs {
+		if !ruleConfig.Enabled {
+			logging.Info("Skipping disabled rule: %s", ruleConfig.Name)
+			continue
+		}
+
+		if rule, exists := srm.ruleRegistry[ruleConfig.Name]; exists {
 			sectionRules = append(sectionRules, rule)
 		} else {
-			logging.Warn("Rule %s not found in registry", ruleName)
+			logging.Warn("Rule %s not found in registry", ruleConfig.Name)
 		}
 	}
 
@@ -278,8 +326,8 @@ func (srm *SectionRuleManager) determineFileDecisionWithSections(ruleResults []s
 		}
 	}
 
-	// Finally, check if there are uncovered lines (only if config requires it)
-	if len(uncoveredLines) > 0 && srm.config.ManualReviewOnUncovered {
+	// Finally, check if there are uncovered lines (strict coverage policy)
+	if len(uncoveredLines) > 0 {
 		return shared.ManualReview
 	}
 
@@ -330,6 +378,89 @@ func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRC
 	return ""
 }
 
+// extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff
+func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared.LineRange {
+	var changedRanges []shared.LineRange
+	lines := strings.Split(diff, "\n")
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "@@") {
+			// Parse hunk header like "@@ -1,4 +1,6 @@"
+			if lineRange := srm.parseHunkHeader(line); lineRange != nil {
+				changedRanges = append(changedRanges, *lineRange)
+			}
+		}
+	}
+
+	return changedRanges
+}
+
+// parseHunkHeader parses a Git diff hunk header to extract the new file line range
+func (srm *SectionRuleManager) parseHunkHeader(hunkHeader string) *shared.LineRange {
+	// Format: @@ -old_start,old_count +new_start,new_count @@
+	parts := strings.Fields(hunkHeader)
+	if len(parts) < 3 {
+		return nil
+	}
+
+	newPart := parts[2] // +new_start,new_count
+	if !strings.HasPrefix(newPart, "+") {
+		return nil
+	}
+
+	newInfo := strings.TrimPrefix(newPart, "+")
+	rangeParts := strings.Split(newInfo, ",")
+
+	startLine := 0
+	count := 1
+
+	// Parse start line
+	if len(rangeParts) > 0 {
+		if n, err := fmt.Sscanf(rangeParts[0], "%d", &startLine); n != 1 || err != nil {
+			return nil
+		}
+	}
+
+	// Parse count if present
+	if len(rangeParts) > 1 {
+		if n, err := fmt.Sscanf(rangeParts[1], "%d", &count); n != 1 || err != nil {
+			count = 1
+		}
+	}
+
+	if startLine <= 0 || count <= 0 {
+		return nil
+	}
+
+	return &shared.LineRange{
+		StartLine: startLine,
+		EndLine:   startLine + count - 1,
+	}
+}
+
+// getAffectedSections returns only the sections that contain changed lines
+func (srm *SectionRuleManager) getAffectedSections(sections []shared.Section, changedLines []shared.LineRange) []shared.Section {
+	var affectedSections []shared.Section
+
+	for _, section := range sections {
+		for _, changedRange := range changedLines {
+			// Check if this section overlaps with any changed line range
+			if srm.sectionsOverlap(section, changedRange) {
+				affectedSections = append(affectedSections, section)
+				break // Don't add the same section multiple times
+			}
+		}
+	}
+
+	return affectedSections
+}
+
+// sectionsOverlap checks if a section overlaps with a changed line range
+func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRange shared.LineRange) bool {
+	// Sections overlap if there's any line in common
+	return section.StartLine <= changedRange.EndLine && section.EndLine >= changedRange.StartLine
+}
+
 // extractFileContentFromDiff attempts to extract file content from a Git diff
 func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
 	// This is a simplified implementation
@@ -371,7 +502,6 @@ func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
 	return strings.Join(contentLines, "\n")
 }
 
-
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
 	var manualReviewFiles []string
 	var approvedFiles []string
@@ -391,6 +521,9 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 		if len(approvedFiles) > 0 {
 			details += fmt.Sprintf(". Files auto-approved: %s", strings.Join(approvedFiles, ", "))
 		}
+
+		logging.Info("MR requires manual review due to %d uncovered files: %v",
+			len(manualReviewFiles), manualReviewFiles)
 
 		return shared.Decision{
 			Type:    shared.ManualReview,

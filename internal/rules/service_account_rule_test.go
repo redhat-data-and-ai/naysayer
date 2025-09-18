@@ -34,18 +34,18 @@ func TestServiceAccountRule_isServiceAccountFile(t *testing.T) {
 		{"astro service account dev", "dataproducts/analytics/sa_astro_dev_appuser.yaml", true},
 		{"astro service account prod", "path/to/my_astro_prod_appuser.yml", true},
 		{"astro uppercase", "SA_ASTRO_STAGING_APPUSER.YAML", true},
-		
+
 		// Generic service account files
 		{"serviceaccount file", "configs/myserviceaccount.yaml", true},
 		{"service-account file", "configs/my-service-account.yml", true},
 		{"serviceaccounts directory", "serviceaccounts/user-sa.yaml", true},
 		{"nested serviceaccounts", "dataproducts/prod/serviceaccounts/app.yml", true},
-		
+
 		// Invalid Astro patterns
-		{"astro without appuser", "sa_astro_dev.yaml", true}, // Still recognized as service account, but won't be Astro type
+		{"astro without appuser", "sa_astro_dev.yaml", true},     // Still recognized as service account, but won't be Astro type
 		{"astro wrong order", "sa_appuser_astro_dev.yaml", true}, // Still recognized as service account
-		{"astro missing env", "sa_astro__appuser.yaml", true}, // Still recognized as service account
-		
+		{"astro missing env", "sa_astro__appuser.yaml", true},    // Still recognized as service account
+
 		// Non-service account files
 		{"regular yaml", "config.yaml", false},
 		{"readme", "README.md", false},
@@ -131,11 +131,11 @@ func TestServiceAccountRule_validateAstroServiceAccount(t *testing.T) {
 	rule := NewServiceAccountRule(nil)
 
 	tests := []struct {
-		name             string
-		filePath         string
-		fileContent      string
-		expectedResult   shared.DecisionType
-		expectedReason   string
+		name           string
+		filePath       string
+		fileContent    string
+		expectedResult shared.DecisionType
+		expectedReason string
 	}{
 		{
 			name:     "valid astro service account",
@@ -192,16 +192,15 @@ metadata:
 	}
 }
 
-
 func TestServiceAccountRule_ValidateLines(t *testing.T) {
 	rule := NewServiceAccountRule(nil)
 
 	tests := []struct {
-		name             string
-		filePath         string
-		fileContent      string
-		expectedResult   shared.DecisionType
-		expectedReason   string
+		name           string
+		filePath       string
+		fileContent    string
+		expectedResult shared.DecisionType
+		expectedReason string
 	}{
 		// Astro service account tests - only these should be auto-approved
 		{
@@ -213,7 +212,7 @@ metadata:
 			expectedResult: shared.Approve,
 			expectedReason: "Astro service account file follows naming convention and name field matches filename",
 		},
-		
+
 		// All non-Astro service account files should require manual review
 		{
 			name:     "generic service account - manual review required",
@@ -225,7 +224,7 @@ spec:
 			expectedResult: shared.ManualReview,
 			expectedReason: "Only Astro service account files (*_astro_*.yaml/yml) are auto-approved - other service account files require manual review",
 		},
-		
+
 		{
 			name:     "basic service account - manual review required",
 			filePath: "configs/myserviceaccount.yaml",
@@ -236,7 +235,7 @@ metadata:
 			expectedResult: shared.ManualReview,
 			expectedReason: "Only Astro service account files (*_astro_*.yaml/yml) are auto-approved - other service account files require manual review",
 		},
-		
+
 		{
 			name:     "appuser service account - manual review required",
 			filePath: "serviceaccounts/user_appuser.yaml",
@@ -245,7 +244,7 @@ metadata:
 			expectedResult: shared.ManualReview,
 			expectedReason: "Only Astro service account files (*_astro_*.yaml/yml) are auto-approved - other service account files require manual review",
 		},
-		
+
 		// Non-service account file
 		{
 			name:           "non-service account file",
@@ -352,7 +351,7 @@ metadata:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rule := NewServiceAccountRule(nil)
-			
+
 			// Test coverage
 			lines := rule.GetCoveredLines(tt.filePath, tt.fileContent)
 			if tt.expectCoverage {

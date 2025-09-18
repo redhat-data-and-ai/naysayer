@@ -1,8 +1,8 @@
 package rules
 
 import (
-	"strings"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"strings"
 )
 
 // ServiceAccountCommentRule demonstrates field-level auto-approval concept for service account files.
@@ -52,8 +52,8 @@ func (r *ServiceAccountCommentRule) ValidateLines(filePath string, fileContent s
 func (r *ServiceAccountCommentRule) isServiceAccountFile(filePath string) bool {
 	// Service account files are in serviceaccounts/ directory and end with _appuser.yaml or _appuser.yml
 	lowerPath := strings.ToLower(filePath)
-	return strings.Contains(lowerPath, "serviceaccounts/") && 
-		   (strings.HasSuffix(lowerPath, "_appuser.yaml") || strings.HasSuffix(lowerPath, "_appuser.yml"))
+	return strings.Contains(lowerPath, "serviceaccounts/") &&
+		(strings.HasSuffix(lowerPath, "_appuser.yaml") || strings.HasSuffix(lowerPath, "_appuser.yml"))
 }
 
 // TODO: To implement proper comment-only detection, this rule would need:
