@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewSectionRuleManager(t *testing.T) {
-	ruleConfig := &config.RuleConfig{
+	ruleConfig := &config.GlobalRuleConfig{
 		Files: []config.FileRuleConfig{
 			{
 				Name:       "test-yaml",
@@ -22,6 +22,9 @@ func TestNewSectionRuleManager(t *testing.T) {
 						Name:     "test_section",
 						YAMLPath: "spec.test",
 						Required: true,
+						RuleConfigs: []config.RuleConfig{
+							{Name: "test_rule", Enabled: true},
+						},
 					},
 				},
 			},
@@ -38,7 +41,7 @@ func TestNewSectionRuleManager(t *testing.T) {
 }
 
 func TestSectionRuleManager_GetParserForFile(t *testing.T) {
-	ruleConfig := &config.RuleConfig{
+	ruleConfig := &config.GlobalRuleConfig{
 		Files: []config.FileRuleConfig{
 			{
 				Name:       "yaml-files",
@@ -50,6 +53,9 @@ func TestSectionRuleManager_GetParserForFile(t *testing.T) {
 					{
 						Name:     "test_section",
 						YAMLPath: "spec.test",
+						RuleConfigs: []config.RuleConfig{
+							{Name: "test_rule", Enabled: true},
+						},
 					},
 				},
 			},

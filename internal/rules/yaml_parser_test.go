@@ -52,7 +52,7 @@ func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 				Content:     "description: This is a test description",
 				FilePath:    "test.yaml",
 				AutoApprove: true,
-				RuleNames:   []string{},
+				RuleConfigs: []config.RuleConfig{},
 			},
 			rules:            []shared.Rule{},
 			expectedDecision: shared.Approve,
@@ -68,7 +68,7 @@ func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 				Content:     "description: This is a test description",
 				FilePath:    "test.yaml",
 				AutoApprove: true,
-				RuleNames:   []string{"test_rule"},
+				RuleConfigs: []config.RuleConfig{{Name: "test_rule", Enabled: true}},
 			},
 			rules: []shared.Rule{
 				&AutoApproveMockRule{
@@ -90,7 +90,7 @@ func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 				Content:     "description: This is a test description",
 				FilePath:    "test.yaml",
 				AutoApprove: true,
-				RuleNames:   []string{"test_rule"},
+				RuleConfigs: []config.RuleConfig{{Name: "test_rule", Enabled: true}},
 			},
 			rules: []shared.Rule{
 				&AutoApproveMockRule{
@@ -112,7 +112,7 @@ func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 				Content:     "warehouses:\n- type: user\n  size: SMALL",
 				FilePath:    "test.yaml",
 				AutoApprove: false,
-				RuleNames:   []string{"test_rule"},
+				RuleConfigs: []config.RuleConfig{{Name: "test_rule", Enabled: true}},
 			},
 			rules: []shared.Rule{
 				&AutoApproveMockRule{
@@ -134,7 +134,7 @@ func TestYAMLSectionParser_ValidateSection_AutoApprove(t *testing.T) {
 				Content:     "unknown: value",
 				FilePath:    "test.yaml",
 				AutoApprove: false,
-				RuleNames:   []string{},
+				RuleConfigs: []config.RuleConfig{},
 			},
 			rules:            []shared.Rule{},
 			expectedDecision: shared.ManualReview,
@@ -190,28 +190,28 @@ changelog:
 			Name:        "description",
 			YAMLPath:    "description",
 			Required:    false,
-			RuleNames:   []string{"text_rule"},
+			RuleConfigs: []config.RuleConfig{{Name: "text_rule", Enabled: true}},
 			AutoApprove: true,
 		},
 		"documentation_url": {
 			Name:        "documentation_url",
 			YAMLPath:    "documentation.url",
 			Required:    false,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: true,
 		},
 		"warehouses": {
 			Name:        "warehouses",
 			YAMLPath:    "warehouses",
 			Required:    true,
-			RuleNames:   []string{"warehouse_rule"},
+			RuleConfigs: []config.RuleConfig{{Name: "warehouse_rule", Enabled: true}},
 			AutoApprove: false,
 		},
 		"changelog": {
 			Name:        "changelog",
 			YAMLPath:    "changelog",
 			Required:    false,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: true,
 		},
 	}
@@ -234,10 +234,10 @@ changelog:
 	assert.True(t, sectionMap["changelog"].AutoApprove)
 
 	// Check rule names
-	assert.Equal(t, []string{"text_rule"}, sectionMap["description"].RuleNames)
-	assert.Equal(t, []string{}, sectionMap["documentation_url"].RuleNames)
-	assert.Equal(t, []string{"warehouse_rule"}, sectionMap["warehouses"].RuleNames)
-	assert.Equal(t, []string{}, sectionMap["changelog"].RuleNames)
+	assert.Equal(t, []config.RuleConfig{{Name: "text_rule", Enabled: true}}, sectionMap["description"].RuleConfigs)
+	assert.Equal(t, []config.RuleConfig{}, sectionMap["documentation_url"].RuleConfigs)
+	assert.Equal(t, []config.RuleConfig{{Name: "warehouse_rule", Enabled: true}}, sectionMap["warehouses"].RuleConfigs)
+	assert.Equal(t, []config.RuleConfig{}, sectionMap["changelog"].RuleConfigs)
 }
 
 func TestYAMLSectionParser_ValidateSection_AuditLogging(t *testing.T) {
@@ -250,7 +250,7 @@ func TestYAMLSectionParser_ValidateSection_AuditLogging(t *testing.T) {
 		Content:     "test: value",
 		FilePath:    "test.yaml",
 		AutoApprove: true,
-		RuleNames:   []string{},
+		RuleConfigs: []config.RuleConfig{},
 	}
 
 	parser := NewYAMLSectionParser(map[string]config.SectionDefinition{})
@@ -284,28 +284,28 @@ changelog:
 			Name:        "description",
 			YAMLPath:    "description",
 			Required:    false,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: true,
 		},
 		"documentation_url": {
 			Name:        "documentation_url",
 			YAMLPath:    "documentation.url",
 			Required:    false,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: true,
 		},
 		"warehouses": {
 			Name:        "warehouses",
 			YAMLPath:    "warehouses",
 			Required:    true,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: false,
 		},
 		"changelog": {
 			Name:        "changelog",
 			YAMLPath:    "changelog",
 			Required:    false,
-			RuleNames:   []string{},
+			RuleConfigs: []config.RuleConfig{},
 			AutoApprove: true,
 		},
 	}

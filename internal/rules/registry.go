@@ -147,11 +147,9 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 	if err != nil {
 		logging.Warn("Failed to load rule config, using minimal configuration: %v", err)
 		// Create minimal config for fallback
-		ruleConfig = &config.RuleConfig{
-			Enabled:                 true,
-			RequireFullCoverage:     false,
-			ManualReviewOnUncovered: true,
-			Files:                   []config.FileRuleConfig{},
+		ruleConfig = &config.GlobalRuleConfig{
+			Enabled: true,
+			Files:   []config.FileRuleConfig{},
 		}
 	}
 
@@ -197,11 +195,9 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 	if err != nil {
 		logging.Error("Error creating dataverse rule manager: %v", err)
 		// Fallback to empty section manager
-		ruleConfig := &config.RuleConfig{
-			Enabled:                 true,
-			RequireFullCoverage:     false,
-			ManualReviewOnUncovered: true,
-			Files:                   []config.FileRuleConfig{},
+		ruleConfig := &config.GlobalRuleConfig{
+			Enabled: true,
+			Files:   []config.FileRuleConfig{},
 		}
 		return NewSectionRuleManager(ruleConfig)
 	}

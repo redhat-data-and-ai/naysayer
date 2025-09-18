@@ -25,7 +25,7 @@ type Section struct {
 	FilePath    string                 `json:"file_path"`    // Parent file path
 	YAMLPath    string                 `json:"yaml_path"`    // YAML path (e.g., "spec.warehouse")
 	Required    bool                   `json:"required"`     // Is this section required?
-	RuleNames   []string               `json:"rule_names"`   // Rules that apply to this section
+	RuleConfigs []config.RuleConfig    `json:"rule_configs"` // Rules with enable/disable control
 	AutoApprove bool                   `json:"auto_approve"` // Auto-approve this section if rules pass
 }
 

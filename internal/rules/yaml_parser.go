@@ -90,7 +90,7 @@ func (p *YAMLSectionParser) extractSection(definition config.SectionDefinition, 
 		FilePath:    p.filePath,
 		YAMLPath:    definition.YAMLPath,
 		Required:    definition.Required,
-		RuleNames:   definition.RuleNames,
+		RuleConfigs: definition.RuleConfigs,
 		AutoApprove: definition.AutoApprove,
 	}
 
@@ -287,44 +287,46 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 		}
 	}
 
-	// Step 2: Apply auto-approve logic
-	if section.AutoApprove {
-		if !hasRules {
-			// No rules + auto-approve = immediate approval
-			result.Decision = shared.Approve
-			result.Reason = fmt.Sprintf("Auto-approved: %s (no validation required)", section.Name)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no rules required)",
-				section.Name, section.FilePath, section.StartLine, section.EndLine)
-		} else if rulesPassed && len(result.AppliedRules) > 0 {
-			// Rules passed + auto-approve = auto-approved
-			result.Decision = shared.Approve
-			result.Reason = fmt.Sprintf("Auto-approved: %s (validation passed)", lastRuleReason)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (rules: %v passed)",
-				section.Name, section.FilePath, section.StartLine, section.EndLine, result.AppliedRules)
-		} else if len(result.AppliedRules) == 0 {
-			// No applicable rules but auto-approve enabled
-			result.Decision = shared.Approve
-			result.Reason = fmt.Sprintf("Auto-approved: %s (no applicable rules)", section.Name)
-			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no applicable rules)",
-				section.Name, section.FilePath, section.StartLine, section.EndLine)
-		}
-		// If rules failed, decision remains ManualReview (set above)
-		if result.Decision == shared.ManualReview {
+	// Step 2: Apply decision logic - handle definitive cases first
+
+	// Case 1: Rules failed - always manual review regardless of auto-approve setting
+	if hasRules && !rulesPassed {
+		result.Decision = shared.ManualReview
+		// Reason already set above when rules failed
+		if section.AutoApprove {
 			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d failed auto-approve (rules failed: %s)",
 				section.Name, section.FilePath, section.StartLine, section.EndLine, result.Reason)
 		}
-	} else {
-		// Not auto-approve section
-		if !hasRules || len(result.AppliedRules) == 0 {
-			// No rules and not auto-approve = manual review
-			result.Decision = shared.ManualReview
-			result.Reason = fmt.Sprintf("No validation rules configured for %s - manual review required", section.Name)
-		} else if rulesPassed {
-			// Rules passed, normal approval
-			result.Decision = shared.Approve
-			result.Reason = lastRuleReason
+		return result
+	}
+
+	// Case 2: Auto-approve enabled - approve if rules passed or no rules
+	if section.AutoApprove {
+		result.Decision = shared.Approve
+
+		if !hasRules {
+			result.Reason = fmt.Sprintf("Auto-approved: %s (no validation required)", section.Name)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no rules required)",
+				section.Name, section.FilePath, section.StartLine, section.EndLine)
+		} else if len(result.AppliedRules) == 0 {
+			result.Reason = fmt.Sprintf("Auto-approved: %s (no applicable rules)", section.Name)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (no applicable rules)",
+				section.Name, section.FilePath, section.StartLine, section.EndLine)
+		} else {
+			result.Reason = fmt.Sprintf("Auto-approved: %s (validation passed)", lastRuleReason)
+			logging.Info("AUTO_APPROVE_AUDIT: Section '%s' at %s:%d-%d auto-approved (rules: %v passed)",
+				section.Name, section.FilePath, section.StartLine, section.EndLine, result.AppliedRules)
 		}
-		// If rules failed, decision already set to ManualReview above
+		return result
+	}
+
+	// Case 3: Not auto-approve - normal approval process
+	if !hasRules || len(result.AppliedRules) == 0 {
+		result.Decision = shared.ManualReview
+		result.Reason = fmt.Sprintf("No validation rules configured for %s - manual review required", section.Name)
+	} else if rulesPassed {
+		result.Decision = shared.Approve
+		result.Reason = lastRuleReason
 	}
 
 	return result

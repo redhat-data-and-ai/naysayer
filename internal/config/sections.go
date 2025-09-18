@@ -5,17 +5,24 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 
+// RuleConfig defines a rule with its enabled state
+type RuleConfig struct {
+	Name    string `yaml:"name"`    // Rule name (e.g., "warehouse_rule")
+	Enabled bool   `yaml:"enabled"` // Whether this rule should be executed
+}
+
 // SectionDefinition defines how to identify and parse a section within a file
 type SectionDefinition struct {
-	Name        string   `yaml:"name"`         // Section identifier (e.g., "warehouse", "consumers")
-	YAMLPath    string   `yaml:"yaml_path"`    // YAML path to section (e.g., "spec.warehouse")
-	Required    bool     `yaml:"required"`     // Is this section required in the file?
-	RuleNames   []string `yaml:"rule_names"`   // Rules that should validate this section
-	AutoApprove bool     `yaml:"auto_approve"` // Auto-approve this section if rules pass (or no rules)
-	Description string   `yaml:"description"`  // Human-readable description
+	Name        string       `yaml:"name"`         // Section identifier (e.g., "warehouse", "consumers")
+	YAMLPath    string       `yaml:"yaml_path"`    // YAML path to section (e.g., "spec.warehouse")
+	Required    bool         `yaml:"required"`     // Is this section required in the file?
+	RuleConfigs []RuleConfig `yaml:"rule_configs"` // Rules with enable/disable control
+	AutoApprove bool         `yaml:"auto_approve"` // Auto-approve this section if rules pass (or no rules)
+	Description string       `yaml:"description"`  // Human-readable description
 }
 
 // FileRuleConfig defines sections and rules for a specific file type
@@ -30,25 +37,21 @@ type FileRuleConfig struct {
 	Sections      []SectionDefinition `yaml:"sections"`       // Sections within this file type
 }
 
-// RuleConfig holds the complete rule configuration for all file types
-type RuleConfig struct {
-	Enabled                 bool             `yaml:"enabled"`
-	Files                   []FileRuleConfig `yaml:"files"`                      // Array of file configurations
-	RequireFullCoverage     bool             `yaml:"require_full_coverage"`      // All sections must have rules
-	ManualReviewOnUncovered bool             `yaml:"manual_review_on_uncovered"` // Manual review for uncovered sections
+// GlobalRuleConfig holds the complete rule configuration for all file types
+type GlobalRuleConfig struct {
+	Enabled bool             `yaml:"enabled"`
+	Files   []FileRuleConfig `yaml:"files"` // Array of file configurations
 }
 
 // RuleBasedConfig is the external YAML format for rule configuration
 type RuleBasedConfig struct {
-	Enabled                 bool             `yaml:"enabled"`
-	Files                   []FileRuleConfig `yaml:"files"`                      // Array of file configurations
-	RequireFullCoverage     bool             `yaml:"require_full_coverage"`      // All sections must have rules
-	ManualReviewOnUncovered bool             `yaml:"manual_review_on_uncovered"` // Manual review for uncovered changes
+	Enabled bool             `yaml:"enabled"`
+	Files   []FileRuleConfig `yaml:"files"` // Array of file configurations
 }
 
 // LoadRuleConfig loads rule-based validation configuration from YAML
 // The YAML file must exist and be valid - no fallbacks or defaults
-func LoadRuleConfig(configPath string) (*RuleConfig, error) {
+func LoadRuleConfig(configPath string) (*GlobalRuleConfig, error) {
 	// If no config path provided, use default
 	if configPath == "" {
 		configPath = "rules.yaml"
@@ -72,11 +75,9 @@ func LoadRuleConfig(configPath string) (*RuleConfig, error) {
 	}
 
 	// Convert YAML config to internal format
-	config := &RuleConfig{
-		Enabled:                 yamlConfig.Enabled,
-		Files:                   yamlConfig.Files,
-		RequireFullCoverage:     yamlConfig.RequireFullCoverage,
-		ManualReviewOnUncovered: yamlConfig.ManualReviewOnUncovered,
+	config := &GlobalRuleConfig{
+		Enabled: yamlConfig.Enabled,
+		Files:   yamlConfig.Files,
 	}
 
 	// Validate the configuration
@@ -88,13 +89,11 @@ func LoadRuleConfig(configPath string) (*RuleConfig, error) {
 }
 
 // SaveRuleConfig saves rule configuration to file (for custom configs)
-func SaveRuleConfig(config *RuleConfig, configPath string) error {
+func SaveRuleConfig(config *GlobalRuleConfig, configPath string) error {
 	// Convert internal config to external format
 	externalConfig := RuleBasedConfig{
-		Enabled:                 config.Enabled,
-		Files:                   config.Files,
-		RequireFullCoverage:     config.RequireFullCoverage,
-		ManualReviewOnUncovered: config.ManualReviewOnUncovered,
+		Enabled: config.Enabled,
+		Files:   config.Files,
 	}
 
 	// Marshal to YAML
@@ -118,7 +117,7 @@ func SaveRuleConfig(config *RuleConfig, configPath string) error {
 }
 
 // ValidateRuleConfig validates the rule configuration
-func ValidateRuleConfig(config *RuleConfig) error {
+func ValidateRuleConfig(config *GlobalRuleConfig) error {
 	if config == nil {
 		return fmt.Errorf("section config is nil")
 	}
@@ -145,10 +144,10 @@ func ValidateRuleConfig(config *RuleConfig) error {
 
 		// Validate default_action if specified
 		if fileConfig.DefaultAction != "" &&
-			fileConfig.DefaultAction != "manual_review" &&
-			fileConfig.DefaultAction != "auto_approve" {
-			return fmt.Errorf("invalid default_action '%s' for file config '%s'. Must be 'manual_review' or 'auto_approve'",
-				fileConfig.DefaultAction, fileConfig.Name)
+			fileConfig.DefaultAction != utils.DefaultActionManualReview &&
+			fileConfig.DefaultAction != utils.DefaultActionAutoApprove {
+			return fmt.Errorf("invalid default_action '%s' for file config '%s'. Must be '%s' or '%s'",
+				fileConfig.DefaultAction, fileConfig.Name, utils.DefaultActionManualReview, utils.DefaultActionAutoApprove)
 		}
 
 		if len(fileConfig.Sections) == 0 {
@@ -163,8 +162,15 @@ func ValidateRuleConfig(config *RuleConfig) error {
 				return fmt.Errorf("section %s missing YAML path in file configuration %s", section.Name, fileConfig.Name)
 			}
 
+			// Validate rule configs
+			for _, ruleConfig := range section.RuleConfigs {
+				if ruleConfig.Name == "" {
+					return fmt.Errorf("rule config missing name in section %s of file configuration %s", section.Name, fileConfig.Name)
+				}
+			}
+
 			// Auto-approve sections can have no rules, but warn if auto_approve is set with no rules
-			if len(section.RuleNames) == 0 && !section.AutoApprove {
+			if len(section.RuleConfigs) == 0 && !section.AutoApprove {
 				return fmt.Errorf("section %s has no rules defined and auto_approve is false in file configuration %s", section.Name, fileConfig.Name)
 			}
 		}
@@ -174,7 +180,7 @@ func ValidateRuleConfig(config *RuleConfig) error {
 }
 
 // GetRuleConfigFromEnv loads rule config with environment variable overrides
-func GetRuleConfigFromEnv() (*RuleConfig, error) {
+func GetRuleConfigFromEnv() (*GlobalRuleConfig, error) {
 	// Load base config
 	configPath := os.Getenv("RULE_CONFIG_PATH")
 	if configPath == "" {
@@ -189,20 +195,6 @@ func GetRuleConfigFromEnv() (*RuleConfig, error) {
 	// Apply environment variable overrides
 	if enabled := os.Getenv("RULE_VALIDATION_ENABLED"); enabled != "" {
 		config.Enabled = enabled == "true"
-	} else if enabled := os.Getenv("SECTION_VALIDATION_ENABLED"); enabled != "" {
-		config.Enabled = enabled == "true" // Backward compatibility
-	}
-
-	if requireCoverage := os.Getenv("RULE_REQUIRE_FULL_COVERAGE"); requireCoverage != "" {
-		config.RequireFullCoverage = requireCoverage == "true"
-	} else if requireCoverage := os.Getenv("SECTION_REQUIRE_FULL_COVERAGE"); requireCoverage != "" {
-		config.RequireFullCoverage = requireCoverage == "true" // Backward compatibility
-	}
-
-	if manualReview := os.Getenv("RULE_MANUAL_REVIEW_ON_UNCOVERED"); manualReview != "" {
-		config.ManualReviewOnUncovered = manualReview == "true"
-	} else if manualReview := os.Getenv("SECTION_MANUAL_REVIEW_ON_UNCOVERED"); manualReview != "" {
-		config.ManualReviewOnUncovered = manualReview == "true" // Backward compatibility
 	}
 
 	return config, nil
