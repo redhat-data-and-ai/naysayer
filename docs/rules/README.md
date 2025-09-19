@@ -24,6 +24,12 @@ This directory contains detailed documentation for each validation rule implemen
 **Purpose**: Development velocity and documentation quality  
 **Key behavior**: Auto-approves all documentation and metadata changes (zero risk)
 
+### ⚖️ [TOC Approval Rule](TOC_APPROVAL_RULE.md)
+**Validates**: New data product deployments to production environments  
+**Triggers on**: New `**/product.{yaml,yml}` files in preprod/prod paths  
+**Purpose**: Governance oversight and production deployment control  
+**Key behavior**: Requires TOC approval for new products in critical environments
+
 ## 🎯 Quick Problem Resolution
 
 ### My MR is Blocked - What Now?
@@ -38,6 +44,7 @@ This directory contains detailed documentation for each validation rule implemen
 | **File Pattern** | **Rule** | **Common Issues** | **Quick Fix** |
 |------------------|----------|-------------------|---------------|
 | `**/product.{yaml,yml}` | [Warehouse](WAREHOUSE_RULE.md) | Size increases, YAML syntax | Use `XSMALL`/`SMALL`/`MEDIUM`/`LARGE`, validate YAML |
+| `**/product.{yaml,yml}` (new) | [TOC Approval](TOC_APPROVAL_RULE.md) | New products in prod/preprod | Get TOC approval or deploy to dev/test first |
 | `**/*serviceaccount*.{yaml,yml}` | [Service Account](SERVICE_ACCOUNT_RULE.md) | Non-Astro accounts, domain violations | Use Astro patterns, @redhat.com emails |
 | `**/*.md`, docs files | [Metadata](METADATA_RULE.md) | File access issues | Check file permissions, valid UTF-8 encoding |
 

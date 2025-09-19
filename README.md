@@ -17,6 +17,7 @@ Naysayer analyzes GitLab merge requests and automatically:
 Naysayer includes built-in rules for:
 - **🏢 Cost Control** - Warehouse configuration validation
 - **🔒 Security** - Service account compliance  
+- **⚖️ TOC Approval** - TOC oversight for production deployments
 - **📄 Documentation** - Metadata and docs validation
 
 > **📚 Complete Rule Details**: See [Rules Documentation](docs/rules/README.md) for what gets validated, troubleshooting, and examples.
@@ -129,10 +130,12 @@ WAREHOUSE_RULE_ENABLED=true
 | Service Account (Astro) | 🟡 **Medium** | ✅ Conditional | Automated accounts with naming compliance |
 | Warehouse Increase | 🟡 **Medium** | ❌ Never | Requires budget approval |
 | Service Account (Other) | 🔴 **High** | ❌ Never | Security review required |
+| **New Product (Prod)** | 🔴 **High** | ❌ Never | Requires TOC governance approval |
 
 ### 🚫 **Manual Review Triggers**
 
 - **Cost Increases** - Warehouse size increases require budget approval
+- **New Production Deployments** - New product.yaml files in preprod/prod require TOC approval
 - **Security Violations** - Hardcoded secrets, invalid domains
 - **Configuration Errors** - YAML syntax errors, missing fields
 - **Uncovered Changes** - Lines not validated by any rule
