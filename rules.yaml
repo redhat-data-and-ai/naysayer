@@ -5,8 +5,8 @@ enabled: true
 files:
   # Product configuration files - Critical infrastructure validation
   - name: "product_configs"
-    path: "**/dataproducts/**/"
-    filename: "product.{yaml,yml}"
+    path: "dataproducts/**/"
+    filename: "product.yaml"
     parser_type: yaml
     enabled: true
     sections:
@@ -15,6 +15,14 @@ files:
         yaml_path: warehouses
         rule_configs:
           - name: warehouse_rule
+            enabled: true
+        auto_approve: false
+      
+      # Full file validation for new products in preprod/prod
+      - name: full_file_toc_validation
+        yaml_path: .
+        rule_configs:
+          - name: toc_approval_rule
             enabled: true
         auto_approve: false
       
@@ -31,6 +39,8 @@ files:
         rule_configs:
           - name: metadata_rule
             enabled: true
+          - name: toc_approval_rule
+            enabled: true
         auto_approve: true
 
       - name: rover_group
@@ -46,11 +56,25 @@ files:
           - name: metadata_rule
             enabled: true
         auto_approve: true
+        
+  # Documentation files - Auto-approve
+  - name: "documentation_files"
+    path: "*/"
+    filename: "*.md"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file_doc_validation
+        yaml_path: .
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true
 
   # Developer metadata files - Low risk, can auto-approve
   - name: "developer_metadata"
-    path: "**/dataproducts/**/"
-    filename: "developers.{yaml,yml}"
+    path: "dataproducts/**/"
+    filename: "developers.yaml"
     parser_type: yaml
     enabled: true
     sections:
@@ -65,7 +89,6 @@ files:
 # Any file type not explicitly configured above will require manual review by default.
 # This includes:
 #   - .sql files (migration scripts) - CRITICAL: Always require manual review
-#   - .md files (documentation) - Should be reviewed
 #   - .gitlab-ci.yml (CI configuration) - Security-critical
 #   - .yaml/.yml files not matching patterns above - Require review
 #   - Any other file types - Default to manual review

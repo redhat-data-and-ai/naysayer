@@ -8,6 +8,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
 
@@ -78,6 +79,30 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "service_account",
+	})
+
+	// TOC approval rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "toc_approval_rule",
+		Description: "Requires TOC approval for new product.yaml files in preprod/prod environments",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			// Get preprod/prod environments from config
+			cfg := config.Load()
+			preprodProdEnvs := append(cfg.Rules.WarehouseRule.PlatformEnvironments, cfg.Rules.ServiceAccountRule.AstroEnvironmentsOnly...)
+			// Remove duplicates
+			seen := make(map[string]bool)
+			uniqueEnvs := []string{}
+			for _, env := range preprodProdEnvs {
+				if !seen[env] {
+					seen[env] = true
+					uniqueEnvs = append(uniqueEnvs, env)
+				}
+			}
+			return toc_approval.NewTOCApprovalRule(uniqueEnvs)
+		},
+		Enabled:  true,
+		Category: "toc_approval",
 	})
 
 }
