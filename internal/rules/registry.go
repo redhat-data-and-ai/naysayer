@@ -87,19 +87,9 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Description: "Requires TOC approval for new product.yaml files in preprod/prod environments",
 		Version:     "1.0.0",
 		Factory: func(client *gitlab.Client) shared.Rule {
-			// Get preprod/prod environments from config
+			// Get critical environments from dedicated TOC approval rule config
 			cfg := config.Load()
-			preprodProdEnvs := append(cfg.Rules.WarehouseRule.PlatformEnvironments, cfg.Rules.ServiceAccountRule.AstroEnvironmentsOnly...)
-			// Remove duplicates
-			seen := make(map[string]bool)
-			uniqueEnvs := []string{}
-			for _, env := range preprodProdEnvs {
-				if !seen[env] {
-					seen[env] = true
-					uniqueEnvs = append(uniqueEnvs, env)
-				}
-			}
-			return toc_approval.NewTOCApprovalRule(uniqueEnvs)
+			return toc_approval.NewTOCApprovalRule(cfg.Rules.TOCApprovalRule.CriticalEnvironments)
 		},
 		Enabled:  true,
 		Category: "toc_approval",

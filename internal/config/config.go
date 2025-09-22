@@ -47,6 +47,7 @@ type RulesConfig struct {
 	DisabledRules      []string // List of disabled rule names
 	WarehouseRule      WarehouseRuleConfig
 	ServiceAccountRule ServiceAccountRuleConfig
+	TOCApprovalRule    TOCApprovalRuleConfig
 	MigrationsRule     MigrationsRuleConfig
 	NamingRule         NamingRuleConfig
 }
@@ -65,6 +66,11 @@ type ServiceAccountRuleConfig struct {
 	AllowedDomains           []string // Allowed email domains
 	AstroEnvironmentsOnly    []string // Environments where Astro service accounts are allowed
 	EnforceNamingConventions bool     // Enforce naming conventions
+}
+
+// TOCApprovalRuleConfig holds TOC approval rule configuration
+type TOCApprovalRuleConfig struct {
+	CriticalEnvironments []string // Environments requiring TOC approval for new products
 }
 
 // MigrationsRuleConfig holds migrations validation configuration
@@ -123,6 +129,9 @@ func Load() *Config {
 				AllowedDomains:           parseStringList(getEnv("SA_ALLOWED_DOMAINS", "redhat.com")),
 				AstroEnvironmentsOnly:    parseStringList(getEnv("SA_ASTRO_ENVS", "preprod,prod")),
 				EnforceNamingConventions: getEnv("SA_ENFORCE_NAMING", "true") == "true",
+			},
+			TOCApprovalRule: TOCApprovalRuleConfig{
+				CriticalEnvironments: parseStringList(getEnv("TOC_APPROVAL_ENVS", "preprod,prod")),
 			},
 			MigrationsRule: MigrationsRuleConfig{
 				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",

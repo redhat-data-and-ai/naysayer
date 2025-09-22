@@ -6,7 +6,7 @@ files:
   # Product configuration files - Critical infrastructure validation
   - name: "product_configs"
     path: "dataproducts/**/"
-    filename: "product.yaml"
+    filename: "product.{yaml,yml}"
     parser_type: yaml
     enabled: true
     sections:
@@ -33,13 +33,10 @@ files:
             enabled: true
         auto_approve: false
       
-      # Safe sections - can auto-approve after validation
       - name: name
         yaml_path: name
         rule_configs:
           - name: metadata_rule
-            enabled: true
-          - name: toc_approval_rule
             enabled: true
         auto_approve: true
 
@@ -59,7 +56,7 @@ files:
         
   # Documentation files - Auto-approve
   - name: "documentation_files"
-    path: "*/"
+    path: "**/"
     filename: "*.md"
     parser_type: yaml
     enabled: true
@@ -69,6 +66,28 @@ files:
         rule_configs:
           - name: metadata_rule
             enabled: true
+        auto_approve: true
+
+  # Source binding configuration files - Low risk, can auto-approve
+  - name: "source_bindings"
+    path: "dataproducts/**/"
+    filename: "sourcebinding.yaml"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        auto_approve: true
+
+  # Snowpipe configuration files - Low risk, can auto-approve
+  - name: "snowpipe_configs"
+    path: "dataproducts/**/"
+    filename: "snowpipeconfig.yaml"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
         auto_approve: true
 
   # Developer metadata files - Low risk, can auto-approve
