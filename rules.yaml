@@ -77,6 +77,9 @@ files:
     sections:
       - name: full_file
         yaml_path: .
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
         auto_approve: true
 
   # Snowpipe configuration files - Low risk, can auto-approve
@@ -88,6 +91,9 @@ files:
     sections:
       - name: full_file
         yaml_path: .
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
         auto_approve: true
 
   # Developer metadata files - Low risk, can auto-approve

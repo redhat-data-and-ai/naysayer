@@ -151,9 +151,37 @@ func TestPatternMatcher_EdgeCases(t *testing.T) {
 		// Test patterns that cause filepath.Match errors and trigger fallback
 		{"invalid pattern bracket", "test.txt", "[", false}, // Error but no match in fallback
 		{"invalid pattern escape", "test.txt", "\\", false},
-		{"complex nested path", "a/very/deep/nested/path/file.yaml", "**/file.yaml", false}, // filepath.Match doesn't support **
+		{"complex nested path", "a/very/deep/nested/path/file.yaml", "**/file.yaml", true}, // Now supports ** globstar patterns
 		{"pattern with spaces", "file with spaces.txt", "*spaces*", true},
 		{"unicode filename", "测试.yaml", "*.yaml", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := pm.MatchesPattern(tt.filePath, tt.pattern)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestPatternMatcher_GlobstarPatterns tests the new ** globstar functionality
+func TestPatternMatcher_GlobstarPatterns(t *testing.T) {
+	pm := NewPatternMatcher()
+
+	tests := []struct {
+		name     string
+		filePath string
+		pattern  string
+		expected bool
+	}{
+		{"dataproduct nested path", "dataproducts/source/revstream/dev/product.yaml", "dataproducts/**/product.yaml", true},
+		{"dataproduct with environment", "dataproducts/source/revstream/preprod/product.yaml", "dataproducts/**/product.yaml", true},
+		{"brace expansion yaml", "dataproducts/test/product.yaml", "dataproducts/**/product.{yaml,yml}", true},
+		{"brace expansion yml", "dataproducts/test/product.yml", "dataproducts/**/product.{yaml,yml}", true},
+		{"brace expansion no match", "dataproducts/test/product.json", "dataproducts/**/product.{yaml,yml}", false},
+		{"globstar at end", "dataproducts/any/deep/path", "dataproducts/**", true},
+		{"globstar with suffix", "deep/nested/file.txt", "**/file.txt", true},
+		{"no match prefix", "other/nested/file.txt", "dataproducts/**/file.txt", false},
 	}
 
 	for _, tt := range tests {
