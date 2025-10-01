@@ -43,14 +43,14 @@ type CommentsConfig struct {
 
 // RulesConfig holds rule-specific configuration
 type RulesConfig struct {
-	EnabledRules            []string // List of enabled rule names
-	DisabledRules           []string // List of disabled rule names
-	WarehouseRule           WarehouseRuleConfig
-	ServiceAccountRule      ServiceAccountRuleConfig
-	TOCApprovalRule         TOCApprovalRuleConfig
-	DataProductConsumerRule DataProductConsumerRuleConfig
-	MigrationsRule          MigrationsRuleConfig
-	NamingRule              NamingRuleConfig
+	EnabledRules            []string                      // List of enabled rule names
+	DisabledRules           []string                      // List of disabled rule names
+	DataProductConsumerRule DataProductConsumerRuleConfig // Consumer access rule configuration
+	MigrationsRule          MigrationsRuleConfig          // Migrations validation configuration
+	NamingRule              NamingRuleConfig              // Naming conventions configuration
+	ServiceAccountRule      ServiceAccountRuleConfig      // Service account rule configuration
+	TOCApprovalRule         TOCApprovalRuleConfig         // TOC approval rule configuration
+	WarehouseRule           WarehouseRuleConfig           // Warehouse rule configuration
 }
 
 // WarehouseRuleConfig holds warehouse-specific configuration
@@ -124,10 +124,16 @@ func Load() *Config {
 		Rules: RulesConfig{
 			EnabledRules:  parseStringList(getEnv("ENABLED_RULES", "")),
 			DisabledRules: parseStringList(getEnv("DISABLED_RULES", "")),
-			WarehouseRule: WarehouseRuleConfig{
-				AllowTOCBypass:       getEnv("WAREHOUSE_ALLOW_TOC_BYPASS", "false") == "true",
-				PlatformEnvironments: parseStringList(getEnv("WAREHOUSE_PLATFORM_ENVS", "preprod,prod")),
-				AutoApproveEnvs:      parseStringList(getEnv("WAREHOUSE_AUTO_APPROVE_ENVS", "dev,sandbox")),
+			DataProductConsumerRule: DataProductConsumerRuleConfig{
+				AllowedEnvironments: parseStringList(getEnv("DATAPRODUCT_CONSUMER_ENVS", "preprod,prod")),
+			},
+			MigrationsRule: MigrationsRuleConfig{
+				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",
+				AllowSelfServicePaths:   parseStringList(getEnv("MIGRATIONS_SELF_SERVICE_PATHS", "")),
+			},
+			NamingRule: NamingRuleConfig{
+				ValidateTagMatching:      getEnv("NAMING_VALIDATE_TAGS", "true") == "true",
+				EnforceNamingConventions: getEnv("NAMING_ENFORCE_CONVENTIONS", "true") == "true",
 			},
 			ServiceAccountRule: ServiceAccountRuleConfig{
 				ValidateEmailFormat:      getEnv("SA_VALIDATE_EMAIL", "true") == "true",
@@ -139,16 +145,10 @@ func Load() *Config {
 			TOCApprovalRule: TOCApprovalRuleConfig{
 				CriticalEnvironments: parseStringList(getEnv("TOC_APPROVAL_ENVS", "preprod,prod")),
 			},
-			DataProductConsumerRule: DataProductConsumerRuleConfig{
-				AllowedEnvironments: parseStringList(getEnv("DATAPRODUCT_CONSUMER_ENVS", "preprod,prod")),
-			},
-			MigrationsRule: MigrationsRuleConfig{
-				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",
-				AllowSelfServicePaths:   parseStringList(getEnv("MIGRATIONS_SELF_SERVICE_PATHS", "")),
-			},
-			NamingRule: NamingRuleConfig{
-				ValidateTagMatching:      getEnv("NAMING_VALIDATE_TAGS", "true") == "true",
-				EnforceNamingConventions: getEnv("NAMING_ENFORCE_CONVENTIONS", "true") == "true",
+			WarehouseRule: WarehouseRuleConfig{
+				AllowTOCBypass:       getEnv("WAREHOUSE_ALLOW_TOC_BYPASS", "false") == "true",
+				PlatformEnvironments: parseStringList(getEnv("WAREHOUSE_PLATFORM_ENVS", "preprod,prod")),
+				AutoApproveEnvs:      parseStringList(getEnv("WAREHOUSE_AUTO_APPROVE_ENVS", "dev,sandbox")),
 			},
 		},
 		Approval: ApprovalConfig{

@@ -275,53 +275,6 @@ func TestDataProductConsumerRule_extractEnvironmentFromPath(t *testing.T) {
 	}
 }
 
-func TestDataProductConsumerRule_isEnvironmentAllowed(t *testing.T) {
-	tests := []struct {
-		name        string
-		environment string
-		expected    bool
-	}{
-		{
-			name:        "prod is allowed",
-			environment: "prod",
-			expected:    true,
-		},
-		{
-			name:        "preprod is allowed",
-			environment: "preprod",
-			expected:    true,
-		},
-		{
-			name:        "dev is not allowed",
-			environment: "dev",
-			expected:    false,
-		},
-		{
-			name:        "sandbox is not allowed",
-			environment: "sandbox",
-			expected:    false,
-		},
-		{
-			name:        "empty environment is not allowed",
-			environment: "",
-			expected:    false,
-		},
-		{
-			name:        "case insensitive - PROD is allowed",
-			environment: "PROD",
-			expected:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
-
-			result := rule.isEnvironmentAllowed(tt.environment)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
 
 func TestDataProductConsumerRule_isConsumerRelatedLine(t *testing.T) {
 	tests := []struct {
@@ -371,7 +324,7 @@ func TestDataProductConsumerRule_isConsumerRelatedLine(t *testing.T) {
 	}
 }
 
-func TestDataProductConsumerRule_hasConsumerChanges(t *testing.T) {
+func TestDataProductConsumerRule_fileContainsConsumersSection(t *testing.T) {
 	tests := []struct {
 		name        string
 		fileContent string
@@ -418,7 +371,7 @@ data_product_db:
 		t.Run(tt.name, func(t *testing.T) {
 			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
 
-			result := rule.hasConsumerChanges(tt.fileContent, []shared.LineRange{})
+			result := rule.fileContainsConsumersSection(tt.fileContent)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

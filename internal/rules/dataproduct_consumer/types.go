@@ -22,6 +22,4 @@ type ConsumerContext struct {
 	Environment    string
 	HasConsumers   bool
 	IsConsumerOnly bool // Only consumer fields are being modified
-	RequiresReview bool
-	ApprovalReason string
 }

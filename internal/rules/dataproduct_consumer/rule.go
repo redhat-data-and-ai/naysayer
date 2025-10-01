@@ -79,11 +79,10 @@ func (r *DataProductConsumerRule) analyzeFile(filePath string, fileContent strin
 		Environment:    r.extractEnvironmentFromPath(filePath),
 		HasConsumers:   false,
 		IsConsumerOnly: false,
-		RequiresReview: false,
 	}
 
-	// Check if changes are consumer-related
-	context.HasConsumers = r.hasConsumerChanges(fileContent, lineRanges)
+	// Check if file contains consumers section
+	context.HasConsumers = r.fileContainsConsumersSection(fileContent)
 	if !context.HasConsumers {
 		return context
 	}
@@ -94,8 +93,8 @@ func (r *DataProductConsumerRule) analyzeFile(filePath string, fileContent strin
 	return context
 }
 
-// hasConsumerChanges checks if the file has consumer-related changes
-func (r *DataProductConsumerRule) hasConsumerChanges(fileContent string, lineRanges []shared.LineRange) bool {
+// fileContainsConsumersSection checks if the file has a consumers section
+func (r *DataProductConsumerRule) fileContainsConsumersSection(fileContent string) bool {
 	// Parse YAML to check for consumers field
 	var yamlContent map[string]interface{}
 	if err := yaml.Unmarshal([]byte(fileContent), &yamlContent); err != nil {
@@ -170,74 +169,91 @@ func (r *DataProductConsumerRule) isConsumerRelatedLine(line string) bool {
 	return false
 }
 
-// findConsumerSections finds all consumer sections in the YAML file
+// findConsumerSections finds all consumer sections in the YAML file using yaml.Node API
 func (r *DataProductConsumerRule) findConsumerSections(filePath string, fileContent string) []shared.LineRange {
 	var ranges []shared.LineRange
-	lines := strings.Split(fileContent, "\n")
 
-	inConsumers := false
-	startLine := 0
-	indent := 0
-
-	for i, line := range lines {
-		lineNum := i + 1
-		trimmed := strings.TrimSpace(line)
-
-		// Find start of consumers section
-		if strings.HasPrefix(trimmed, "consumers:") {
-			inConsumers = true
-			startLine = lineNum
-			indent = len(line) - len(strings.TrimLeft(line, " "))
-			continue
-		}
-
-		// If in consumers section, check for end
-		if inConsumers {
-			currentIndent := len(line) - len(strings.TrimLeft(line, " "))
-
-			// End of consumers section if we hit a line with same or less indentation
-			if trimmed != "" && currentIndent <= indent && !strings.HasPrefix(trimmed, "-") && !strings.HasPrefix(trimmed, "name:") && !strings.HasPrefix(trimmed, "kind:") {
-				ranges = append(ranges, shared.LineRange{
-					StartLine: startLine,
-					EndLine:   lineNum - 1,
-					FilePath:  filePath,
-				})
-				inConsumers = false
-			}
-		}
+	// Parse YAML into Node structure for accurate line tracking
+	var node yaml.Node
+	if err := yaml.Unmarshal([]byte(fileContent), &node); err != nil {
+		return ranges
 	}
 
-	// Handle case where consumers section goes to end of file
-	if inConsumers {
-		ranges = append(ranges, shared.LineRange{
-			StartLine: startLine,
-			EndLine:   len(lines),
-			FilePath:  filePath,
-		})
-	}
+	// Find all "consumers" nodes in the YAML tree
+	r.findConsumersNodes(&node, filePath, &ranges)
 
 	return ranges
 }
 
-// isEnvironmentAllowed checks if the environment allows consumer access
-func (r *DataProductConsumerRule) isEnvironmentAllowed(environment string) bool {
-	if environment == "" {
-		return false
+// findConsumersNodes recursively traverses the YAML node tree to find all "consumers" keys
+func (r *DataProductConsumerRule) findConsumersNodes(node *yaml.Node, filePath string, ranges *[]shared.LineRange) {
+	if node == nil {
+		return
 	}
 
-	for _, allowedEnv := range r.config.AllowedEnvironments {
-		if r.config.CaseSensitive {
-			if environment == allowedEnv {
-				return true
+	// Process mapping nodes (key-value pairs)
+	if node.Kind == yaml.MappingNode {
+		// Mapping nodes have content in pairs: [key1, value1, key2, value2, ...]
+		for i := 0; i < len(node.Content); i += 2 {
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+
+			// Check if this is a "consumers" key
+			if keyNode.Value == "consumers" && valueNode.Kind == yaml.SequenceNode {
+				// Found a consumers section - extract line range
+				startLine := keyNode.Line
+				endLine := valueNode.Line
+
+				// For sequences, find the last line
+				if len(valueNode.Content) > 0 {
+					lastItem := valueNode.Content[len(valueNode.Content)-1]
+					endLine = r.getNodeEndLine(lastItem)
+				}
+
+				*ranges = append(*ranges, shared.LineRange{
+					StartLine: startLine,
+					EndLine:   endLine,
+					FilePath:  filePath,
+				})
 			}
-		} else {
-			if strings.EqualFold(environment, allowedEnv) {
-				return true
-			}
+
+			// Recursively search in value node
+			r.findConsumersNodes(valueNode, filePath, ranges)
 		}
 	}
 
-	return false
+	// Process sequence nodes (arrays)
+	if node.Kind == yaml.SequenceNode {
+		for _, item := range node.Content {
+			r.findConsumersNodes(item, filePath, ranges)
+		}
+	}
+
+	// Document nodes contain the root content
+	if node.Kind == yaml.DocumentNode {
+		for _, item := range node.Content {
+			r.findConsumersNodes(item, filePath, ranges)
+		}
+	}
+}
+
+// getNodeEndLine recursively finds the last line number in a YAML node
+func (r *DataProductConsumerRule) getNodeEndLine(node *yaml.Node) int {
+	if node == nil {
+		return 0
+	}
+
+	endLine := node.Line
+
+	// Check all content nodes and find the maximum line number
+	for _, child := range node.Content {
+		childEndLine := r.getNodeEndLine(child)
+		if childEndLine > endLine {
+			endLine = childEndLine
+		}
+	}
+
+	return endLine
 }
 
 // extractEnvironmentFromPath attempts to extract the environment name from the file path
