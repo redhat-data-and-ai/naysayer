@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.23.0'
+        go-version: '1.24.6'
         cache: true
 
     - name: Cache Go modules
@@ -68,7 +68,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.23.0'
+        go-version: '1.24.6'
 
     - name: Run Gosec Security Scanner
       run: |
@@ -81,10 +81,12 @@ jobs:
       with:
         name: gosec-results
         path: gosec-results.sarif
+        if-no-files-found: warn
       if: always()
 
-    - name: Run Nancy vulnerability scanner
+    - name: Run Go vulnerability scanner
       run: |
-        go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
 
 

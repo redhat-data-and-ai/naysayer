@@ -1,0 +1,6 @@
+# Nancy ignore file for known false positives
+# Add CVE IDs or OSS Index IDs here to exclude them from vulnerability reports
+# Format: One ID per line
+# Example:
+# CVE-2021-12345
+# sonatype-2021-0123
