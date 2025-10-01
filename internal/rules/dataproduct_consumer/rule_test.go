@@ -275,7 +275,6 @@ func TestDataProductConsumerRule_extractEnvironmentFromPath(t *testing.T) {
 	}
 }
 
-
 func TestDataProductConsumerRule_isConsumerRelatedLine(t *testing.T) {
 	tests := []struct {
 		name     string
