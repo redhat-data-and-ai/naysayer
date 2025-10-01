@@ -7,6 +7,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
@@ -93,6 +94,20 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "toc_approval",
+	})
+
+	// Data Product Consumer rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "dataproduct_consumer_rule",
+		Description: "Auto-approves consumer access changes to data products in allowed environments (preprod/prod)",
+		Version:     "1.0.0",
+		Factory: func(client *gitlab.Client) shared.Rule {
+			// Get allowed environments from dedicated consumer rule config
+			cfg := config.Load()
+			return dataproduct_consumer.NewDataProductConsumerRule(cfg.Rules.DataProductConsumerRule.AllowedEnvironments)
+		},
+		Enabled:  true,
+		Category: "consumer_access",
 	})
 
 }

@@ -25,10 +25,16 @@ This directory contains detailed documentation for each validation rule implemen
 **Key behavior**: Auto-approves all documentation and metadata changes (zero risk)
 
 ### ⚖️ [TOC Approval Rule](TOC_APPROVAL_RULE.md)
-**Validates**: New data product deployments to production environments  
-**Triggers on**: New `**/product.{yaml,yml}` files in preprod/prod paths  
-**Purpose**: Governance oversight and production deployment control  
+**Validates**: New data product deployments to production environments
+**Triggers on**: New `**/product.{yaml,yml}` files in preprod/prod paths
+**Purpose**: Governance oversight and production deployment control
 **Key behavior**: Requires TOC approval for new products in critical environments
+
+### 👥 [Data Product Consumer Rule](DATAPRODUCT_CONSUMER_RULE.md)
+**Validates**: Consumer access changes to data products
+**Triggers on**: `data_product_db[*].presentation_schemas[*].consumers` sections in `**/product.{yaml,yml}`
+**Purpose**: Streamlined consumer access management across all environments
+**Key behavior**: Auto-approves consumer-only changes with data product owner approval (no TOC needed)
 
 ## 🎯 Quick Problem Resolution
 
@@ -45,6 +51,7 @@ This directory contains detailed documentation for each validation rule implemen
 |------------------|----------|-------------------|---------------|
 | `**/product.{yaml,yml}` | [Warehouse](WAREHOUSE_RULE.md) | Size increases, YAML syntax | Use `XSMALL`/`SMALL`/`MEDIUM`/`LARGE`, validate YAML |
 | `**/product.{yaml,yml}` (new) | [TOC Approval](TOC_APPROVAL_RULE.md) | New products in prod/preprod | Get TOC approval or deploy to dev/test first |
+| `**/product.{yaml,yml}` (consumers) | [Consumer](DATAPRODUCT_CONSUMER_RULE.md) | Mixed changes with non-consumer fields | Separate consumer changes into dedicated MR |
 | `**/*serviceaccount*.{yaml,yml}` | [Service Account](SERVICE_ACCOUNT_RULE.md) | Non-Astro accounts, domain violations | Use Astro patterns, @redhat.com emails |
 | `**/*.md`, docs files | [Metadata](METADATA_RULE.md) | File access issues | Check file permissions, valid UTF-8 encoding |
 
@@ -75,6 +82,7 @@ NAYSAYER uses a **Section-Based Validation Architecture** where rules can target
 |--------------|-------------|--------------|
 | 🏢 **Cost Control** | Prevent unexpected cost increases | Warehouse size validation |
 | 🔒 **Security** | Enforce security policies | Service account email validation |
+| 👥 **Access Management** | Streamline data access workflows | Consumer access auto-approval |
 | 📋 **Compliance** | Meet organizational standards | Naming conventions, documentation |
 | 🔧 **Configuration** | Ensure valid configurations | YAML syntax, required fields |
 
@@ -112,6 +120,8 @@ Understanding security controls:
 |----------|------------|------------------------|-------------------|
 | 🏢 **Warehouse** | ✅ Active | ~85% | Size increases (15%) |
 | 🔒 **Service Account** | ✅ Active | ~70% | Non-Astro accounts (30%) |
+| 👥 **Consumer** | ✅ Active | ~100% | Mixed changes (<1%) |
+| ⚖️ **TOC Approval** | ✅ Active | N/A | New prod deployments |
 | 📄 **Metadata** | ✅ Active | ~100% | File access issues (<1%) |
 
 ### Performance Metrics

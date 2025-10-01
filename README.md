@@ -16,7 +16,8 @@ Naysayer analyzes GitLab merge requests and automatically:
 
 Naysayer includes built-in rules for:
 - **🏢 Cost Control** - Warehouse configuration validation
-- **🔒 Security** - Service account compliance  
+- **🔒 Security** - Service account compliance
+- **👥 Access Management** - Consumer access auto-approval (NEW!)
 - **⚖️ TOC Approval** - TOC oversight for production deployments
 - **📄 Documentation** - Metadata and docs validation
 
