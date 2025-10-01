@@ -69,8 +69,7 @@ dataproducts/analytics/test/product.yaml        # New file in test environment
 ### Environment Variables
 ```bash
 # Configure which environments require TOC approval
-WAREHOUSE_PLATFORM_ENVS=preprod,prod
-SA_ASTRO_ENVS=preprod,prod
+TOC_APPROVAL_ENVS=preprod,prod
 ```
 
 ### Rules Configuration (rules.yaml)
