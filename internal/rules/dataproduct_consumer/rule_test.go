@@ -202,7 +202,7 @@ data_product_db:
 			expectedEndLine:     11,
 		},
 		{
-			name: "product.yaml without consumers should have no coverage",
+			name:     "product.yaml without consumers should have no coverage",
 			filePath: "dataproducts/analytics/prod/product.yaml",
 			fileContent: `---
 name: test
