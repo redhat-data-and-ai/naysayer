@@ -66,8 +66,8 @@ func (pm *PatternMatcher) matchGlobstar(filePath, pattern string) bool {
 	// Use standard filepath.Match for simple patterns
 	matched, err := filepath.Match(pattern, filePath)
 	if err != nil {
-		// Fallback to substring matching for complex patterns
-		return strings.Contains(filePath, strings.ReplaceAll(pattern, "*", ""))
+		// If filepath.Match fails, the pattern is invalid, so we fail the match
+		return false
 	}
 	return matched
 }
@@ -77,8 +77,8 @@ func (pm *PatternMatcher) matchGlobstarPattern(filePath, pattern string) bool {
 	// Split pattern by **
 	parts := strings.Split(pattern, "**")
 	if len(parts) != 2 {
-		// Multiple ** not supported, fallback to contains
-		return strings.Contains(filePath, strings.ReplaceAll(pattern, "*", ""))
+		// Multiple ** are not supported, so we fail the match
+		return false
 	}
 
 	prefix := parts[0]
