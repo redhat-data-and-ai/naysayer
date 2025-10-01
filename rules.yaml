@@ -25,7 +25,15 @@ files:
           - name: toc_approval_rule
             enabled: true
         auto_approve: false
-      
+
+      # Consumer access changes - auto-approve with data product owner approval
+      - name: consumers
+        yaml_path: data_product_db[*].presentation_schemas[*].consumers
+        rule_configs:
+          - name: dataproduct_consumer_rule
+            enabled: true
+        auto_approve: true
+
       - name: service_account
         yaml_path: service_account
         rule_configs:

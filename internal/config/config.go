@@ -43,13 +43,14 @@ type CommentsConfig struct {
 
 // RulesConfig holds rule-specific configuration
 type RulesConfig struct {
-	EnabledRules       []string // List of enabled rule names
-	DisabledRules      []string // List of disabled rule names
-	WarehouseRule      WarehouseRuleConfig
-	ServiceAccountRule ServiceAccountRuleConfig
-	TOCApprovalRule    TOCApprovalRuleConfig
-	MigrationsRule     MigrationsRuleConfig
-	NamingRule         NamingRuleConfig
+	EnabledRules            []string // List of enabled rule names
+	DisabledRules           []string // List of disabled rule names
+	WarehouseRule           WarehouseRuleConfig
+	ServiceAccountRule      ServiceAccountRuleConfig
+	TOCApprovalRule         TOCApprovalRuleConfig
+	DataProductConsumerRule DataProductConsumerRuleConfig
+	MigrationsRule          MigrationsRuleConfig
+	NamingRule              NamingRuleConfig
 }
 
 // WarehouseRuleConfig holds warehouse-specific configuration
@@ -71,6 +72,11 @@ type ServiceAccountRuleConfig struct {
 // TOCApprovalRuleConfig holds TOC approval rule configuration
 type TOCApprovalRuleConfig struct {
 	CriticalEnvironments []string // Environments requiring TOC approval for new products
+}
+
+// DataProductConsumerRuleConfig holds data product consumer rule configuration
+type DataProductConsumerRuleConfig struct {
+	AllowedEnvironments []string // Environments where consumer access is allowed (preprod, prod)
 }
 
 // MigrationsRuleConfig holds migrations validation configuration
@@ -132,6 +138,9 @@ func Load() *Config {
 			},
 			TOCApprovalRule: TOCApprovalRuleConfig{
 				CriticalEnvironments: parseStringList(getEnv("TOC_APPROVAL_ENVS", "preprod,prod")),
+			},
+			DataProductConsumerRule: DataProductConsumerRuleConfig{
+				AllowedEnvironments: parseStringList(getEnv("DATAPRODUCT_CONSUMER_ENVS", "preprod,prod")),
 			},
 			MigrationsRule: MigrationsRuleConfig{
 				RequirePlatformApproval: getEnv("MIGRATIONS_REQUIRE_PLATFORM", "true") == "true",
