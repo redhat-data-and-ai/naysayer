@@ -16,16 +16,18 @@ type SectionRuleManager struct {
 	rules          []shared.Rule
 	sectionParsers map[string]shared.SectionParser // File pattern -> parser
 	config         *config.GlobalRuleConfig
-	ruleRegistry   map[string]shared.Rule // Rule name -> rule instance
+	ruleRegistry   map[string]shared.Rule          // Rule name -> rule instance
+	gitlabClient   gitlab.GitLabClient             // GitLab client for fetching file content
 }
 
 // NewSectionRuleManager creates a new section-based rule manager
-func NewSectionRuleManager(ruleConfig *config.GlobalRuleConfig) *SectionRuleManager {
+func NewSectionRuleManager(ruleConfig *config.GlobalRuleConfig, client gitlab.GitLabClient) *SectionRuleManager {
 	manager := &SectionRuleManager{
 		rules:          make([]shared.Rule, 0),
 		sectionParsers: make(map[string]shared.SectionParser),
 		config:         ruleConfig,
 		ruleRegistry:   make(map[string]shared.Rule),
+		gitlabClient:   client,
 	}
 
 	// Initialize parsers based on configuration
@@ -135,7 +137,7 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
 
 	for _, filePath := range filePaths {
-		// Get file content (in production, this would fetch from GitLab API)
+		// Get file content from source branch
 		fileContent := srm.getFileContent(filePath, mrCtx)
 		totalLines := shared.CountLines(fileContent)
 
@@ -231,7 +233,8 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	}
 
 	// Check for uncovered lines (lines not in any section)
-	uncoveredLines := srm.getUncoveredLinesFromSections(totalLines, sections)
+	// Only consider lines that were actually changed in this MR
+	uncoveredLines := srm.getUncoveredLinesInChanges(totalLines, sections, changedLines)
 
 	// If there are uncovered lines and config requires manual review
 	fileDecision := srm.determineFileDecisionWithSections(ruleResults, uncoveredLines, sectionResults)
@@ -310,6 +313,66 @@ func (srm *SectionRuleManager) getUncoveredLinesFromSections(totalLines int, sec
 	return shared.GetUncoveredLines(totalLines, sectionRanges)
 }
 
+// getUncoveredLinesInChanges calculates uncovered lines only within the changed line ranges
+// This prevents unchanged lines from being marked as uncovered
+func (srm *SectionRuleManager) getUncoveredLinesInChanges(totalLines int, sections []shared.Section, changedLines []shared.LineRange) []shared.LineRange {
+	// If no changes detected, fall back to checking all lines
+	if len(changedLines) == 0 {
+		return srm.getUncoveredLinesFromSections(totalLines, sections)
+	}
+
+	var sectionRanges []shared.LineRange
+	for _, section := range sections {
+		sectionRanges = append(sectionRanges, shared.LineRange{
+			StartLine: section.StartLine,
+			EndLine:   section.EndLine,
+			FilePath:  section.FilePath,
+		})
+	}
+
+	// Get uncovered line ranges (lines not in any section)
+	allUncovered := shared.GetUncoveredLines(totalLines, sectionRanges)
+
+	// Filter to only include uncovered lines that are within changed ranges
+	var uncoveredInChanges []shared.LineRange
+	for _, uncovered := range allUncovered {
+		for _, changed := range changedLines {
+			// Find the intersection between uncovered and changed ranges
+			intersection := srm.getLineRangeIntersection(uncovered, changed)
+			if intersection != nil {
+				uncoveredInChanges = append(uncoveredInChanges, *intersection)
+			}
+		}
+	}
+
+	return uncoveredInChanges
+}
+
+// getLineRangeIntersection returns the intersection of two line ranges, or nil if they don't overlap
+func (srm *SectionRuleManager) getLineRangeIntersection(range1, range2 shared.LineRange) *shared.LineRange {
+	// Find the overlapping part
+	start := range1.StartLine
+	if range2.StartLine > start {
+		start = range2.StartLine
+	}
+
+	end := range1.EndLine
+	if range2.EndLine < end {
+		end = range2.EndLine
+	}
+
+	// If start > end, there's no overlap
+	if start > end {
+		return nil
+	}
+
+	return &shared.LineRange{
+		StartLine: start,
+		EndLine:   end,
+		FilePath:  range1.FilePath,
+	}
+}
+
 // determineFileDecisionWithSections determines file decision considering sections
 func (srm *SectionRuleManager) determineFileDecisionWithSections(ruleResults []shared.LineValidationResult, uncoveredLines []shared.LineRange, sectionResults []shared.SectionValidationResult) shared.DecisionType {
 	// First, check if any rule explicitly failed/rejected
@@ -365,17 +428,31 @@ func (srm *SectionRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) [
 }
 
 func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
-	// For now, extract content from the diff in the changes
-	// In a full implementation, this would fetch the current file content from GitLab API
-	for _, change := range mrCtx.Changes {
-		if change.NewPath == filePath {
-			// Try to reconstruct file content from diff
-			if change.Diff != "" {
-				return srm.extractFileContentFromDiff(change.Diff)
-			}
-		}
+	// Fetch full file content from source branch using GitLab client
+	if srm.gitlabClient == nil {
+		logging.Warn("GitLab client not available, cannot fetch file content for: %s", filePath)
+		return ""
 	}
-	return ""
+
+	// Get the source branch from MR context
+	sourceBranch := mrCtx.MRInfo.SourceBranch
+	if sourceBranch == "" {
+		logging.Warn("Source branch not available in MR context for file: %s", filePath)
+		return ""
+	}
+
+	// Fetch full file content from source branch
+	fileContent, err := srm.gitlabClient.FetchFileContent(mrCtx.ProjectID, filePath, sourceBranch)
+	if err != nil {
+		logging.Warn("Failed to fetch file content for %s from branch %s: %v", filePath, sourceBranch, err)
+		return ""
+	}
+
+	if fileContent == nil {
+		return ""
+	}
+
+	return fileContent.Content
 }
 
 // extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff
@@ -461,46 +538,6 @@ func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRa
 	return section.StartLine <= changedRange.EndLine && section.EndLine >= changedRange.StartLine
 }
 
-// extractFileContentFromDiff attempts to extract file content from a Git diff
-func (srm *SectionRuleManager) extractFileContentFromDiff(diff string) string {
-	// This is a simplified implementation
-	// In production, we should fetch the actual file content from GitLab API
-	// For now, we'll try to extract content from the diff
-
-	lines := strings.Split(diff, "\n")
-	var contentLines []string
-	inContent := false
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "@@") {
-			inContent = true
-			continue
-		}
-		if !inContent {
-			continue
-		}
-
-		// Add lines that are not diff markers
-		if len(line) > 0 {
-			switch line[0] {
-			case '+':
-				// Added line - include in content
-				contentLines = append(contentLines, line[1:])
-			case ' ':
-				// Unchanged line - include in content
-				contentLines = append(contentLines, line[1:])
-			case '-':
-				// Removed line - skip for new content
-				continue
-			default:
-				// Regular line
-				contentLines = append(contentLines, line)
-			}
-		}
-	}
-
-	return strings.Join(contentLines, "\n")
-}
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
 	var manualReviewFiles []string

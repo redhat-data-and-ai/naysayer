@@ -15,11 +15,11 @@ import (
 // This rule supports various service account types and can be extended with additional validation logic.
 type ServiceAccountRule struct {
 	*common.BaseRule
-	client *gitlab.Client
+	client gitlab.GitLabClient
 }
 
 // NewServiceAccountRule creates a new service account rule
-func NewServiceAccountRule(client *gitlab.Client) *ServiceAccountRule {
+func NewServiceAccountRule(client gitlab.GitLabClient) *ServiceAccountRule {
 	return &ServiceAccountRule{
 		BaseRule: common.NewBaseRule(
 			"service_account_rule",

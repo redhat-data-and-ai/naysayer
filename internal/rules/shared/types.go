@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"sort"
 	"strings"
 	"time"
 
@@ -165,8 +166,17 @@ func MergeLineRanges(ranges []LineRange) []LineRange {
 	}
 
 	// Sort by start line
+	// First, copy the ranges to avoid modifying the input
+	sorted := make([]LineRange, len(ranges))
+	copy(sorted, ranges)
+
+	// Sort by StartLine using standard library
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].StartLine < sorted[j].StartLine
+	})
+
 	var merged []LineRange
-	for _, r := range ranges {
+	for _, r := range sorted {
 		if len(merged) == 0 {
 			merged = append(merged, r)
 			continue

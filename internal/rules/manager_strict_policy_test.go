@@ -17,7 +17,7 @@ func TestStrictPolicy_SQLFilesRequireManualReview(t *testing.T) {
 		Files:   []config.FileRuleConfig{}, // No rules configured
 	}
 
-	manager := NewSectionRuleManager(ruleConfig)
+	manager := NewSectionRuleManager(ruleConfig, nil)
 
 	// Create MR context with SQL file changes
 	mrCtx := &shared.MRContext{
@@ -79,7 +79,7 @@ func TestStrictPolicy_MixedFiles(t *testing.T) {
 		},
 	}
 
-	manager := NewSectionRuleManager(ruleConfig)
+	manager := NewSectionRuleManager(ruleConfig, nil)
 
 	// Create MR context with both covered and uncovered files
 	mrCtx := &shared.MRContext{

@@ -10,13 +10,13 @@ import (
 
 // CreateDataverseRuleManager creates a rule manager with rules for dataverse product config
 // This function now uses the extensible rule registry system
-func CreateDataverseRuleManager(gitlabClient *gitlab.Client) shared.RuleManager {
+func CreateDataverseRuleManager(gitlabClient gitlab.GitLabClient) shared.RuleManager {
 	registry := GetGlobalRegistry()
 	return registry.CreateDataverseRuleManager(gitlabClient)
 }
 
 // CreateCustomRuleManager creates a rule manager with specific rules
-func CreateCustomRuleManager(gitlabClient *gitlab.Client, ruleNames []string) (shared.RuleManager, error) {
+func CreateCustomRuleManager(gitlabClient gitlab.GitLabClient, ruleNames []string) (shared.RuleManager, error) {
 	registry := GetGlobalRegistry()
 	return registry.CreateRuleManager(gitlabClient, ruleNames)
 }
@@ -27,12 +27,12 @@ func LoadRuleConfigFromPath(configPath string) (*config.GlobalRuleConfig, error)
 }
 
 // NewSectionRuleManagerFromConfig creates a new section-based rule manager from config
-func NewSectionRuleManagerFromConfig(ruleConfig *config.GlobalRuleConfig) shared.RuleManager {
-	return NewSectionRuleManager(ruleConfig)
+func NewSectionRuleManagerFromConfig(ruleConfig *config.GlobalRuleConfig, client gitlab.GitLabClient) shared.RuleManager {
+	return NewSectionRuleManager(ruleConfig, client)
 }
 
 // CreateSectionBasedDataverseManager creates a section-aware manager for dataverse workflows
-func CreateSectionBasedDataverseManager(client *gitlab.Client) (shared.RuleManager, error) {
+func CreateSectionBasedDataverseManager(client gitlab.GitLabClient) (shared.RuleManager, error) {
 	registry := GetGlobalRegistry()
 
 	// Create section-based manager - no fallback allowed

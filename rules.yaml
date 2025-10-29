@@ -61,7 +61,14 @@ files:
           - name: metadata_rule
             enabled: true
         auto_approve: true
-        
+
+      - name: kind
+        yaml_path: kind
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true
+
   # Documentation files - Auto-approve
   - name: "documentation_files"
     path: "**/"

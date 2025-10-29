@@ -14,7 +14,7 @@ import (
 )
 
 // RuleFactory is a function that creates a rule instance
-type RuleFactory func(client *gitlab.Client) shared.Rule
+type RuleFactory func(client gitlab.GitLabClient) shared.Rule
 
 // RuleInfo contains metadata about a rule
 type RuleInfo struct {
@@ -45,49 +45,49 @@ func NewRuleRegistry() *RuleRegistry {
 
 // registerBuiltInRules registers all built-in rules
 func (r *RuleRegistry) registerBuiltInRules() {
+
+	// Section-based rules
+
 	// Warehouse rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "warehouse_rule",
 		Description: "Auto-approves MRs with only dataverse-safe files (warehouse/sourcebinding), requires manual review for warehouse increases",
 		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			return warehouse.NewRule(client)
 		},
 		Enabled:  true,
 		Category: "warehouse",
 	})
 
-	// Section-based rules
-
+	// Metadata rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "metadata_rule",
 		Description: "Auto-approves documentation and metadata file changes",
 		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			return common.NewMetadataRule()
 		},
 		Enabled:  true,
 		Category: "auto_approval",
 	})
 
-	// Service account rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "service_account_rule",
 		Description: "Auto-approves Astro service account files (**_astro_<env>_appuser.yaml/yml) when name field matches filename. Other service account files require manual review.",
 		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			return NewServiceAccountRule(client)
 		},
 		Enabled:  true,
 		Category: "service_account",
 	})
 
-	// TOC approval rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "toc_approval_rule",
 		Description: "Requires TOC approval for new product.yaml files in preprod/prod environments",
 		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			// Get critical environments from dedicated TOC approval rule config
 			cfg := config.Load()
 			return toc_approval.NewTOCApprovalRule(cfg.Rules.TOCApprovalRule.CriticalEnvironments)
@@ -96,12 +96,12 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "toc_approval",
 	})
 
-	// Data Product Consumer rule
+	// Data product consumer rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "dataproduct_consumer_rule",
 		Description: "Auto-approves consumer access changes to data products in allowed environments (preprod/prod)",
 		Version:     "1.0.0",
-		Factory: func(client *gitlab.Client) shared.Rule {
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			// Get allowed environments from dedicated consumer rule config
 			cfg := config.Load()
 			return dataproduct_consumer.NewDataProductConsumerRule(cfg.Rules.DataProductConsumerRule.AllowedEnvironments)
@@ -171,7 +171,7 @@ func (r *RuleRegistry) ListRulesByCategory(category string) map[string]*RuleInfo
 }
 
 // CreateRuleManager creates a rule manager with specified rules
-func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []string) (shared.RuleManager, error) {
+func (r *RuleRegistry) CreateRuleManager(client gitlab.GitLabClient, ruleNames []string) (shared.RuleManager, error) {
 	// Load default rule configuration for section-based validation
 	ruleConfig, err := config.LoadRuleConfig("rules.yaml")
 	if err != nil {
@@ -183,7 +183,7 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 		}
 	}
 
-	manager := NewSectionRuleManager(ruleConfig)
+	manager := NewSectionRuleManager(ruleConfig, client)
 
 	// If no specific rules requested, use all enabled rules
 	if len(ruleNames) == 0 {
@@ -209,16 +209,10 @@ func (r *RuleRegistry) CreateRuleManager(client *gitlab.Client, ruleNames []stri
 }
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
-func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.RuleManager {
+func (r *RuleRegistry) CreateDataverseRuleManager(client gitlab.GitLabClient) shared.RuleManager {
 	// Include warehouse rule and auto-approval rules for complete dataverse workflow support
 	dataverseRules := []string{
 		"warehouse_rule",
-		// Note: service_account_comment_rule is registered but disabled in production
-		// because it requires GitLab API access to compare old vs new file content
-		// "service_account_comment_rule",
-		// TODO: Add back when implemented:
-		// "migrations_rule",
-		// "naming_conventions_rule",
 	}
 
 	manager, err := r.CreateRuleManager(client, dataverseRules)
@@ -229,14 +223,14 @@ func (r *RuleRegistry) CreateDataverseRuleManager(client *gitlab.Client) shared.
 			Enabled: true,
 			Files:   []config.FileRuleConfig{},
 		}
-		return NewSectionRuleManager(ruleConfig)
+		return NewSectionRuleManager(ruleConfig, client)
 	}
 
 	return manager
 }
 
 // CreateSectionBasedRuleManager creates a section-aware rule manager
-func (r *RuleRegistry) CreateSectionBasedRuleManager(client *gitlab.Client, ruleConfigPath string) (shared.RuleManager, error) {
+func (r *RuleRegistry) CreateSectionBasedRuleManager(client gitlab.GitLabClient, ruleConfigPath string) (shared.RuleManager, error) {
 	// Load rule configuration
 	ruleConfig, err := config.LoadRuleConfig(ruleConfigPath)
 	if err != nil {
@@ -249,7 +243,7 @@ func (r *RuleRegistry) CreateSectionBasedRuleManager(client *gitlab.Client, rule
 	}
 
 	// Create section-based manager
-	sectionManager := NewSectionRuleManager(ruleConfig)
+	sectionManager := NewSectionRuleManager(ruleConfig, client)
 
 	// Add all enabled rules to the section manager
 	for _, info := range r.ListEnabledRules() {

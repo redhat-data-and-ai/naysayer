@@ -99,17 +99,20 @@ func (p *YAMLSectionParser) extractSection(definition config.SectionDefinition, 
 
 // navigateYAMLPath navigates to a specific path in the YAML node tree
 func (p *YAMLSectionParser) navigateYAMLPath(rootNode *yaml.Node, yamlPath string) (*yaml.Node, error) {
-	if yamlPath == "" || yamlPath == "." {
-		return rootNode, nil
-	}
-
-	pathParts := strings.Split(yamlPath, ".")
 	currentNode := rootNode
 
 	// Navigate through document nodes to find the root mapping
+	// This must happen BEFORE checking for "." path
 	for currentNode.Kind == yaml.DocumentNode && len(currentNode.Content) > 0 {
 		currentNode = currentNode.Content[0]
 	}
+
+	// If path is "." or empty, return the unwrapped root mapping
+	if yamlPath == "" || yamlPath == "." {
+		return currentNode, nil
+	}
+
+	pathParts := strings.Split(yamlPath, ".")
 
 	for _, part := range pathParts {
 		if part == "" {
@@ -158,6 +161,12 @@ func (p *YAMLSectionParser) calculateSectionLines(node *yaml.Node, contentLines 
 		endLine = p.calculateEndLine(node)
 	}
 
+	// Special handling for root path ("."): should cover entire file from line 1
+	if yamlPath == "." {
+		startLine = 1
+		endLine = len(contentLines)
+	}
+
 	// Ensure we don't go beyond the file bounds
 	if endLine > len(contentLines) {
 		endLine = len(contentLines)
@@ -169,6 +178,12 @@ func (p *YAMLSectionParser) calculateSectionLines(node *yaml.Node, contentLines 
 // calculateEndLine recursively calculates the last line of a YAML node
 func (p *YAMLSectionParser) calculateEndLine(node *yaml.Node) int {
 	maxLine := node.Line
+
+	// Also check the Column to get a more accurate end position
+	// For scalar nodes, use the line they're on
+	if node.Kind == yaml.ScalarNode {
+		maxLine = node.Line
+	}
 
 	for _, child := range node.Content {
 		childEndLine := p.calculateEndLine(child)
