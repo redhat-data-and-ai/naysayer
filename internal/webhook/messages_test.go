@@ -56,9 +56,9 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 
 	comment := builder.BuildApprovalComment(result, mrInfo)
 
-	assert.Contains(t, comment, "✅ **Auto-approved after CI pipeline success**")
-	assert.Contains(t, comment, "All warehouse changes are decreases")
-	assert.Contains(t, comment, "🤖 *Automated by NAYSAYER v1.0.0*")
+	assert.Contains(t, comment, "✅ **Auto-approved**")
+	assert.Contains(t, comment, "**What was checked:**")
+	assert.Contains(t, comment, "Warehouse configuration validated")
 }
 
 func TestBuildApprovalComment_ContainsIdentifier(t *testing.T) {
@@ -92,7 +92,7 @@ func TestBuildApprovalComment_ContainsIdentifier(t *testing.T) {
 
 	// Should contain the hidden identifier for approval comments
 	assert.Contains(t, comment, "<!-- naysayer-comment-id: approval -->")
-	assert.Contains(t, comment, "Auto-approved after CI pipeline success")
+	assert.Contains(t, comment, "✅ **Auto-approved**")
 }
 
 func TestBuildManualReviewComment_ContainsIdentifier(t *testing.T) {
@@ -178,10 +178,9 @@ func TestBuildApprovalComment_DetailedVerbosity(t *testing.T) {
 
 	comment := builder.BuildApprovalComment(result, mrInfo)
 
-	assert.Contains(t, comment, "✅ **Auto-approved after CI pipeline success**")
-	assert.Contains(t, comment, "📊 **Analysis Results:**")
-	assert.Contains(t, comment, "⏱️ **Processing Details:**")
-	// Note: Files Analyzed section only appears when there are files with validation results
+	assert.Contains(t, comment, "✅ **Auto-approved**")
+	assert.Contains(t, comment, "**What was checked:**")
+	// Note: Files section only appears when there are 3+ files
 }
 
 func TestBuildManualReviewComment(t *testing.T) {
@@ -231,6 +230,7 @@ func TestBuildManualReviewComment(t *testing.T) {
 	comment := builder.BuildManualReviewComment(result, mrInfo)
 
 	assert.Contains(t, comment, "⚠️ **Manual review required**")
-	assert.Contains(t, comment, "Manual review required: warehouse size increase detected")
-	assert.Contains(t, comment, "📋 <strong>Analysis Details</strong>")
+	assert.Contains(t, comment, "**Why manual review is needed:**")
+	assert.Contains(t, comment, "warehouse size increase detected")
+	assert.Contains(t, comment, "**What was checked:**")
 }

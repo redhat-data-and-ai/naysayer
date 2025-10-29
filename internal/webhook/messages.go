@@ -3,7 +3,6 @@ package webhook
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
@@ -28,7 +27,7 @@ func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mr
 	comment.WriteString("<!-- naysayer-comment-id: approval -->\n")
 
 	// Header
-	comment.WriteString("✅ **Auto-approved after CI pipeline success**\n\n")
+	comment.WriteString("✅ **Auto-approved**\n\n")
 
 	// Analysis results based on verbosity
 	switch mb.config.Comments.CommentVerbosity {
@@ -39,9 +38,6 @@ func (mb *MessageBuilder) BuildApprovalComment(result *shared.RuleEvaluation, mr
 	default: // "detailed"
 		comment.WriteString(mb.buildDetailedSummary(result))
 	}
-
-	// Footer
-	comment.WriteString("\n🤖 *Automated by NAYSAYER v1.0.0*")
 
 	return comment.String()
 }
@@ -72,9 +68,8 @@ func (mb *MessageBuilder) BuildManualReviewComment(result *shared.RuleEvaluation
 func (mb *MessageBuilder) buildBasicSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	summary.WriteString("📊 **Analysis Results:**\n")
-	summary.WriteString(fmt.Sprintf("• %d files analyzed, all approved\n", result.ApprovedFiles))
-	summary.WriteString(fmt.Sprintf("• Decision: %s\n", result.FinalDecision.Reason))
+	summary.WriteString("**What was checked:**\n")
+	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
 
 	return summary.String()
 }
@@ -83,22 +78,18 @@ func (mb *MessageBuilder) buildBasicSummary(result *shared.RuleEvaluation) strin
 func (mb *MessageBuilder) buildDetailedSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	// Analysis results
-	summary.WriteString("📊 **Analysis Results:**\n")
-	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
-	summary.WriteString("\n")
-
-	// File changes summary
-	if filesSummary := mb.buildFilesSummary(result); filesSummary != "" {
-		summary.WriteString("📄 **Files Analyzed:**\n")
-		summary.WriteString(filesSummary)
-		summary.WriteString("\n")
+	// File list if 3+ files
+	if result.TotalFiles >= 3 {
+		if filesSummary := mb.buildFilesSummary(result); filesSummary != "" {
+			summary.WriteString("**Files in this MR:**\n")
+			summary.WriteString(filesSummary)
+			summary.WriteString("\n")
+		}
 	}
 
-	// Timing information
-	summary.WriteString("⏱️ **Processing Details:**\n")
-	summary.WriteString(fmt.Sprintf("• Rule evaluation time: %v\n", result.ExecutionTime))
-	summary.WriteString(fmt.Sprintf("• Approved at: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+	// What was checked
+	summary.WriteString("**What was checked:**\n")
+	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
 
 	return summary.String()
 }
@@ -115,11 +106,6 @@ func (mb *MessageBuilder) buildDebugSummary(result *shared.RuleEvaluation, mrInf
 	summary.WriteString(fmt.Sprintf("• Title: %s\n", mrInfo.Title))
 	summary.WriteString("\n")
 
-	// Detailed analysis results
-	summary.WriteString("📊 **Detailed Analysis Results:**\n")
-	summary.WriteString(mb.buildDetailedRulesSummary(result.FileValidations))
-	summary.WriteString("\n")
-
 	// File changes with metadata
 	if filesSummary := mb.buildDetailedFilesSummary(result); filesSummary != "" {
 		summary.WriteString("📄 **Detailed File Analysis:**\n")
@@ -127,43 +113,105 @@ func (mb *MessageBuilder) buildDebugSummary(result *shared.RuleEvaluation, mrInf
 		summary.WriteString("\n")
 	}
 
-	// System information
-	summary.WriteString("⚙️ **System Details:**\n")
-	summary.WriteString(fmt.Sprintf("• Rule evaluation time: %v\n", result.ExecutionTime))
-	summary.WriteString(fmt.Sprintf("• Total files analyzed: %d\n", result.TotalFiles))
-	summary.WriteString(fmt.Sprintf("• Final decision: %s\n", result.FinalDecision.Type))
-	summary.WriteString(fmt.Sprintf("• Approved at: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+	// Detailed analysis results
+	summary.WriteString("📊 **Detailed Analysis Results:**\n")
+	summary.WriteString(mb.buildDetailedRulesSummary(result.FileValidations))
 
 	return summary.String()
 }
 
-// buildRulesSummary creates a summary of rule evaluation results from file validations
+// buildRulesSummary creates a summary of rule evaluation results, filtering out noise
 func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.FileValidationSummary) string {
 	var summary strings.Builder
-	ruleMessages := make(map[string][]string)
+	ruleMessages := make(map[string]string)
 
-	// Collect messages by rule
+	// Collect messages by rule, filtering out noise
 	for _, fileValidation := range fileValidations {
 		for _, ruleResult := range fileValidation.RuleResults {
+			// Skip noise messages
+			if mb.isNoiseMessage(ruleResult.Reason) {
+				continue
+			}
+
+			// Skip rules that didn't actually validate anything
+			if len(ruleResult.LineRanges) == 0 {
+				continue
+			}
+
+			ruleName := mb.formatRuleName(ruleResult.RuleName)
+
 			switch ruleResult.Decision {
 			case shared.Approve:
-				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName],
-					fmt.Sprintf("✅ %s: %s", ruleResult.RuleName, ruleResult.Reason))
+				// Only store if not already present
+				if _, exists := ruleMessages[ruleName]; !exists {
+					ruleMessages[ruleName] = fmt.Sprintf("✅ %s", ruleName)
+				}
 			case shared.ManualReview:
-				ruleMessages[ruleResult.RuleName] = append(ruleMessages[ruleResult.RuleName],
-					fmt.Sprintf("🚫 %s: %s", ruleResult.RuleName, ruleResult.Reason))
+				// Manual review messages always override
+				ruleMessages[ruleName] = fmt.Sprintf("🚫 %s: %s", ruleName, ruleResult.Reason)
 			}
 		}
 	}
 
 	// Output unique rule messages
-	for _, messages := range ruleMessages {
-		if len(messages) > 0 {
-			summary.WriteString(fmt.Sprintf("• %s\n", messages[0]))
-		}
+	for _, message := range ruleMessages {
+		summary.WriteString(fmt.Sprintf("• %s\n", message))
 	}
 
 	return summary.String()
+}
+
+// isNoiseMessage checks if a message should be filtered out
+func (mb *MessageBuilder) isNoiseMessage(message string) bool {
+	noisePatterns := []string{
+		"Not a ",
+		"No warehouse size changes detected",
+		"No changes detected",
+	}
+
+	for _, pattern := range noisePatterns {
+		if strings.HasPrefix(message, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// formatRuleName converts internal rule names to user-friendly descriptions
+func (mb *MessageBuilder) formatRuleName(ruleName string) string {
+	friendlyNames := map[string]string{
+		"warehouse_rule":       "Warehouse configuration validated",
+		"service_account_rule": "Service account validated",
+		"toc_approval_rule":    "TOC approval check",
+		"metadata_rule":        "Metadata validated",
+	}
+
+	if friendly, ok := friendlyNames[ruleName]; ok {
+		return friendly
+	}
+	return ruleName
+}
+
+// hasUncoveredFiles checks if there are files without validation rules
+func (mb *MessageBuilder) hasUncoveredFiles(result *shared.RuleEvaluation) bool {
+	for _, fileValidation := range result.FileValidations {
+		if len(fileValidation.RuleResults) == 0 && fileValidation.FileDecision == shared.ManualReview {
+			return true
+		}
+	}
+	return false
+}
+
+// getUncoveredReason returns a user-friendly reason for why a file is uncovered
+func (mb *MessageBuilder) getUncoveredReason(filePath string) string {
+	if strings.HasSuffix(filePath, ".sql") {
+		return "No validation rules configured for SQL migrations"
+	} else if strings.HasSuffix(filePath, ".sh") {
+		return "No validation rules configured for shell scripts"
+	} else if strings.HasSuffix(filePath, ".py") {
+		return "No validation rules configured for Python scripts"
+	}
+	return "No validation rules configured for this file type"
 }
 
 // buildDetailedRulesSummary creates a detailed summary with metadata from file validations
@@ -174,6 +222,16 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(fileValidations map[string]*
 	// Collect detailed rule results from file validations
 	for _, fileValidation := range fileValidations {
 		for _, ruleResult := range fileValidation.RuleResults {
+			// Skip noise messages
+			if mb.isNoiseMessage(ruleResult.Reason) {
+				continue
+			}
+
+			// Skip rules that didn't validate anything
+			if len(ruleResult.LineRanges) == 0 {
+				continue
+			}
+
 			// Use the first occurrence of each rule for detailed display
 			if _, exists := ruleDetails[ruleResult.RuleName]; !exists {
 				ruleDetails[ruleResult.RuleName] = &ruleResult
@@ -183,17 +241,13 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(fileValidations map[string]*
 
 	// Output detailed rule information
 	for ruleName, result := range ruleDetails {
+		friendlyName := mb.formatRuleName(ruleName)
+
 		switch result.Decision {
 		case shared.Approve:
-			summary.WriteString(fmt.Sprintf("• ✅ **%s**: %s\n", ruleName, result.Reason))
+			summary.WriteString(fmt.Sprintf("• ✅ **%s**\n", friendlyName))
 		case shared.ManualReview:
-			summary.WriteString(fmt.Sprintf("• 🚫 **%s**: %s\n", ruleName, result.Reason))
-		}
-
-		// Add line range information
-		if len(result.LineRanges) > 0 {
-			summary.WriteString(fmt.Sprintf("  - Covered lines: %d-%d\n",
-				result.LineRanges[0].StartLine, result.LineRanges[0].EndLine))
+			summary.WriteString(fmt.Sprintf("• 🚫 **%s**: %s\n", friendlyName, result.Reason))
 		}
 	}
 
@@ -205,7 +259,7 @@ func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) strin
 	var summary strings.Builder
 
 	for filePath, fileValidation := range result.FileValidations {
-		summary.WriteString(fmt.Sprintf("• %s", filePath))
+		summary.WriteString(fmt.Sprintf("• `%s`", filePath))
 
 		// Add decision status
 		switch fileValidation.FileDecision {
@@ -213,11 +267,6 @@ func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) strin
 			summary.WriteString(" ✅")
 		case shared.ManualReview:
 			summary.WriteString(" 🚫")
-		}
-
-		// Add line coverage info
-		if len(fileValidation.UncoveredLines) > 0 {
-			summary.WriteString(fmt.Sprintf(" (%d uncovered lines)", len(fileValidation.UncoveredLines)))
 		}
 
 		summary.WriteString("\n")
@@ -231,21 +280,18 @@ func (mb *MessageBuilder) buildDetailedFilesSummary(result *shared.RuleEvaluatio
 	var summary strings.Builder
 
 	for filePath, fileValidation := range result.FileValidations {
-		summary.WriteString(fmt.Sprintf("**File: %s**\n", filePath))
+		summary.WriteString(fmt.Sprintf("**File: `%s`**\n", filePath))
 		summary.WriteString(fmt.Sprintf("• Total lines: %d\n", fileValidation.TotalLines))
-		summary.WriteString(fmt.Sprintf("• Covered lines: %d\n", len(fileValidation.CoveredLines)))
-
-		if len(fileValidation.UncoveredLines) > 0 {
-			summary.WriteString(fmt.Sprintf("• Uncovered lines: %d\n", len(fileValidation.UncoveredLines)))
-		}
-
 		summary.WriteString(fmt.Sprintf("• Decision: %s\n", fileValidation.FileDecision))
 
-		// List rules that validated this file
+		// List rules that validated this file (filtered)
 		if len(fileValidation.RuleResults) > 0 {
 			summary.WriteString("• Rules applied:\n")
 			for _, ruleResult := range fileValidation.RuleResults {
-				summary.WriteString(fmt.Sprintf("  - %s: %s\n", ruleResult.RuleName, ruleResult.Reason))
+				if !mb.isNoiseMessage(ruleResult.Reason) && len(ruleResult.LineRanges) > 0 {
+					friendlyName := mb.formatRuleName(ruleResult.RuleName)
+					summary.WriteString(fmt.Sprintf("  - %s: %s\n", friendlyName, ruleResult.Reason))
+				}
 			}
 		}
 
@@ -266,7 +312,7 @@ func (mb *MessageBuilder) BuildApprovalMessage(result *shared.RuleEvaluation) st
 	case mb.hasOnlyDataverseFiles(result):
 		return "Auto-approved: Only dataverse-safe files modified"
 	default:
-		return "Auto-approved: All rules passed after CI success"
+		return "Auto-approved: All rules passed"
 	}
 }
 
@@ -301,14 +347,10 @@ func (mb *MessageBuilder) hasOnlyDataverseFiles(result *shared.RuleEvaluation) b
 func (mb *MessageBuilder) buildBasicManualReviewSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	summary.WriteString("📊 **Analysis Results:**\n")
-	summary.WriteString(fmt.Sprintf("• %d files evaluated\n", result.TotalFiles))
-	summary.WriteString(fmt.Sprintf("• Decision: %s\n", result.FinalDecision.Reason))
+	summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n\n", result.FinalDecision.Reason))
 
-	// Show files requiring manual review
-	if result.ReviewFiles > 0 {
-		summary.WriteString(fmt.Sprintf("• %d file(s) require manual review\n", result.ReviewFiles))
-	}
+	summary.WriteString("**What was checked:**\n")
+	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
 
 	return summary.String()
 }
@@ -317,44 +359,29 @@ func (mb *MessageBuilder) buildBasicManualReviewSummary(result *shared.RuleEvalu
 func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	// Main decision message
-	summary.WriteString(fmt.Sprintf("**Decision:** %s\n\n", result.FinalDecision.Reason))
+	// Enhanced decision with WHY explanation
+	if mb.hasUncoveredFiles(result) {
+		summary.WriteString("**Why manual review is needed:**\n")
+		summary.WriteString("This MR contains files that Naysayer doesn't know how to validate\n\n")
 
-	// Single expandable section with all details
-	summary.WriteString("<details>\n")
-	summary.WriteString("<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>\n\n")
+		summary.WriteString("**Files needing review:**\n")
+		for filePath, fileValidation := range result.FileValidations {
+			if fileValidation.FileDecision == shared.ManualReview && len(fileValidation.RuleResults) == 0 {
+				summary.WriteString(fmt.Sprintf("• `%s` - %s\n", filePath, mb.getUncoveredReason(filePath)))
+			}
+		}
+	} else {
+		summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n", result.FinalDecision.Reason))
 
-	// Analysis results
-	summary.WriteString("**📊 Analysis Results:**\n")
-	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
-	summary.WriteString("\n")
+		// Show file list if 3+ files
+		if result.TotalFiles >= 3 {
+			summary.WriteString("\n**Files in this MR:**\n")
+			summary.WriteString(mb.buildFilesSummary(result))
+		}
 
-	// File changes summary
-	if filesSummary := mb.buildFilesSummary(result); filesSummary != "" {
-		summary.WriteString("**📄 Files Analyzed:**\n")
-		summary.WriteString(filesSummary)
-		summary.WriteString("\n")
+		summary.WriteString("\n**What was checked:**\n")
+		summary.WriteString(mb.buildRulesSummary(result.FileValidations))
 	}
-
-	// Next steps
-	summary.WriteString("**👀 Next Steps:**\n")
-	summary.WriteString("• A reviewer will evaluate this MR manually\n")
-	summary.WriteString("• You can find more details about the requirements in the project documentation\n")
-	summary.WriteString("• Feel free to ask questions in the MR comments\n")
-	summary.WriteString("\n")
-
-	// Processing details
-	summary.WriteString("**⏱️ Processing Details:**\n")
-	summary.WriteString(fmt.Sprintf("• **Rule evaluation time:** %v\n", result.ExecutionTime))
-	summary.WriteString(fmt.Sprintf("• **Total files analyzed:** %d\n", result.TotalFiles))
-	summary.WriteString(fmt.Sprintf("• **Files approved:** %d\n", result.ApprovedFiles))
-	summary.WriteString(fmt.Sprintf("• **Files requiring review:** %d\n", result.ReviewFiles))
-	if result.UncoveredFiles > 0 {
-		summary.WriteString(fmt.Sprintf("• **Uncovered files:** %d\n", result.UncoveredFiles))
-	}
-	summary.WriteString(fmt.Sprintf("• **Analyzed at:** %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
-
-	summary.WriteString("\n</details>")
 
 	return summary.String()
 }
@@ -371,11 +398,6 @@ func (mb *MessageBuilder) buildDebugManualReviewSummary(result *shared.RuleEvalu
 	summary.WriteString(fmt.Sprintf("• Title: %s\n", mrInfo.Title))
 	summary.WriteString("\n")
 
-	// Detailed analysis results
-	summary.WriteString("📊 **Detailed Analysis Results:**\n")
-	summary.WriteString(mb.buildDetailedRulesSummary(result.FileValidations))
-	summary.WriteString("\n")
-
 	// File changes with metadata
 	if filesSummary := mb.buildDetailedFilesSummary(result); filesSummary != "" {
 		summary.WriteString("📄 **Detailed File Analysis:**\n")
@@ -383,19 +405,16 @@ func (mb *MessageBuilder) buildDebugManualReviewSummary(result *shared.RuleEvalu
 		summary.WriteString("\n")
 	}
 
-	// Next steps
-	summary.WriteString("👀 **Next Steps:**\n")
-	summary.WriteString("• A reviewer will evaluate this MR manually\n")
-	summary.WriteString("• Check the detailed rule results above for specific requirements\n")
-	summary.WriteString("• Review the project documentation for guidelines\n")
+	// Detailed analysis results
+	summary.WriteString("📊 **Detailed Analysis Results:**\n")
+	summary.WriteString(mb.buildDetailedRulesSummary(result.FileValidations))
 	summary.WriteString("\n")
 
-	// System information
+	// System information (debug mode keeps some details)
 	summary.WriteString("⚙️ **System Details:**\n")
 	summary.WriteString(fmt.Sprintf("• Rule evaluation time: %v\n", result.ExecutionTime))
 	summary.WriteString(fmt.Sprintf("• Total files analyzed: %d\n", result.TotalFiles))
 	summary.WriteString(fmt.Sprintf("• Final decision: %s\n", result.FinalDecision.Type))
-	summary.WriteString(fmt.Sprintf("• Analyzed at: %s\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
 
 	return summary.String()
 }
