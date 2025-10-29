@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"sort"
 	"strings"
 	"time"
 
@@ -169,14 +170,10 @@ func MergeLineRanges(ranges []LineRange) []LineRange {
 	sorted := make([]LineRange, len(ranges))
 	copy(sorted, ranges)
 
-	// Simple bubble sort by StartLine (good enough for small lists)
-	for i := 0; i < len(sorted)-1; i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].StartLine < sorted[i].StartLine {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	// Sort by StartLine using standard library
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].StartLine < sorted[j].StartLine
+	})
 
 	var merged []LineRange
 	for _, r := range sorted {
