@@ -41,11 +41,29 @@ jobs:
     - name: Install dependencies
       run: make install
 
-    - name: Run build (includes lint, fmt, vet, test)
-      run: make build
+    - name: Run linting
+      run: make lint
 
-    - name: Generate test coverage
-      run: make test-coverage
+    - name: Run formatting check
+      run: make fmt
+
+    - name: Run go vet
+      run: make vet
+
+    - name: Run unit tests
+      run: make test-unit
+
+    - name: Generate test coverage (unit tests only)
+      run: |
+        mkdir -p coverage
+        go test $(go list ./... | grep -v /e2e) -coverprofile=coverage/coverage.out -covermode=atomic
+
+    - name: Build binary
+      run: |
+        echo "Building naysayer..."
+        go mod download && go mod tidy && go mod vendor
+        go build -o naysayer cmd/main.go
+        echo "✅ Built naysayer binary"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
@@ -88,5 +106,47 @@ jobs:
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
+
+  # E2E testing job
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.24.6'
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: make install
+
+    - name: Run E2E tests
+      run: make test-e2e
+
+    - name: Upload E2E test artifacts on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: e2e-test-results
+        path: |
+          e2e/testdata/
+          e2e/*.log
+        if-no-files-found: warn
 
 

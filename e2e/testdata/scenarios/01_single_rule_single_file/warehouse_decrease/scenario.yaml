@@ -1,0 +1,22 @@
+name: "Warehouse size decrease"
+description: "Warehouse size decrease should be auto-approved (cost reduction)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  rules_evaluated:
+    - name: warehouse_rule
+      section: warehouses
+      decision: Approve
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+    - "Warehouse configuration validated"
+
+mr_metadata:
+  title: "Scale down warehouse to reduce costs"
+  author: "testuser"
+  source_branch: "feature/warehouse-scale-down"
+  target_branch: "main"

@@ -1,0 +1,24 @@
+name: "Warehouse size increase"
+description: "Single warehouse size increase should require manual review due to cost implications"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  rules_evaluated:
+    - name: warehouse_rule
+      section: warehouses
+      decision: ManualReview
+      reason: "Warehouse size increase detected"
+
+  comment_contains:
+    - "🚫 **Manual review required**"
+    - "Warehouse size increase detected"
+    - "Warehouse configuration validated"
+
+mr_metadata:
+  title: "Scale up warehouse for increased load"
+  author: "testuser"
+  source_branch: "feature/warehouse-scale-up"
+  target_branch: "main"

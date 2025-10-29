@@ -154,9 +154,10 @@ WAREHOUSE_RULE_ENABLED=true
 - 🔧 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Fix common issues
 - ⚙️ **[Configuration Guide](docs/DEVELOPMENT_SETUP.md)** - Environment setup
 
-### 👨‍💻 For Developers  
+### 👨‍💻 For Developers
 - 🎯 **[Rule Creation Guide](docs/RULE_CREATION_GUIDE.md)** - Build new validation rules
-- 🧪 **[Development Setup Guide](docs/DEVELOPMENT_SETUP.md)** - Testing strategies and development setup
+- 🧪 **[E2E Testing Guide](e2e/README.md)** - End-to-end testing framework
+- 🔧 **[Development Setup Guide](docs/DEVELOPMENT_SETUP.md)** - Testing strategies and development setup
 
 ### 🚀 For Operators
 - 🐳 **[Deployment Guide](DEPLOYMENT.md)** - Production setup
@@ -164,56 +165,22 @@ WAREHOUSE_RULE_ENABLED=true
 
 ## 🛠️ Development
 
-### Quick Development Setup
+Quick setup for developers:
+
 ```bash
 # Clone and setup
 git clone https://github.com/your-org/naysayer.git
-cd naysayer && go mod tidy
+cd naysayer && make install
 
-# Setup code quality tools
-./scripts/setup-quality.sh
-
-# Run code quality checks
-make build
+# Run tests
+make test
 
 # Start development server
 export GITLAB_TOKEN=your-token
-go run cmd/main.go
+make run
 ```
 
-### Project Structure
-```
-naysayer/
-├── internal/rules/           # Rule engine and validation logic
-│   └── warehouse/           # Warehouse configuration validation  
-├── docs/                    # Complete documentation
-│   ├── rules/              # User-facing rule guides
-│   └── templates/          # Developer templates
-└── config/                 # Kubernetes/OpenShift manifests
-```
-
-### Code Quality
-```bash
-# Run individual code quality checks
-make lint       # Run golangci-lint
-make lint-fix   # Run golangci-lint with automatic fixes
-make fmt        # Format code
-make vet        # Run go vet
-make test       # Run tests
-
-# Run all at once
-make lint fmt vet test
-```
-
-### Adding New Rules
-```bash
-# 1. Create from template
-mkdir internal/rules/myrule
-# Follow the Rule Creation Guide for detailed template usage
-
-# 2. Follow the Rule Creation Guide
-# See: docs/RULE_CREATION_GUIDE.md
-```
+For complete development setup, testing guides, and project structure details, see the [Development Guide](docs/DEVELOPMENT_SETUP.md).
 
 ## 🔒 Security & Compliance
 
