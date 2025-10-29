@@ -16,7 +16,7 @@ import (
 
 // DataProductConfigMrReviewHandler handles GitLab webhook requests
 type DataProductConfigMrReviewHandler struct {
-	gitlabClient *gitlab.Client
+	gitlabClient gitlab.GitLabClient
 	ruleManager  shared.RuleManager
 	config       *config.Config
 }
@@ -24,20 +24,25 @@ type DataProductConfigMrReviewHandler struct {
 // NewDataProductConfigMrReviewHandler creates a new webhook handler
 func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigMrReviewHandler {
 	gitlabClient := gitlab.NewClientWithConfig(cfg)
+	return NewDataProductConfigMrReviewHandlerWithClient(cfg, gitlabClient)
+}
 
+// NewDataProductConfigMrReviewHandlerWithClient creates a webhook handler with a custom GitLab client
+// This is primarily used for testing with mock clients
+func NewDataProductConfigMrReviewHandlerWithClient(cfg *config.Config, client gitlab.GitLabClient) *DataProductConfigMrReviewHandler {
 	// Create rule manager for dataverse product config
-	// Use the old client constructor for the rule manager since it doesn't need dry-run mode
-	ruleManagerClient := gitlab.NewClient(cfg.GitLab)
-	manager, err := rules.CreateSectionBasedDataverseManager(ruleManagerClient)
+	manager, err := rules.CreateSectionBasedDataverseManager(client)
 	if err != nil {
 		logging.Error("Failed to create section-based rule manager: %v", err)
 		panic(fmt.Sprintf("Critical error: cannot start without section-based validation: %v", err))
 	}
 
-	// Log security configuration
-	logging.Info("Webhook security: %s", cfg.WebhookSecurityMode())
-	if len(cfg.Webhook.AllowedIPs) > 0 {
-		logging.Info("IP restrictions enabled: %v", cfg.Webhook.AllowedIPs)
+	// Log security configuration (skip in tests if config is minimal)
+	if cfg.Webhook.AllowedIPs != nil {
+		logging.Info("Webhook security: %s", cfg.WebhookSecurityMode())
+		if len(cfg.Webhook.AllowedIPs) > 0 {
+			logging.Info("IP restrictions enabled: %v", cfg.Webhook.AllowedIPs)
+		}
 	}
 
 	// Log comments configuration
@@ -45,7 +50,7 @@ func NewDataProductConfigMrReviewHandler(cfg *config.Config) *DataProductConfigM
 		cfg.Comments.EnableMRComments, cfg.Comments.CommentVerbosity)
 
 	return &DataProductConfigMrReviewHandler{
-		gitlabClient: gitlabClient,
+		gitlabClient: client,
 		ruleManager:  manager,
 		config:       cfg,
 	}

@@ -31,7 +31,7 @@ func TestNewSectionRuleManager(t *testing.T) {
 		},
 	}
 
-	manager := NewSectionRuleManager(ruleConfig)
+	manager := NewSectionRuleManager(ruleConfig, nil)
 
 	assert.NotNil(t, manager)
 	assert.NotNil(t, manager.config)
@@ -62,7 +62,7 @@ func TestSectionRuleManager_GetParserForFile(t *testing.T) {
 		},
 	}
 
-	manager := NewSectionRuleManager(ruleConfig)
+	manager := NewSectionRuleManager(ruleConfig, nil)
 
 	// Should return parser for YAML files
 	parser := manager.getParserForFile("test.yaml")

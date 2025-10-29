@@ -61,7 +61,7 @@ func TestRuleRegistry_RegisterRule(t *testing.T) {
 				Name:        "test_rule",
 				Description: "Test rule for unit testing",
 				Version:     "1.0.0",
-				Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "test_rule"} },
+				Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "test_rule"} },
 				Enabled:     true,
 				Category:    "test",
 			},
@@ -72,7 +72,7 @@ func TestRuleRegistry_RegisterRule(t *testing.T) {
 			ruleInfo: &RuleInfo{
 				Name:        "",
 				Description: "Test rule with empty name",
-				Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{} },
+				Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{} },
 			},
 			expectedError: "rule name cannot be empty",
 		},
@@ -90,7 +90,7 @@ func TestRuleRegistry_RegisterRule(t *testing.T) {
 			ruleInfo: &RuleInfo{
 				Name:        "warehouse_rule", // Already registered in built-in rules
 				Description: "Duplicate warehouse rule",
-				Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "duplicate"} },
+				Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "duplicate"} },
 			},
 			expectedError: "rule 'warehouse_rule' is already registered",
 		},
@@ -143,7 +143,7 @@ func TestRuleRegistry_ListRules(t *testing.T) {
 		Name:        "test_list_rule",
 		Description: "Test rule for list functionality",
 		Version:     "1.0.0",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "test_list_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "test_list_rule"} },
 		Enabled:     false,
 		Category:    "test",
 	}
@@ -170,14 +170,14 @@ func TestRuleRegistry_ListEnabledRules(t *testing.T) {
 	enabledRule := &RuleInfo{
 		Name:        "enabled_test_rule",
 		Description: "Enabled test rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "enabled_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "enabled_test_rule"} },
 		Enabled:     true,
 		Category:    "test",
 	}
 	disabledRule := &RuleInfo{
 		Name:        "disabled_test_rule",
 		Description: "Disabled test rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "disabled_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "disabled_test_rule"} },
 		Enabled:     false,
 		Category:    "test",
 	}
@@ -209,19 +209,19 @@ func TestRuleRegistry_ListRulesByCategory(t *testing.T) {
 	warehouseTestRule := &RuleInfo{
 		Name:        "warehouse_test_rule",
 		Description: "Test warehouse rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "warehouse_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "warehouse_test_rule"} },
 		Category:    "warehouse",
 	}
 	sourceTestRule := &RuleInfo{
 		Name:        "source_test_rule",
 		Description: "Test source rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "source_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "source_test_rule"} },
 		Category:    "source",
 	}
 	securityRule := &RuleInfo{
 		Name:        "security_rule",
 		Description: "Test security rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "security_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "security_rule"} },
 		Category:    "security",
 	}
 
@@ -277,7 +277,7 @@ func TestRuleRegistry_CreateRuleManager_SpecificRules(t *testing.T) {
 	testRule := &RuleInfo{
 		Name:        "specific_test_rule",
 		Description: "Rule for specific test",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "specific_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "specific_test_rule"} },
 		Enabled:     false, // Even disabled rules can be specifically requested
 		Category:    "test",
 	}
@@ -319,7 +319,7 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 	warehouseRule := &RuleInfo{
 		Name:        "warehouse_rule",
 		Description: "Warehouse rule",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "warehouse_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "warehouse_rule"} },
 		Enabled:     true,
 		Category:    "warehouse",
 	}
@@ -353,7 +353,7 @@ func TestGlobalRegistry(t *testing.T) {
 	testRule := &RuleInfo{
 		Name:        "global_test_rule",
 		Description: "Test rule for global registry",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "global_test_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "global_test_rule"} },
 		Category:    "test",
 	}
 
@@ -396,7 +396,7 @@ func TestRuleRegistry_EdgeCases(t *testing.T) {
 	emptyCategoryRule := &RuleInfo{
 		Name:        "empty_category_rule",
 		Description: "Rule with empty category",
-		Factory:     func(client *gitlab.Client) shared.Rule { return &MockRule{name: "empty_category_rule"} },
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "empty_category_rule"} },
 		Category:    "",
 	}
 	err := registry.RegisterRule(emptyCategoryRule)

@@ -10,13 +10,13 @@ import (
 
 // Rule implements warehouse file validation for product.yaml files
 type Rule struct {
-	client   *gitlab.Client
+	client   gitlab.GitLabClient
 	analyzer AnalyzerInterface
 	mrCtx    *shared.MRContext // Store MR context for warehouse analysis
 }
 
 // NewRule creates a new warehouse validation rule
-func NewRule(client *gitlab.Client) *Rule {
+func NewRule(client gitlab.GitLabClient) *Rule {
 	var analyzer AnalyzerInterface
 	if client != nil {
 		analyzer = NewAnalyzer(client)

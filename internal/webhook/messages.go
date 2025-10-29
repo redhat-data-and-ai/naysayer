@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
@@ -153,9 +154,16 @@ func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.F
 		}
 	}
 
-	// Output unique rule messages
-	for _, message := range ruleMessages {
-		summary.WriteString(fmt.Sprintf("• %s\n", message))
+	// Sort rule names alphabetically for consistent output
+	var ruleNames []string
+	for ruleName := range ruleMessages {
+		ruleNames = append(ruleNames, ruleName)
+	}
+	sort.Strings(ruleNames)
+
+	// Output unique rule messages in sorted order
+	for _, ruleName := range ruleNames {
+		summary.WriteString(fmt.Sprintf("• %s\n", ruleMessages[ruleName]))
 	}
 
 	return summary.String()
@@ -239,8 +247,16 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(fileValidations map[string]*
 		}
 	}
 
-	// Output detailed rule information
-	for ruleName, result := range ruleDetails {
+	// Sort rule names alphabetically for consistent output
+	var ruleNames []string
+	for ruleName := range ruleDetails {
+		ruleNames = append(ruleNames, ruleName)
+	}
+	sort.Strings(ruleNames)
+
+	// Output detailed rule information in sorted order
+	for _, ruleName := range ruleNames {
+		result := ruleDetails[ruleName]
 		friendlyName := mb.formatRuleName(ruleName)
 
 		switch result.Decision {

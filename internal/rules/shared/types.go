@@ -165,8 +165,21 @@ func MergeLineRanges(ranges []LineRange) []LineRange {
 	}
 
 	// Sort by start line
+	// First, copy the ranges to avoid modifying the input
+	sorted := make([]LineRange, len(ranges))
+	copy(sorted, ranges)
+
+	// Simple bubble sort by StartLine (good enough for small lists)
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].StartLine < sorted[i].StartLine {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
 	var merged []LineRange
-	for _, r := range ranges {
+	for _, r := range sorted {
 		if len(merged) == 0 {
 			merged = append(merged, r)
 			continue
