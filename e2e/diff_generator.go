@@ -21,8 +21,8 @@ const (
 
 // FileComparison represents a comparison between before and after files
 type FileComparison struct {
-	Path      string
-	Operation FileOperation
+	Path       string
+	Operation  FileOperation
 	OldContent string
 	NewContent string
 }
@@ -215,51 +215,8 @@ func createSimpleDiff(oldContent, newContent string) string {
 	return diff.String()
 }
 
-// DetectFileOperationType returns the operation type for a file
-func DetectFileOperationType(beforeDir, afterDir, filePath string) FileOperation {
-	beforePath := filepath.Join(beforeDir, filePath)
-	afterPath := filepath.Join(afterDir, filePath)
-
-	beforeExists := fileExists(beforePath)
-	afterExists := fileExists(afterPath)
-
-	if !beforeExists && afterExists {
-		return FileAdded
-	} else if beforeExists && !afterExists {
-		return FileDeleted
-	}
-	return FileModified
-}
-
 // fileExists checks if a file exists
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
-}
-
-// CountChanges returns statistics about the file changes
-func CountChanges(changes []gitlab.FileChange) (added, modified, deleted int) {
-	for _, change := range changes {
-		if change.NewFile {
-			added++
-		} else if change.DeletedFile {
-			deleted++
-		} else {
-			modified++
-		}
-	}
-	return
-}
-
-// GetChangedFiles returns a list of file paths that changed
-func GetChangedFiles(changes []gitlab.FileChange) []string {
-	var files []string
-	for _, change := range changes {
-		if change.NewPath != "" {
-			files = append(files, change.NewPath)
-		} else if change.OldPath != "" {
-			files = append(files, change.OldPath)
-		}
-	}
-	return files
 }

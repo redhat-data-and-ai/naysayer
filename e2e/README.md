@@ -89,15 +89,12 @@ mr_metadata:
   target_branch: "main"
 
 expected:
-  decision: "approve"  # or "manual_review"
-  approved: true       # or false
+  decision: Approve  # or ManualReview
+  approved: true     # or false
   reason: "Expected reason substring"
   comment_contains:
     - "phrase that should appear in comment"
     - "another expected phrase"
-  rules_evaluated:
-    - "warehouse_rule"
-    - "metadata_rule"
 ```
 
 ### Step 3: Add before/after files

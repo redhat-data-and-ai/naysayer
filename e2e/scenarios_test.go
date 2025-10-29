@@ -90,11 +90,6 @@ func runScenario(t *testing.T, scenario ScenarioConfig) {
 	// 9. Validate MR comment
 	validateMRComment(t, scenario, mockGitLab)
 
-	// 10. Validate rules evaluated (if specified)
-	if len(scenario.Expected.RulesEvaluated) > 0 {
-		validateRulesEvaluated(t, scenario, response)
-	}
-
 	t.Logf("✅ Scenario '%s' passed all validations", scenario.Name)
 }
 
@@ -286,13 +281,6 @@ func validateMRComment(t *testing.T, scenario ScenarioConfig, mockGitLab *MockGi
 		}
 		t.Logf("✅ Comment contains all expected phrases (%d)", len(scenario.Expected.CommentContains))
 	}
-}
-
-// validateRulesEvaluated validates that expected rules were evaluated
-func validateRulesEvaluated(t *testing.T, scenario ScenarioConfig, response map[string]interface{}) {
-	// This is a placeholder - actual implementation depends on response structure
-	// For now, just log that we would validate rules
-	t.Logf("ℹ️  Would validate %d expected rules (not yet implemented)", len(scenario.Expected.RulesEvaluated))
 }
 
 // normalizeWhitespace normalizes whitespace for comment comparison

@@ -22,12 +22,12 @@ type ScenarioConfig struct {
 
 // ExpectedResults defines what to expect from the scenario
 type ExpectedResults struct {
-	Decision         shared.DecisionType
-	Reason           string
-	Approved         bool
-	RulesEvaluated   []ExpectedRule
-	CommentContains  []string
-	CommentFile      string // Path to expected_comment.txt
+	Decision        shared.DecisionType
+	Reason          string
+	Approved        bool
+	RulesEvaluated  []ExpectedRule
+	CommentContains []string
+	CommentFile     string // Path to expected_comment.txt
 }
 
 // ExpectedRule defines expected rule evaluation
@@ -51,10 +51,10 @@ type ScenarioYAML struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	Expected    struct {
-		Decision        string `yaml:"decision"`
-		Reason          string `yaml:"reason"`
-		Approved        bool   `yaml:"approved"`
-		RulesEvaluated  []struct {
+		Decision       string `yaml:"decision"`
+		Reason         string `yaml:"reason"`
+		Approved       bool   `yaml:"approved"`
+		RulesEvaluated []struct {
 			Name     string `yaml:"name"`
 			Section  string `yaml:"section"`
 			Decision string `yaml:"decision"`
@@ -244,46 +244,4 @@ func validateScenario(scenario *ScenarioConfig) error {
 	}
 
 	return nil
-}
-
-// FilterScenariosByTag filters scenarios by tags in their names or descriptions
-func FilterScenariosByTag(scenarios []ScenarioConfig, tags []string) []ScenarioConfig {
-	if len(tags) == 0 {
-		return scenarios
-	}
-
-	var filtered []ScenarioConfig
-	for _, scenario := range scenarios {
-		for _, tag := range tags {
-			if strings.Contains(strings.ToLower(scenario.Name), strings.ToLower(tag)) ||
-				strings.Contains(strings.ToLower(scenario.Description), strings.ToLower(tag)) {
-				filtered = append(filtered, scenario)
-				break
-			}
-		}
-	}
-
-	return filtered
-}
-
-// GetScenarioByName finds a scenario by name
-func GetScenarioByName(scenarios []ScenarioConfig, name string) (*ScenarioConfig, error) {
-	for _, scenario := range scenarios {
-		if scenario.Name == name {
-			return &scenario, nil
-		}
-	}
-	return nil, fmt.Errorf("scenario not found: %s", name)
-}
-
-// CountScenariosByDecision counts scenarios by expected decision
-func CountScenariosByDecision(scenarios []ScenarioConfig) (approve, manualReview int) {
-	for _, scenario := range scenarios {
-		if scenario.Expected.Decision == shared.Approve {
-			approve++
-		} else {
-			manualReview++
-		}
-	}
-	return
 }

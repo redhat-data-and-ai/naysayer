@@ -53,8 +53,8 @@ func NewMockGitLabClient(beforeDir, afterDir string) *MockGitLabClient {
 	return &MockGitLabClient{
 		beforeDir:         beforeDir,
 		afterDir:          afterDir,
-		sourceBranch:      "feature/test",  // Default, can be overridden
-		targetBranch:      "main",          // Default, can be overridden
+		sourceBranch:      "feature/test", // Default, can be overridden
+		targetBranch:      "main",         // Default, can be overridden
 		CapturedComments:  []CapturedComment{},
 		CapturedApprovals: []CapturedApproval{},
 		FetchedFiles:      []string{},
@@ -78,10 +78,10 @@ func (m *MockGitLabClient) GetFileContent(projectID int, filePath, ref string) (
 	m.FetchedFiles = append(m.FetchedFiles, filePath)
 
 	// Determine which directory to read from based on branch
-	// "main" (target branch) = before/ directory
-	// "feature/*" or any other branch (source branch) = after/ directory
+	// target branch = before/ directory
+	// source branch = after/ directory
 	var baseDir string
-	if ref == "main" {
+	if ref == m.targetBranch {
 		baseDir = m.beforeDir
 	} else {
 		baseDir = m.afterDir
@@ -238,9 +238,9 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string)
 	}, nil
 }
 
-// GetMRTargetBranch returns the target branch (always "main" for tests)
+// GetMRTargetBranch returns the target branch
 func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, error) {
-	return "main", nil
+	return m.targetBranch, nil
 }
 
 // GetMRDetails returns MR details (minimal implementation for tests)

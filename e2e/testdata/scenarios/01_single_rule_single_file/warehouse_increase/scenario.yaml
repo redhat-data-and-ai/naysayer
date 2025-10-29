@@ -13,7 +13,7 @@ expected:
       reason: "Warehouse size increase detected"
 
   comment_contains:
-    - "🚫 **Manual review required**"
+    - "⚠️ **Manual review required**"
     - "Warehouse size increase detected"
     - "Warehouse configuration validated"
 
