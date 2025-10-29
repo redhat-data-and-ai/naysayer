@@ -16,8 +16,8 @@ type SectionRuleManager struct {
 	rules          []shared.Rule
 	sectionParsers map[string]shared.SectionParser // File pattern -> parser
 	config         *config.GlobalRuleConfig
-	ruleRegistry   map[string]shared.Rule          // Rule name -> rule instance
-	gitlabClient   gitlab.GitLabClient             // GitLab client for fetching file content
+	ruleRegistry   map[string]shared.Rule // Rule name -> rule instance
+	gitlabClient   gitlab.GitLabClient    // GitLab client for fetching file content
 }
 
 // NewSectionRuleManager creates a new section-based rule manager
@@ -537,7 +537,6 @@ func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRa
 	// Sections overlap if there's any line in common
 	return section.StartLine <= changedRange.EndLine && section.EndLine >= changedRange.StartLine
 }
-
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
 	var manualReviewFiles []string

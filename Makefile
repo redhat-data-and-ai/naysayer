@@ -1,6 +1,6 @@
 # NAYSAYER Makefile
 
-.PHONY: build run test test-coverage clean install help docker fmt vet lint lint-fix
+.PHONY: build run test test-unit test-e2e test-coverage clean install help docker fmt vet lint lint-fix
 
 # Default target
 help:
@@ -12,7 +12,9 @@ help:
 	@echo "  docker         Build Docker image"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test           Run all tests"
+	@echo "  test           Run all tests (unit + e2e)"
+	@echo "  test-unit      Run unit tests only"
+	@echo "  test-e2e       Run E2E tests only"
 	@echo "  test-coverage  Generate test coverage report"
 	@echo ""
 	@echo "Code Quality:"
@@ -38,10 +40,21 @@ run: build
 	@echo "Starting naysayer server..."
 	./naysayer
 
-# Run unit tests
+# Run all tests (unit + e2e)
 test:
-	@echo "Running unit tests..."
+	@echo "Running all tests (unit + e2e)..."
 	go test ./... -v -race -cover
+
+# Run unit tests only (excluding e2e)
+test-unit:
+	@echo "Running unit tests..."
+	go test $$(go list ./... | grep -v /e2e) -v -race -cover
+
+# Run E2E tests only
+test-e2e:
+	@echo "Running E2E tests..."
+	go test ./e2e -v -count=1
+	@echo "✅ E2E tests completed"
 
 # Generate test coverage report
 test-coverage:

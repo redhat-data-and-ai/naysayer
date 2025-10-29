@@ -1,0 +1,13 @@
+---
+name: marketing
+kind: aggregated
+rover_group: example-aggregate-marketing
+warehouses:
+- type: user
+  size: MEDIUM
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+tags:
+  data_product: marketing

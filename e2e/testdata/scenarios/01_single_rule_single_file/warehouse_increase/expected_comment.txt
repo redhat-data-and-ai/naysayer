@@ -1,0 +1,9 @@
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
+
+**What was checked:**
+• ✅ TOC approval check
+• 🚫 Warehouse configuration validated: Warehouse size increase detected: user warehouse: SMALL → MEDIUM
