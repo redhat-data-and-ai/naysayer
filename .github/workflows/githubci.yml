@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.6'
+        go-version: '1.24.x'
         cache: true
 
     - name: Cache Go modules
@@ -35,7 +35,7 @@ jobs:
 
     - name: Install golangci-lint
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.6.0
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
     - name: Install dependencies
@@ -86,13 +86,12 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.6'
+        go-version: '1.24.x'
 
     - name: Run Gosec Security Scanner
       run: |
-        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        go install github.com/securego/gosec/v2/cmd/gosec@v2.22.10
         gosec -fmt sarif -out gosec-results.sarif ./...
-      continue-on-error: true
 
     - name: Upload Gosec results
       uses: actions/upload-artifact@v4
@@ -104,7 +103,7 @@ jobs:
 
     - name: Run Go vulnerability scanner
       run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
         govulncheck ./...
 
   # E2E testing job
@@ -120,7 +119,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.6'
+        go-version: '1.24.x'
         cache: true
 
     - name: Cache Go modules
