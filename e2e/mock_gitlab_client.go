@@ -88,7 +88,7 @@ func (m *MockGitLabClient) GetFileContent(projectID int, filePath, ref string) (
 	}
 
 	fullPath := filepath.Join(baseDir, filePath)
-	content, err := os.ReadFile(fullPath)
+	content, err := os.ReadFile(fullPath) // #nosec G304 - reading test fixture files
 	if err != nil {
 		return "", fmt.Errorf("file not found: %s (ref: %s)", filePath, ref)
 	}

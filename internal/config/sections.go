@@ -62,8 +62,9 @@ func LoadRuleConfig(configPath string) (*GlobalRuleConfig, error) {
 		return nil, fmt.Errorf("rule config file not found: %s (create this file to define validation rules)", configPath)
 	}
 
-	// Read YAML config file
-	data, err := os.ReadFile(configPath)
+	// Read YAML config file (sanitize path to prevent traversal)
+	cleanPath := filepath.Clean(configPath)
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read rule config file %s: %w", configPath, err)
 	}
@@ -104,12 +105,12 @@ func SaveRuleConfig(config *GlobalRuleConfig, configPath string) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Write to file
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write section config file: %w", err)
 	}
 

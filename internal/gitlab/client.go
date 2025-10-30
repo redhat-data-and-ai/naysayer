@@ -26,7 +26,9 @@ func createHTTPClient(cfg config.GitLabConfig) (*http.Client, error) {
 	transport := &http.Transport{}
 
 	// Configure TLS settings
-	tlsConfig := &tls.Config{}
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12, // Enforce TLS 1.2 minimum for security
+	}
 
 	// Handle insecure TLS (skip certificate verification)
 	if cfg.InsecureTLS {
