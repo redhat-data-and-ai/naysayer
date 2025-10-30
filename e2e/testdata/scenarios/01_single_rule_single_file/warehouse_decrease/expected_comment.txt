@@ -2,5 +2,6 @@
 ✅ **Auto-approved**
 
 **What was checked:**
+• ✅ Metadata validated
 • ✅ TOC approval check
 • ✅ Warehouse configuration validated

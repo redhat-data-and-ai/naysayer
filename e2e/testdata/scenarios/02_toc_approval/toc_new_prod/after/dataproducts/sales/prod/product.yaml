@@ -1,18 +1,18 @@
 ---
-name: marketing
-kind: aggregated
-rover_group: dataverse-aggregate-marketing
+name: sales-analytics
+kind: source-aligned
+rover_group: dataverse-source-sales
 warehouses:
 - type: user
-  size: SMALL
+  size: LARGE
 - type: service_account
   size: XSMALL
 service_account:
   dbt: true
 tags:
-  data_product: marketing
+  data_product: sales
 data_product_db:
-- database: marketing_db
+- database: sales_db
   presentation_schemas:
   - name: marts
     consumers: []

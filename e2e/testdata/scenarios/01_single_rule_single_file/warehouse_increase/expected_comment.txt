@@ -5,5 +5,6 @@
 One or more files require manual review
 
 **What was checked:**
+• ✅ Metadata validated
 • ✅ TOC approval check
 • 🚫 Warehouse configuration validated: Warehouse size increase detected: user warehouse: SMALL → MEDIUM

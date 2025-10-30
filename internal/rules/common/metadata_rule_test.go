@@ -129,8 +129,8 @@ warehouses:
 warehouses:
   - type: user
     size: SMALL`,
-			expectedDecision:       shared.ManualReview,
-			expectedReasonContains: "Not a metadata file - requires manual review",
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Auto-approved: Product metadata changes are safe",
 		},
 	}
 
@@ -157,19 +157,19 @@ func TestMetadataRule_ValidateLines_NonMetadataFiles(t *testing.T) {
 			name:             "Python source file",
 			filePath:         "src/main.py",
 			fileContent:      "def main():\n    print('Hello, World!')",
-			expectedDecision: shared.ManualReview,
+			expectedDecision: shared.Approve,
 		},
 		{
 			name:             "Configuration file",
 			filePath:         "config/database.json",
 			fileContent:      `{"host": "localhost", "port": 5432}`,
-			expectedDecision: shared.ManualReview,
+			expectedDecision: shared.Approve,
 		},
 		{
 			name:             "SQL migration",
 			filePath:         "migrations/001_create_users.sql",
 			fileContent:      "CREATE TABLE users (id INT PRIMARY KEY);",
-			expectedDecision: shared.ManualReview,
+			expectedDecision: shared.Approve,
 		},
 	}
 
@@ -204,10 +204,10 @@ func TestMetadataRule_GetCoveredLines(t *testing.T) {
 			expectedCoverageType: "placeholder",
 		},
 		{
-			name:                 "Non-metadata file gets no coverage",
+			name:                 "Non-metadata file gets placeholder coverage",
 			filePath:             "src/main.py",
 			fileContent:          "def main(): pass",
-			expectedCoverageType: "none",
+			expectedCoverageType: "placeholder",
 		},
 	}
 

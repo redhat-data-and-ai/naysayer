@@ -1,7 +1,7 @@
 ---
 name: marketing
 kind: aggregated
-rover_group: example-aggregate-marketing
+rover_group: dataverse-aggregate-marketing
 warehouses:
 - type: user
   size: MEDIUM
@@ -11,3 +11,8 @@ service_account:
   dbt: true
 tags:
   data_product: marketing
+data_product_db:
+- database: marketing_db
+  presentation_schemas:
+  - name: marts
+    consumers: []
