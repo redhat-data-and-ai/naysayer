@@ -56,7 +56,7 @@ files:
 }
 
 func cleanupTestRulesFile() {
-	os.Remove("rules.yaml")
+	_ = os.Remove("rules.yaml")
 }
 
 // createTestApplicationWithCleanup creates a test application and returns a cleanup function

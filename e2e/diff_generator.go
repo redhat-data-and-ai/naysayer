@@ -83,7 +83,7 @@ func buildFileMap(rootDir string) (map[string]string, error) {
 		}
 
 		// Read file content
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) // #nosec G304 - walking test directories
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %w", path, err)
 		}
@@ -213,10 +213,4 @@ func createSimpleDiff(oldContent, newContent string) string {
 	}
 
 	return diff.String()
-}
-
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

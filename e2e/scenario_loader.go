@@ -180,7 +180,7 @@ func loadScenarioYAML(scenarioDir string) (*ScenarioYAML, error) {
 	var err error
 
 	for _, path := range paths {
-		content, err = os.ReadFile(path)
+		content, err = os.ReadFile(path) // #nosec G304 - reading test scenario files
 		if err == nil {
 			break
 		}
@@ -206,7 +206,7 @@ func LoadExpectedComment(commentPath string) (string, error) {
 		return "", nil
 	}
 
-	content, err := os.ReadFile(commentPath)
+	content, err := os.ReadFile(commentPath) // #nosec G304 - reading test expected output
 	if err != nil {
 		return "", fmt.Errorf("failed to read expected_comment.txt: %w", err)
 	}

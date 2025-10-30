@@ -344,11 +344,6 @@ func (mb *MessageBuilder) hasWarehouseChanges(result *shared.RuleEvaluation) boo
 	return false
 }
 
-// isDraftMR checks if this was a draft MR requiring manual review
-func (mb *MessageBuilder) isDraftMR(result *shared.RuleEvaluation) bool {
-	return strings.Contains(result.FinalDecision.Reason, "Draft MR")
-}
-
 // isAutomatedUser checks if this was an automated user approval
 func (mb *MessageBuilder) isAutomatedUser(result *shared.RuleEvaluation) bool {
 	return strings.Contains(result.FinalDecision.Reason, "Automated user")

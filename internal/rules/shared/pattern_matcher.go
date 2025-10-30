@@ -98,10 +98,7 @@ func (pm *PatternMatcher) matchGlobstarPattern(filePath, pattern string) bool {
 	}
 
 	// For suffix, we need to match it at any directory level after prefix
-	remaining := filePath[len(prefix):]
-	if strings.HasPrefix(remaining, "/") {
-		remaining = remaining[1:]
-	}
+	remaining := strings.TrimPrefix(filePath[len(prefix):], "/")
 
 	// Split remaining path into segments and check if any segment matches suffix pattern
 	segments := strings.Split(remaining, "/")

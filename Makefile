@@ -80,12 +80,12 @@ vet:
 # Run linter
 lint:
 	@echo "Running golangci-lint..."
-	@if command -v golangci-lint > /dev/null; then \
-		golangci-lint run --skip-dirs=vendor ./...; \
-		echo "✅ Linting completed"; \
+	@if command -v $$(go env GOPATH)/bin/golangci-lint > /dev/null; then \
+		$$(go env GOPATH)/bin/golangci-lint run ./... && echo "✅ Linting completed"; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with:"; \
-		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.54.2"; \
+		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.6.0"; \
+		exit 1; \
 	fi
 
 # Run linter with automatic fixes
