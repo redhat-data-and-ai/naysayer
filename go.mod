@@ -1,6 +1,6 @@
 module github.com/redhat-data-and-ai/naysayer
 
-go 1.24.6
+go 1.24.9
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.9

@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.x'
+        go-version: '1.24.9'
         cache: true
 
     - name: Cache Go modules
@@ -86,7 +86,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.x'
+        go-version: '1.24.9'
 
     - name: Run Gosec Security Scanner
       run: |
@@ -119,7 +119,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.24.x'
+        go-version: '1.24.9'
         cache: true
 
     - name: Cache Go modules
