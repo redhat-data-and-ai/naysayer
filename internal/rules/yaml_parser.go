@@ -229,11 +229,6 @@ func (p *YAMLSectionParser) parseNodeToMap(node *yaml.Node) (map[string]interfac
 	}, nil
 }
 
-// matchesFilePattern checks if a file path matches any of the given patterns
-func (p *YAMLSectionParser) matchesFilePattern(filePath string, patterns []string) bool {
-	return shared.MatchesAnyPattern(filePath, patterns)
-}
-
 // GetSectionAtLine returns the section that contains the given line number
 func (p *YAMLSectionParser) GetSectionAtLine(sections []shared.Section, lineNumber int) *shared.Section {
 	for i := range sections {

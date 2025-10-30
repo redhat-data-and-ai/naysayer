@@ -214,9 +214,3 @@ func createSimpleDiff(oldContent, newContent string) string {
 
 	return diff.String()
 }
-
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}

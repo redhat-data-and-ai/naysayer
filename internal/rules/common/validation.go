@@ -32,7 +32,7 @@ func (v *ValidationHelper) ValidateEmail(email string, approvedDomains []string)
 	if len(approvedDomains) > 0 {
 		domain := strings.Split(email, "@")[1]
 		for _, approvedDomain := range approvedDomains {
-			if strings.ToLower(domain) == strings.ToLower(approvedDomain) {
+			if strings.EqualFold(domain, approvedDomain) {
 				return nil
 			}
 		}
@@ -49,7 +49,7 @@ func (v *ValidationHelper) ValidateRole(role string, validRoles []string) error 
 	}
 
 	for _, validRole := range validRoles {
-		if strings.ToLower(role) == strings.ToLower(validRole) {
+		if strings.EqualFold(role, validRole) {
 			return nil
 		}
 	}

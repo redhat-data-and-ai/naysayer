@@ -103,7 +103,7 @@ files:
 	if err != nil {
 		t.Fatalf("Failed to create test rules file: %v", err)
 	}
-	t.Cleanup(func() { os.Remove("rules.yaml") })
+	t.Cleanup(func() { _ = os.Remove("rules.yaml") })
 }
 
 func TestNewWebhookHandler(t *testing.T) {
