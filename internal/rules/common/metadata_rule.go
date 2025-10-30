@@ -34,8 +34,8 @@ func (r *MetadataRule) ValidateLines(filePath string, fileContent string, lineRa
 		return r.CreateApprovalResult("Auto-approved: DBT metadata configuration changes are safe")
 	}
 
-	// For all other cases (product metadata sections, README files, etc.)
-	// The rule is only called for files that match the configured patterns
+	// For section-based validation where this rule is configured to handle
+	// specific YAML sections (e.g., product metadata sections in product.yaml)
 	return r.CreateApprovalResult("Auto-approved: Product metadata changes are safe")
 }
 
@@ -58,8 +58,8 @@ func (r *MetadataRule) GetCoveredLines(filePath string, fileContent string) []sh
 		}
 	}
 
-	// For all other cases (product metadata sections, README files, etc.)
-	// The rule is only called for files that match the configured patterns
+	// For section-based validation where this rule is configured to handle
+	// specific YAML sections (e.g., product metadata sections in product.yaml)
 	return []shared.LineRange{
 		{
 			StartLine: 1,
