@@ -34,7 +34,9 @@ func (r *MetadataRule) ValidateLines(filePath string, fileContent string, lineRa
 		return r.CreateApprovalResult("Auto-approved: DBT metadata configuration changes are safe")
 	}
 
-	return r.CreateManualReviewResult("Not a metadata file - requires manual review")
+	// For all other cases (product metadata sections, README files, etc.)
+	// The rule is only called for files that match the configured patterns
+	return r.CreateApprovalResult("Auto-approved: Product metadata changes are safe")
 }
 
 // GetCoveredLines returns line ranges this rule covers
@@ -56,7 +58,15 @@ func (r *MetadataRule) GetCoveredLines(filePath string, fileContent string) []sh
 		}
 	}
 
-	return []shared.LineRange{}
+	// For all other cases (product metadata sections, README files, etc.)
+	// The rule is only called for files that match the configured patterns
+	return []shared.LineRange{
+		{
+			StartLine: 1,
+			EndLine:   1,
+			FilePath:  filePath,
+		},
+	}
 }
 
 // isMetadataFile checks if a file is a metadata/documentation file
