@@ -1,0 +1,16 @@
+name: "Multiple files all auto-approve"
+description: "Multiple files where all should auto-approve (documentation release)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Documentation release with multiple updates"
+  author: "testuser"
+  source_branch: "feature/docs-release"
+  target_branch: "main"

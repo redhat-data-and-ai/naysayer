@@ -1,0 +1,5 @@
+---
+name: analytics
+warehouses:
+- type: user
+  size: SMALL

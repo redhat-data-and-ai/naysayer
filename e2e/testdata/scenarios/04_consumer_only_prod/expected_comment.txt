@@ -1,0 +1,5 @@
+<!-- naysayer-comment-id: approval -->
+✅ **Auto-approved**
+
+**What was checked:**
+• ✅ TOC approval check

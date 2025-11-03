@@ -1,0 +1,16 @@
+name: "Update sourcebinding.yaml"
+description: "Sourcebinding updates should be auto-approved (safe config file)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Update source binding configuration"
+  author: "testuser"
+  source_branch: "feature/update-sourcebinding"
+  target_branch: "main"

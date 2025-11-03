@@ -1,0 +1,6 @@
+---
+name: newproduct
+kind: source-aligned
+warehouses:
+- type: user
+  size: LARGE

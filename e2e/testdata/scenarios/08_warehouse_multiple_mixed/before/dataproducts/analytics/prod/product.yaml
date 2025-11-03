@@ -1,0 +1,13 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+warehouses:
+- type: user
+  size: MEDIUM
+- type: service_account
+  size: SMALL
+service_account:
+  dbt: true
+tags:
+  data_product: analytics

@@ -1,0 +1,7 @@
+---
+name: analytics-v2
+kind: source-aligned
+rover_group: example-analytics
+tags:
+  data_product: analytics
+  pii: true

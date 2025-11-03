@@ -1,0 +1,12 @@
+<!-- naysayer-comment-id: approval -->
+✅ **Auto-approved**
+
+**Files in this MR:**
+• `dataproducts/analytics/CHANGELOG.md` ✅
+• `dataproducts/analytics/README.md` ✅
+• `dataproducts/analytics/prod/product.yaml` ✅
+
+**What was checked:**
+• ✅ Metadata validated
+• ✅ TOC approval check
+• ✅ Warehouse configuration validated

@@ -1,0 +1,9 @@
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
+
+**What was checked:**
+• 🚫 TOC approval check: Manual review required: New data product being promoted to preprod environment requires TOC (Technical Oversight Committee) approval before deployment
+• 🚫 Warehouse configuration validated: Warehouse size increase detected: New user warehouse: MEDIUM, New service_account warehouse: XSMALL

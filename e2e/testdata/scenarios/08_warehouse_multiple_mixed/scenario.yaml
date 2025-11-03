@@ -1,0 +1,17 @@
+name: "Multiple warehouses with mixed changes"
+description: "Multiple warehouses - some increase, some decrease - should require manual review (conservative)"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "Warehouse"
+
+mr_metadata:
+  title: "Rebalance warehouse resources"
+  author: "testuser"
+  source_branch: "feature/rebalance-warehouses"
+  target_branch: "main"

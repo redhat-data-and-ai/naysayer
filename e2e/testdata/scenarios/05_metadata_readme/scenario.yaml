@@ -1,0 +1,16 @@
+name: "README.md update"
+description: "README updates should be auto-approved (documentation only)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Update README with new setup instructions"
+  author: "testuser"
+  source_branch: "feature/update-docs"
+  target_branch: "main"
