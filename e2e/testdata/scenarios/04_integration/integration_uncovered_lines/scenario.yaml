@@ -1,0 +1,25 @@
+name: "Uncovered lines trigger manual review"
+description: "Files with lines not covered by any validation rule must require manual review (strict coverage policy)"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  rules_evaluated:
+    - name: metadata_rule
+      section: name
+      decision: Approve
+    - name: metadata_rule
+      section: tags
+      decision: Approve
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "manual review"
+
+mr_metadata:
+  title: "Update product with uncovered sections"
+  author: "testuser"
+  source_branch: "feature/product-with-uncovered-sections"
+  target_branch: "main"
