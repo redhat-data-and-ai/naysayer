@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
 func TestNewAnalyzer(t *testing.T) {
@@ -538,6 +539,55 @@ func (m *MockGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails
 		return nil, m.mrDetailsError
 	}
 	return m.mrDetails, nil
+}
+
+// Stub implementations for interface compliance (not used in warehouse tests)
+func (m *MockGitLabClient) FetchMRChanges(projectID, mrIID int) ([]gitlab.FileChange, error) {
+	return []gitlab.FileChange{}, nil
+}
+
+func (m *MockGitLabClient) AddMRComment(projectID, mrIID int, comment string) error {
+	return nil
+}
+
+func (m *MockGitLabClient) AddOrUpdateMRComment(projectID, mrIID int, commentBody, commentType string) error {
+	return nil
+}
+
+func (m *MockGitLabClient) ListMRComments(projectID, mrIID int) ([]gitlab.MRComment, error) {
+	return []gitlab.MRComment{}, nil
+}
+
+func (m *MockGitLabClient) UpdateMRComment(projectID, mrIID, commentID int, newBody string) error {
+	return nil
+}
+
+func (m *MockGitLabClient) FindLatestNaysayerComment(projectID, mrIID int, commentType ...string) (*gitlab.MRComment, error) {
+	return nil, nil
+}
+
+func (m *MockGitLabClient) ApproveMR(projectID, mrIID int) error {
+	return nil
+}
+
+func (m *MockGitLabClient) ApproveMRWithMessage(projectID, mrIID int, message string) error {
+	return nil
+}
+
+func (m *MockGitLabClient) ResetNaysayerApproval(projectID, mrIID int) error {
+	return nil
+}
+
+func (m *MockGitLabClient) GetCurrentBotUsername() (string, error) {
+	return "naysayer-bot", nil
+}
+
+func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool {
+	return false
+}
+
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
+	return nil
 }
 
 func TestAnalyzer_hasNonWarehouseChanges(t *testing.T) {

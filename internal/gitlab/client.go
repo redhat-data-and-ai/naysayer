@@ -543,3 +543,39 @@ func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, comment
 	// No existing comment found, create new one
 	return c.AddMRComment(projectID, mrIID, commentBody)
 }
+
+// RebaseMR triggers a rebase for a merge request
+func (c *Client) RebaseMR(projectID, mrIID int) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/rebase",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte("{}")))
+	if err != nil {
+		return fmt.Errorf("failed to create rebase request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to rebase MR: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case 202:
+		return nil // Success - rebase accepted
+	case 403:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("rebase failed: insufficient permissions or rebase not allowed: %s", string(body))
+	case 404:
+		return fmt.Errorf("rebase failed: MR not found")
+	case 409:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("rebase failed: rebase already in progress or conflicts detected: %s", string(body))
+	default:
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, string(body))
+	}
+}
