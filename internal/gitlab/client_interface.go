@@ -26,6 +26,9 @@ type GitLabClient interface {
 	// Bot identity
 	GetCurrentBotUsername() (string, error)
 	IsNaysayerBotAuthor(author map[string]interface{}) bool
+
+	// Rebase operations
+	RebaseMR(projectID, mrIID int) error
 }
 
 // Verify that Client implements GitLabClient interface

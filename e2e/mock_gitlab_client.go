@@ -303,3 +303,10 @@ func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bo
 	}
 	return false
 }
+
+// RebaseMR is a no-op for mock client (rebase functionality is not tested in e2e)
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
+	// In e2e tests, we don't need to test rebase functionality
+	// Just return success
+	return nil
+}
