@@ -2,7 +2,13 @@
 ⚠️ **Manual review required**
 
 **Why manual review is needed:**
-This MR contains files that Naysayer doesn't know how to validate
 
-**Files needing review:**
-• `scripts/process_data.py` - No validation rules configured for Python scripts
+This MR contains files that Naysayer doesn't know how to validate.
+
+<details>
+<summary><b>Files requiring manual approval (no automated rules configured)</b> (1 file)</summary>
+
+**No validation rules configured for Python scripts** (1 file)
+- `scripts/process_data.py`
+
+</details>

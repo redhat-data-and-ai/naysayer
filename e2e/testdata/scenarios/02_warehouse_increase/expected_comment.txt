@@ -4,7 +4,12 @@
 **Why manual review is needed:**
 One or more files require manual review
 
+<details>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
+
 **What was checked:**
-• ✅ Metadata validated
-• ✅ TOC approval check
+• ✅ Metadata validated: Product metadata changes (name, tags, kind) are safe and don't affect infrastructure
+• ✅ TOC approval check: Changes to existing products in non-critical environments
 • 🚫 Warehouse configuration validated: Warehouse size increase detected: user warehouse: SMALL → MEDIUM
+
+</details>

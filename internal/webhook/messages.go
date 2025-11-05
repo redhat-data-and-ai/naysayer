@@ -79,6 +79,10 @@ func (mb *MessageBuilder) buildBasicSummary(result *shared.RuleEvaluation) strin
 func (mb *MessageBuilder) buildDetailedSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
+	// Collapsible section for cleaner comments
+	summary.WriteString("<details>\n")
+	summary.WriteString("<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>\n\n")
+
 	// File list if 3+ files
 	if result.TotalFiles >= 3 {
 		if filesSummary := mb.buildFilesSummary(result); filesSummary != "" {
@@ -91,6 +95,8 @@ func (mb *MessageBuilder) buildDetailedSummary(result *shared.RuleEvaluation) st
 	// What was checked
 	summary.WriteString("**What was checked:**\n")
 	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
+
+	summary.WriteString("\n</details>")
 
 	return summary.String()
 }
@@ -145,7 +151,8 @@ func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.F
 			case shared.Approve:
 				// Only store if not already present
 				if _, exists := ruleMessages[ruleName]; !exists {
-					ruleMessages[ruleName] = fmt.Sprintf("✅ %s", ruleName)
+					explanation := mb.getApprovalExplanation(ruleResult.RuleName, ruleResult.Reason)
+					ruleMessages[ruleName] = fmt.Sprintf("✅ %s%s", ruleName, explanation)
 				}
 			case shared.ManualReview:
 				// Manual review messages always override
@@ -188,16 +195,38 @@ func (mb *MessageBuilder) isNoiseMessage(message string) bool {
 // formatRuleName converts internal rule names to user-friendly descriptions
 func (mb *MessageBuilder) formatRuleName(ruleName string) string {
 	friendlyNames := map[string]string{
-		"warehouse_rule":       "Warehouse configuration validated",
-		"service_account_rule": "Service account validated",
-		"toc_approval_rule":    "TOC approval check",
-		"metadata_rule":        "Metadata validated",
+		"warehouse_rule":            "Warehouse configuration validated",
+		"service_account_rule":      "Service account validated",
+		"toc_approval_rule":         "TOC approval check",
+		"metadata_rule":             "Metadata validated",
+		"dataproduct_consumer_rule": "Consumer access changes validated",
 	}
 
 	if friendly, ok := friendlyNames[ruleName]; ok {
 		return friendly
 	}
 	return ruleName
+}
+
+// getApprovalExplanation provides meaningful context for why a rule auto-approved
+func (mb *MessageBuilder) getApprovalExplanation(ruleName string, reason string) string {
+	switch ruleName {
+	case "metadata_rule":
+		return ": Product metadata changes (name, tags, kind) are safe and don't affect infrastructure"
+	case "dataproduct_consumer_rule":
+		return ": Data product owner can grant consumer access without TOC approval"
+	case "warehouse_rule":
+		if strings.Contains(reason, "decrease") {
+			return ": Warehouse size decrease saves costs and is safe to auto-approve"
+		}
+		return ": Warehouse configuration changes validated"
+	case "toc_approval_rule":
+		return ": Changes to existing products in non-critical environments"
+	case "service_account_rule":
+		return ": Service account configuration is valid"
+	default:
+		return ""
+	}
 }
 
 // hasUncoveredFiles checks if there are files without validation rules
@@ -274,7 +303,16 @@ func (mb *MessageBuilder) buildDetailedRulesSummary(fileValidations map[string]*
 func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	for filePath, fileValidation := range result.FileValidations {
+	// Collect and sort file paths
+	var filePaths []string
+	for filePath := range result.FileValidations {
+		filePaths = append(filePaths, filePath)
+	}
+	sort.Strings(filePaths)
+
+	// Output sorted file list
+	for _, filePath := range filePaths {
+		fileValidation := result.FileValidations[filePath]
 		summary.WriteString(fmt.Sprintf("• `%s`", filePath))
 
 		// Add decision status
@@ -295,7 +333,16 @@ func (mb *MessageBuilder) buildFilesSummary(result *shared.RuleEvaluation) strin
 func (mb *MessageBuilder) buildDetailedFilesSummary(result *shared.RuleEvaluation) string {
 	var summary strings.Builder
 
-	for filePath, fileValidation := range result.FileValidations {
+	// Collect and sort file paths
+	var filePaths []string
+	for filePath := range result.FileValidations {
+		filePaths = append(filePaths, filePath)
+	}
+	sort.Strings(filePaths)
+
+	// Output sorted detailed file list
+	for _, filePath := range filePaths {
+		fileValidation := result.FileValidations[filePath]
 		summary.WriteString(fmt.Sprintf("**File: `%s`**\n", filePath))
 		summary.WriteString(fmt.Sprintf("• Total lines: %d\n", fileValidation.TotalLines))
 		summary.WriteString(fmt.Sprintf("• Decision: %s\n", fileValidation.FileDecision))
@@ -372,26 +419,71 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 
 	// Enhanced decision with WHY explanation
 	if mb.hasUncoveredFiles(result) {
-		summary.WriteString("**Why manual review is needed:**\n")
-		summary.WriteString("This MR contains files that Naysayer doesn't know how to validate\n\n")
+		summary.WriteString("**Why manual review is needed:**\n\n")
+		summary.WriteString("This MR contains files that Naysayer doesn't know how to validate.\n\n")
 
-		summary.WriteString("**Files needing review:**\n")
+		// Group files by reason
+		filesByReason := make(map[string][]string)
 		for filePath, fileValidation := range result.FileValidations {
 			if fileValidation.FileDecision == shared.ManualReview && len(fileValidation.RuleResults) == 0 {
-				summary.WriteString(fmt.Sprintf("• `%s` - %s\n", filePath, mb.getUncoveredReason(filePath)))
+				reason := mb.getUncoveredReason(filePath)
+				filesByReason[reason] = append(filesByReason[reason], filePath)
 			}
 		}
+
+		// Sort reasons alphabetically
+		var reasons []string
+		for reason := range filesByReason {
+			reasons = append(reasons, reason)
+		}
+		sort.Strings(reasons)
+
+		// Use collapsible details for long lists
+		totalFiles := 0
+		for _, files := range filesByReason {
+			totalFiles += len(files)
+		}
+
+		// Always use collapsible section for file lists
+		summary.WriteString("<details>\n")
+		summary.WriteString(fmt.Sprintf("<summary><b>Files requiring manual approval (no automated rules configured)</b> (%d file", totalFiles))
+		if totalFiles != 1 {
+			summary.WriteString("s")
+		}
+		summary.WriteString(")</summary>\n\n")
+
+		for _, reason := range reasons {
+			files := filesByReason[reason]
+			sort.Strings(files)
+			summary.WriteString(fmt.Sprintf("**%s** (%d file", reason, len(files)))
+			if len(files) != 1 {
+				summary.WriteString("s")
+			}
+			summary.WriteString(")\n")
+			for _, filePath := range files {
+				summary.WriteString(fmt.Sprintf("- `%s`\n", filePath))
+			}
+			summary.WriteString("\n")
+		}
+		summary.WriteString("</details>\n")
 	} else {
-		summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n", result.FinalDecision.Reason))
+		summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n\n", result.FinalDecision.Reason))
+
+		// Collapsible section for analysis details
+		summary.WriteString("<details>\n")
+		summary.WriteString("<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>\n\n")
 
 		// Show file list if 3+ files
 		if result.TotalFiles >= 3 {
-			summary.WriteString("\n**Files in this MR:**\n")
+			summary.WriteString("**Files in this MR:**\n")
 			summary.WriteString(mb.buildFilesSummary(result))
+			summary.WriteString("\n")
 		}
 
-		summary.WriteString("\n**What was checked:**\n")
+		summary.WriteString("**What was checked:**\n")
 		summary.WriteString(mb.buildRulesSummary(result.FileValidations))
+
+		summary.WriteString("\n</details>")
 	}
 
 	return summary.String()
