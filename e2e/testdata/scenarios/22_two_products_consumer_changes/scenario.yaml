@@ -1,0 +1,16 @@
+name: "Two products with consumer-only changes"
+description: "Consumer additions to both preprod and prod product files - should auto-approve (data product owner approval sufficient)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add consumer group to subscription watch preprod and prod"
+  author: "testuser"
+  source_branch: "feature/add-subscriptionwatch-consumers"
+  target_branch: "main"

@@ -1,0 +1,16 @@
+name: "Multiple sourcebinding.yaml files across environments"
+description: "Sourcebinding updates across 4 environments - should auto-approve (low-risk metadata changes)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add snowpipe_db access to srcdatagovernance across all environments"
+  author: "testuser"
+  source_branch: "feature/srcdatagovernance-snowpipe-access"
+  target_branch: "main"

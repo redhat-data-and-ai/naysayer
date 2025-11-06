@@ -1,0 +1,18 @@
+name: "New product with warehouse decrease - TOC fails, warehouse passes"
+description: "New product in prod with warehouse decrease - TOC should fail but warehouse should pass, requiring manual review"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "TOC approval"
+    - "Warehouse configuration validated"
+
+mr_metadata:
+  title: "Deploy new sales product with optimized warehouse configuration"
+  author: "testuser"
+  source_branch: "feature/new-sales-product-optimized"
+  target_branch: "main"

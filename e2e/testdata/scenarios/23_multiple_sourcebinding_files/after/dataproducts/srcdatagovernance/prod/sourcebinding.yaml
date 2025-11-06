@@ -1,0 +1,7 @@
+---
+source:
+- database: datagovernance_source_db
+  schema: public
+- database: snowpipe_db
+  schema: datagovernance
+  read_only: true
