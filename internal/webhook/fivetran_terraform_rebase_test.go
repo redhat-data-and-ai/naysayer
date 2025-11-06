@@ -18,6 +18,8 @@ import (
 type MockRebaseGitLabClient struct {
 	rebaseError       error
 	addCommentError   error
+	listOpenMRsError  error
+	openMRs           []int
 	capturedComments  []string
 	capturedRebaseMRs []struct {
 		projectID int
@@ -91,6 +93,13 @@ func (m *MockRebaseGitLabClient) IsNaysayerBotAuthor(author map[string]interface
 	return false
 }
 
+func (m *MockRebaseGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
+	if m.listOpenMRsError != nil {
+		return nil, m.listOpenMRsError
+	}
+	return m.openMRs, nil
+}
+
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
@@ -111,23 +120,69 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_Success(t *testing.T) {
 		},
 	}
 
-	mockClient := &MockRebaseGitLabClient{}
+	mockClient := &MockRebaseGitLabClient{
+		openMRs: []int{123, 456, 789},
+	}
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
 
 	payload := map[string]interface{}{
-		"object_kind": "merge_request",
-		"object_attributes": map[string]interface{}{
-			"iid":   123,
-			"state": "opened",
-		},
+		"object_kind": "push",
+		"ref":         "refs/heads/main",
 		"project": map[string]interface{}{
 			"id": 456,
 		},
-		"user": map[string]interface{}{
-			"username": "testuser",
+		"user_username": "testuser",
+	}
+
+	payloadBytes, _ := json.Marshal(payload)
+	req := httptest.NewRequest("POST", "/rebase", bytes.NewReader(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	assert.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	// Parse response
+	body, _ := io.ReadAll(resp.Body)
+	var response map[string]interface{}
+	_ = json.Unmarshal(body, &response)
+
+	assert.Equal(t, "processed", response["webhook_response"])
+	assert.Equal(t, "completed", response["status"])
+	assert.Equal(t, float64(456), response["project_id"])
+	assert.Equal(t, "main", response["branch"])
+	assert.Equal(t, float64(3), response["total_mrs"])
+	assert.Equal(t, float64(3), response["successful"])
+	assert.Equal(t, float64(0), response["failed"])
+
+	// Verify rebase was called for all MRs
+	assert.Len(t, mockClient.capturedRebaseMRs, 3)
+	assert.Equal(t, 456, mockClient.capturedRebaseMRs[0].projectID)
+	assert.Equal(t, 123, mockClient.capturedRebaseMRs[0].mrIID)
+	assert.Equal(t, 456, mockClient.capturedRebaseMRs[1].projectID)
+	assert.Equal(t, 456, mockClient.capturedRebaseMRs[1].mrIID)
+	assert.Equal(t, 456, mockClient.capturedRebaseMRs[2].projectID)
+	assert.Equal(t, 789, mockClient.capturedRebaseMRs[2].mrIID)
+}
+
+func TestFivetranTerraformRebaseHandler_HandleWebhook_NoOpenMRs(t *testing.T) {
+	cfg := createTestConfig()
+	mockClient := &MockRebaseGitLabClient{
+		openMRs: []int{}, // No open MRs
+	}
+	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+
+	app := createTestApp()
+	app.Post("/rebase", handler.HandleWebhook)
+
+	payload := map[string]interface{}{
+		"object_kind": "push",
+		"ref":         "refs/heads/main",
+		"project": map[string]interface{}{
+			"id": 456,
 		},
 	}
 
@@ -145,59 +200,9 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_Success(t *testing.T) {
 	_ = json.Unmarshal(body, &response)
 
 	assert.Equal(t, "processed", response["webhook_response"])
-	assert.Equal(t, "merge_request_rebase", response["event_type"])
 	assert.Equal(t, "success", response["status"])
-	assert.Equal(t, true, response["rebased"])
-	assert.Equal(t, float64(456), response["project_id"])
-	assert.Equal(t, float64(123), response["mr_iid"])
-
-	// Verify rebase was called
-	assert.Len(t, mockClient.capturedRebaseMRs, 1)
-	assert.Equal(t, 456, mockClient.capturedRebaseMRs[0].projectID)
-	assert.Equal(t, 123, mockClient.capturedRebaseMRs[0].mrIID)
-
-	// Verify comment was added
-	assert.Len(t, mockClient.capturedComments, 1)
-	assert.Contains(t, mockClient.capturedComments[0], "Naysayer Rebase Triggered")
-}
-
-func TestFivetranTerraformRebaseHandler_HandleWebhook_NonOpenMR(t *testing.T) {
-	cfg := createTestConfig()
-	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
-
-	app := createTestApp()
-	app.Post("/rebase", handler.HandleWebhook)
-
-	payload := map[string]interface{}{
-		"object_kind": "merge_request",
-		"object_attributes": map[string]interface{}{
-			"iid":   123,
-			"state": "merged",
-		},
-		"project": map[string]interface{}{
-			"id": 456,
-		},
-		"user": map[string]interface{}{
-			"username": "testuser",
-		},
-	}
-
-	payloadBytes, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/rebase", bytes.NewReader(payloadBytes))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := app.Test(req)
-	assert.NoError(t, err)
-	assert.Equal(t, 200, resp.StatusCode)
-
-	// Parse response
-	body, _ := io.ReadAll(resp.Body)
-	var response map[string]interface{}
-	_ = json.Unmarshal(body, &response)
-
-	assert.Equal(t, "skipped", response["status"])
-	assert.Equal(t, false, response["rebased"])
+	assert.Equal(t, "No open MRs to rebase", response["message"])
+	assert.Equal(t, float64(0), response["mrs_rebased"])
 
 	// Verify rebase was NOT called
 	assert.Len(t, mockClient.capturedRebaseMRs, 0)
@@ -215,6 +220,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 	}
 
 	mockClient := &MockRebaseGitLabClient{
+		openMRs:     []int{123, 456},
 		rebaseError: fmt.Errorf("rebase failed: conflicts detected"),
 	}
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
@@ -223,16 +229,10 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 	app.Post("/rebase", handler.HandleWebhook)
 
 	payload := map[string]interface{}{
-		"object_kind": "merge_request",
-		"object_attributes": map[string]interface{}{
-			"iid":   123,
-			"state": "opened",
-		},
+		"object_kind": "push",
+		"ref":         "refs/heads/main",
 		"project": map[string]interface{}{
 			"id": 456,
-		},
-		"user": map[string]interface{}{
-			"username": "testuser",
 		},
 	}
 
@@ -242,19 +242,25 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 
 	resp, err := app.Test(req)
 	assert.NoError(t, err)
-	assert.Equal(t, 500, resp.StatusCode)
+	assert.Equal(t, 200, resp.StatusCode)
 
 	// Parse response
 	body, _ := io.ReadAll(resp.Body)
 	var response map[string]interface{}
 	_ = json.Unmarshal(body, &response)
 
-	assert.Equal(t, false, response["rebased"])
-	assert.Contains(t, response["error"].(string), "conflicts detected")
+	assert.Equal(t, "processed", response["webhook_response"])
+	assert.Equal(t, "completed", response["status"])
+	assert.Equal(t, float64(2), response["total_mrs"])
+	assert.Equal(t, float64(0), response["successful"])
+	assert.Equal(t, float64(2), response["failed"])
 
-	// Verify failure comment was added
-	assert.Len(t, mockClient.capturedComments, 1)
-	assert.Contains(t, mockClient.capturedComments[0], "Naysayer Rebase Failed")
+	// Verify both rebase attempts were made
+	assert.Len(t, mockClient.capturedRebaseMRs, 2)
+
+	// Verify failures are reported
+	failures := response["failures"].([]interface{})
+	assert.Len(t, failures, 2)
 }
 
 func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidContentType(t *testing.T) {
@@ -310,10 +316,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *te
 	app.Post("/rebase", handler.HandleWebhook)
 
 	payload := map[string]interface{}{
-		"object_kind": "push",
-		"object_attributes": map[string]interface{}{
-			"iid": 123,
-		},
+		"object_kind": "merge_request",
 		"project": map[string]interface{}{
 			"id": 456,
 		},
@@ -334,7 +337,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *te
 	assert.Contains(t, response["error"].(string), "Unsupported event type")
 }
 
-func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingObjectAttributes(t *testing.T) {
+func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingProject(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
@@ -343,7 +346,8 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingObjectAttributes(t 
 	app.Post("/rebase", handler.HandleWebhook)
 
 	payload := map[string]interface{}{
-		"object_kind": "merge_request",
+		"object_kind": "push",
+		"ref":         "refs/heads/main",
 	}
 
 	payloadBytes, _ := json.Marshal(payload)
@@ -358,37 +362,24 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingObjectAttributes(t 
 	var response map[string]interface{}
 	_ = json.Unmarshal(body, &response)
 
-	assert.Contains(t, response["error"].(string), "missing object_attributes")
+	assert.Contains(t, response["error"].(string), "missing project information")
 }
 
-func TestFivetranTerraformRebaseHandler_HandleWebhook_CommentsDisabled(t *testing.T) {
-	cfg := &config.Config{
-		GitLab: config.GitLabConfig{
-			BaseURL: "https://gitlab.example.com",
-			Token:   "test-token",
-		},
-		Comments: config.CommentsConfig{
-			EnableMRComments: false, // Comments disabled
-		},
+func TestFivetranTerraformRebaseHandler_HandleWebhook_PushToNonMainBranch(t *testing.T) {
+	cfg := createTestConfig()
+	mockClient := &MockRebaseGitLabClient{
+		openMRs: []int{123},
 	}
-
-	mockClient := &MockRebaseGitLabClient{}
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
 
 	payload := map[string]interface{}{
-		"object_kind": "merge_request",
-		"object_attributes": map[string]interface{}{
-			"iid":   123,
-			"state": "opened",
-		},
+		"object_kind": "push",
+		"ref":         "refs/heads/feature-branch",
 		"project": map[string]interface{}{
 			"id": 456,
-		},
-		"user": map[string]interface{}{
-			"username": "testuser",
 		},
 	}
 
@@ -400,11 +391,17 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_CommentsDisabled(t *testin
 	assert.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 
-	// Verify no comment was added
-	assert.Len(t, mockClient.capturedComments, 0)
+	// Parse response
+	body, _ := io.ReadAll(resp.Body)
+	var response map[string]interface{}
+	_ = json.Unmarshal(body, &response)
 
-	// But rebase should still be called
-	assert.Len(t, mockClient.capturedRebaseMRs, 1)
+	assert.Equal(t, "processed", response["webhook_response"])
+	assert.Equal(t, "skipped", response["status"])
+	assert.Contains(t, response["reason"].(string), "only main/master triggers rebase")
+
+	// Verify rebase was NOT called
+	assert.Len(t, mockClient.capturedRebaseMRs, 0)
 }
 
 func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
@@ -421,9 +418,6 @@ func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 		{
 			name: "Valid payload",
 			payload: map[string]interface{}{
-				"object_attributes": map[string]interface{}{
-					"iid": 123,
-				},
 				"project": map[string]interface{}{
 					"id": 456,
 				},
@@ -437,31 +431,10 @@ func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 			errorMsg:    "payload is nil",
 		},
 		{
-			name:        "Missing object_attributes",
+			name:        "Missing project",
 			payload:     map[string]interface{}{},
 			expectError: true,
-			errorMsg:    "missing object_attributes",
-		},
-		{
-			name: "Missing iid",
-			payload: map[string]interface{}{
-				"object_attributes": map[string]interface{}{},
-				"project": map[string]interface{}{
-					"id": 456,
-				},
-			},
-			expectError: true,
-			errorMsg:    "missing iid",
-		},
-		{
-			name: "Missing project",
-			payload: map[string]interface{}{
-				"object_attributes": map[string]interface{}{
-					"iid": 123,
-				},
-			},
-			expectError: true,
-			errorMsg:    "missing project",
+			errorMsg:    "missing project information",
 		},
 	}
 
