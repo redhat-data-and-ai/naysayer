@@ -29,6 +29,7 @@ type GitLabClient interface {
 
 	// Rebase operations
 	RebaseMR(projectID, mrIID int) error
+	ListOpenMRs(projectID int) ([]int, error)
 }
 
 // Verify that Client implements GitLabClient interface

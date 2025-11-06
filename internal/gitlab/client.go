@@ -579,3 +579,42 @@ func (c *Client) RebaseMR(projectID, mrIID int) error {
 		return fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
+
+// ListOpenMRs returns a list of open MR IIDs for a project
+func (c *Client) ListOpenMRs(projectID int) ([]int, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create list MRs request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list MRs: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list MRs failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var mrs []struct {
+		IID int `json:"iid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&mrs); err != nil {
+		return nil, fmt.Errorf("failed to decode MRs response: %w", err)
+	}
+
+	mrIIDs := make([]int, len(mrs))
+	for i, mr := range mrs {
+		mrIIDs[i] = mr.IID
+	}
+
+	return mrIIDs, nil
+}

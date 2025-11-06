@@ -590,6 +590,10 @@ func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
 	return nil
 }
 
+func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
+	return []int{}, nil
+}
+
 func TestAnalyzer_hasNonWarehouseChanges(t *testing.T) {
 	analyzer := NewAnalyzer(nil)
 

@@ -10,7 +10,6 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
-	"github.com/redhat-data-and-ai/naysayer/internal/utils"
 )
 
 // FivetranTerraformRebaseHandler handles Fivetran Terraform rebase requests
@@ -85,7 +84,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	// Only support MR events
+	// Get event type
 	eventType, ok := payload["object_kind"].(string)
 	if !ok {
 		logging.Warn("Missing object_kind in payload")
@@ -94,101 +93,129 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 		})
 	}
 
-	if eventType != "merge_request" {
-		logging.Warn("Skipping unsupported event: %s", eventType)
-		return c.Status(400).JSON(fiber.Map{
-			"error": fmt.Sprintf("Unsupported event type: %s. Only merge_request events are supported.", eventType),
-		})
+	// Handle push events to main branch (rebase all open MRs)
+	if eventType == "push" {
+		return h.handlePushToMain(c, payload)
 	}
 
-	return h.handleMergeRequestRebase(c, payload)
+	// Unsupported event type
+	logging.Warn("Skipping unsupported event: %s", eventType)
+	return c.Status(400).JSON(fiber.Map{
+		"error": fmt.Sprintf("Unsupported event type: %s. Only push events are supported.", eventType),
+	})
 }
 
-// handleMergeRequestRebase handles the rebase operation for a merge request
-func (h *FivetranTerraformRebaseHandler) handleMergeRequestRebase(c *fiber.Ctx, payload map[string]interface{}) error {
-	// Extract MR information
-	mrInfo, err := gitlab.ExtractMRInfo(payload)
-	if err != nil {
-		logging.Error("Failed to extract MR info: %v", err)
+// handlePushToMain handles push events to main branch by rebasing all open MRs
+func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload map[string]interface{}) error {
+	// Extract project ID
+	project, ok := payload["project"].(map[string]interface{})
+	if !ok {
+		logging.Error("Missing project information in push payload")
 		return c.Status(400).JSON(fiber.Map{
-			"error": "Missing MR information: " + err.Error(),
+			"error": "Missing project information",
 		})
 	}
 
-	logging.MRInfo(mrInfo.MRIID, "Processing rebase request",
-		zap.Int("project_id", mrInfo.ProjectID),
-		zap.String("author", mrInfo.Author),
-		zap.String("state", mrInfo.State))
+	projectID, ok := project["id"].(float64)
+	if !ok {
+		logging.Error("Invalid project ID in push payload")
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
 
-	// Skip rebase if MR is not open
-	if mrInfo.State != utils.MRStateOpened {
-		logging.MRInfo(mrInfo.MRIID, "Skipping rebase for non-open MR",
-			zap.String("state", mrInfo.State))
+	// Extract branch reference
+	ref, ok := payload["ref"].(string)
+	if !ok {
+		logging.Warn("Missing ref in push payload")
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Missing ref in payload",
+		})
+	}
 
+	// Check if push is to main/master branch
+	targetBranch := strings.TrimPrefix(ref, "refs/heads/")
+	if targetBranch != "main" && targetBranch != "master" {
+		logging.Info("Ignoring push to non-main branch: %s", targetBranch)
 		return c.JSON(fiber.Map{
 			"webhook_response": "processed",
-			"event_type":       "merge_request_rebase",
 			"status":           "skipped",
-			"reason":           fmt.Sprintf("MR state is '%s', only processing open MRs", mrInfo.State),
-			"rebased":          false,
-			"project_id":       mrInfo.ProjectID,
-			"mr_iid":           mrInfo.MRIID,
+			"reason":           fmt.Sprintf("Push to %s branch, only main/master triggers rebase", targetBranch),
+			"branch":           targetBranch,
 		})
 	}
 
-	// Trigger the rebase operation
-	logging.MRInfo(mrInfo.MRIID, "Triggering rebase operation")
-	if err := h.gitlabClient.RebaseMR(mrInfo.ProjectID, mrInfo.MRIID); err != nil {
-		logging.MRError(mrInfo.MRIID, "Failed to trigger rebase", err)
+	logging.Info("Push to main branch detected, rebasing all open MRs",
+		zap.String("branch", targetBranch),
+		zap.Int("project_id", int(projectID)))
 
-		// Add a comment if enabled to inform about the failure
-		if h.config.Comments.EnableMRComments {
-			comment := fmt.Sprintf("🔄 **Naysayer Rebase Failed**\n\n"+
-				"Failed to trigger automatic rebase for this merge request.\n\n"+
-				"**Error:** %s\n\n"+
-				"Please manually rebase or check the merge request status.",
-				err.Error())
-
-			if addCommentErr := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); addCommentErr != nil {
-				logging.MRWarn(mrInfo.MRIID, "Failed to add failure comment", zap.Error(addCommentErr))
-			}
-		}
-
+	// Get all open MRs
+	mrIIDs, err := h.gitlabClient.ListOpenMRs(int(projectID))
+	if err != nil {
+		logging.Error("Failed to list open MRs: %v", err)
 		return c.Status(500).JSON(fiber.Map{
-			"error":      "Failed to trigger rebase: " + err.Error(),
-			"rebased":    false,
-			"project_id": mrInfo.ProjectID,
-			"mr_iid":     mrInfo.MRIID,
+			"error":      "Failed to list open MRs: " + err.Error(),
+			"project_id": int(projectID),
 		})
 	}
 
-	logging.MRInfo(mrInfo.MRIID, "Rebase triggered successfully")
+	if len(mrIIDs) == 0 {
+		logging.Info("No open MRs found to rebase")
+		return c.JSON(fiber.Map{
+			"webhook_response": "processed",
+			"status":           "success",
+			"message":          "No open MRs to rebase",
+			"project_id":       int(projectID),
+			"branch":           targetBranch,
+			"mrs_rebased":      0,
+		})
+	}
 
-	// Add a success comment if enabled
-	if h.config.Comments.EnableMRComments {
-		comment := "🔄 **Naysayer Rebase Triggered**\n\n" +
-			"Automatic rebase has been initiated for this merge request.\n\n" +
-			"The rebase operation is running in the background. " +
-			"Please wait a few moments for it to complete."
+	logging.Info("Found %d open MRs to rebase", len(mrIIDs))
 
-		if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
-			logging.MRWarn(mrInfo.MRIID, "Failed to add success comment", zap.Error(err))
-			// Continue - comment failure shouldn't block the webhook response
+	// Rebase all open MRs
+	successCount := 0
+	failureCount := 0
+	failures := make([]map[string]interface{}, 0)
+
+	for _, mrIID := range mrIIDs {
+		logging.Info("Attempting to rebase MR", zap.Int("mr_iid", mrIID))
+
+		err := h.gitlabClient.RebaseMR(int(projectID), mrIID)
+		if err != nil {
+			logging.Warn("Failed to rebase MR", zap.Int("mr_iid", mrIID), zap.Error(err))
+			failureCount++
+			failures = append(failures, map[string]interface{}{
+				"mr_iid": mrIID,
+				"error":  err.Error(),
+			})
 		} else {
-			logging.MRInfo(mrInfo.MRIID, "Added rebase notification comment")
+			logging.Info("Successfully triggered rebase for MR", zap.Int("mr_iid", mrIID))
+			successCount++
 		}
 	}
 
-	// Return success response
-	return c.JSON(fiber.Map{
+	// Build response
+	response := fiber.Map{
 		"webhook_response": "processed",
-		"event_type":       "merge_request_rebase",
-		"status":           "success",
-		"rebased":          true,
-		"project_id":       mrInfo.ProjectID,
-		"mr_iid":           mrInfo.MRIID,
-		"message":          "Rebase operation triggered successfully",
-	})
+		"status":           "completed",
+		"project_id":       int(projectID),
+		"branch":           targetBranch,
+		"total_mrs":        len(mrIIDs),
+		"successful":       successCount,
+		"failed":           failureCount,
+	}
+
+	if failureCount > 0 {
+		response["failures"] = failures
+	}
+
+	logging.Info("Rebase operation completed",
+		zap.Int("total", len(mrIIDs)),
+		zap.Int("successful", successCount),
+		zap.Int("failed", failureCount))
+
+	return c.JSON(response)
 }
 
 // validateWebhookPayload performs validation on webhook payload
@@ -198,23 +225,7 @@ func (h *FivetranTerraformRebaseHandler) validateWebhookPayload(payload map[stri
 		return fmt.Errorf("payload is nil")
 	}
 
-	// Validate object_attributes section
-	objectAttrs, ok := payload["object_attributes"]
-	if !ok {
-		return fmt.Errorf("missing object_attributes")
-	}
-
-	objectAttrsMap, ok := objectAttrs.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("object_attributes must be an object")
-	}
-
-	// Validate required fields
-	if _, exists := objectAttrsMap["iid"]; !exists {
-		return fmt.Errorf("missing iid in object_attributes")
-	}
-
-	// Validate project section
+	// Validate project section (required for both push and MR events)
 	if _, ok := payload["project"]; !ok {
 		return fmt.Errorf("missing project information")
 	}

@@ -310,3 +310,9 @@ func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
 	// Just return success
 	return nil
 }
+
+// ListOpenMRs is a stub for mock client
+func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
+	// Return empty list for e2e tests
+	return []int{}, nil
+}
