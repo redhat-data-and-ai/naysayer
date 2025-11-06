@@ -1,0 +1,14 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+data_product_db:
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: journey
+      kind: data_product
+  - name: staging
+    consumers:
+    - name: reporting
+      kind: data_product

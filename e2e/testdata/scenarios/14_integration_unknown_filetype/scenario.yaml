@@ -1,0 +1,16 @@
+name: "Unknown file type Python script"
+description: "Unknown file types (.py) should require manual review (strict policy)"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+
+mr_metadata:
+  title: "Add Python data processing script"
+  author: "testuser"
+  source_branch: "feature/add-python-script"
+  target_branch: "main"

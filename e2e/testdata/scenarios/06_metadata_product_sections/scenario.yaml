@@ -1,0 +1,16 @@
+name: "Metadata-only sections in product.yaml"
+description: "Metadata-only sections (name, tags) should be auto-approved"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Update product name and add PII tag"
+  author: "testuser"
+  source_branch: "feature/update-metadata"
+  target_branch: "main"

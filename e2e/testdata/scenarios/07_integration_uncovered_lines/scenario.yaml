@@ -1,0 +1,16 @@
+name: "Unknown file type requires manual review"
+description: "Files without section configuration should trigger manual review (strict coverage policy)"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+
+mr_metadata:
+  title: "Add SQL migration script"
+  author: "testuser"
+  source_branch: "feature/add-migration"
+  target_branch: "main"

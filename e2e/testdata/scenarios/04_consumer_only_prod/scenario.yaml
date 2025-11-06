@@ -1,0 +1,16 @@
+name: "Consumer-only changes in prod"
+description: "Consumer-only changes should be auto-approved (owner approval sufficient)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Grant journey product access to analytics data"
+  author: "testuser"
+  source_branch: "feature/add-journey-consumer"
+  target_branch: "main"

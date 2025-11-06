@@ -1,0 +1,4 @@
+---
+source: new_database
+table: customers_v2
+schema: public

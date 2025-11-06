@@ -1,0 +1,16 @@
+name: "Consumers in multiple presentation schemas"
+description: "Consumer changes in multiple schemas should be auto-approved"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Grant access to journey and reporting products"
+  author: "testuser"
+  source_branch: "feature/add-multiple-consumers"
+  target_branch: "main"

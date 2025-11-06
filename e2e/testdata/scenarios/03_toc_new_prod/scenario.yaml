@@ -1,0 +1,17 @@
+name: "New product.yaml in prod"
+description: "New product.yaml in prod environment requires TOC approval"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "TOC approval"
+
+mr_metadata:
+  title: "Deploy new sales-analytics product to production"
+  author: "testuser"
+  source_branch: "feature/new-sales-product"
+  target_branch: "main"
