@@ -1,0 +1,13 @@
+---
+name: analytics
+kind: aggregated
+rover_group: dataverse-aggregate-analytics
+warehouses:
+- type: user
+  size: LARGE
+- type: service_account
+  size: MEDIUM
+service_account:
+  dbt: true
+tags:
+  data_product: analytics

@@ -1,0 +1,22 @@
+---
+name: subscriptionwatch
+kind: source-aligned
+rover_group: dataverse-source-subscriptionwatch
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+data_product_db:
+- database: subscriptionwatch_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: dataverse_tableaupai_preprod_appuser
+      kind: service_account
+    - kind: consumer_group
+      name: dataverse-consumer-subscriptionwatch-marts
+tags:
+  data_product: subscriptionwatch

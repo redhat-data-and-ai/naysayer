@@ -1,0 +1,13 @@
+---
+name: marketing
+kind: aggregated
+rover_group: dataverse-aggregate-marketing
+warehouses:
+- type: user
+  size: LARGE
+- type: service_account
+  size: MEDIUM
+service_account:
+  dbt: true
+tags:
+  data_product: marketing

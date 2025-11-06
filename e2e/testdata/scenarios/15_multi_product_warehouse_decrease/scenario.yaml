@@ -1,0 +1,17 @@
+name: "Two products both warehouse decreases"
+description: "Multiple products with warehouse decreases should be auto-approved (cost reduction)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+    - "Warehouse configuration validated"
+
+mr_metadata:
+  title: "Scale down warehouses across products to reduce costs"
+  author: "testuser"
+  source_branch: "feature/multi-product-warehouse-decrease"
+  target_branch: "main"

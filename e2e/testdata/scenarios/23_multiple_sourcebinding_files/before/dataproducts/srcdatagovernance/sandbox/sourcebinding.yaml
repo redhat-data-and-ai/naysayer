@@ -1,0 +1,4 @@
+---
+source:
+- database: datagovernance_source_db
+  schema: public
