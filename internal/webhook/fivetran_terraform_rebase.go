@@ -59,10 +59,10 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/json")
 
 	// Quick validation of content type
-	contentType := c.Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") {
+	if !c.Is("json") {
+		contentType := c.Get("Content-Type")
 		logging.Warn("Invalid content type: %s", contentType)
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Content-Type must be application/json",
 		})
 	}
@@ -71,7 +71,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 	var payload map[string]interface{}
 	if err := c.BodyParser(&payload); err != nil {
 		logging.Error("Failed to parse payload: %v", err)
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid JSON payload",
 		})
 	}
@@ -79,7 +79,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 	// Validate webhook payload structure
 	if err := h.validateWebhookPayload(payload); err != nil {
 		logging.Warn("Webhook validation failed: %v", err)
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid webhook payload: " + err.Error(),
 		})
 	}
@@ -88,7 +88,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 	eventType, ok := payload["object_kind"].(string)
 	if !ok {
 		logging.Warn("Missing object_kind in payload")
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Missing object_kind",
 		})
 	}
@@ -100,7 +100,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 
 	// Unsupported event type
 	logging.Warn("Skipping unsupported event: %s", eventType)
-	return c.Status(400).JSON(fiber.Map{
+	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 		"error": fmt.Sprintf("Unsupported event type: %s. Only push events are supported.", eventType),
 	})
 }
@@ -111,7 +111,7 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	project, ok := payload["project"].(map[string]interface{})
 	if !ok {
 		logging.Error("Missing project information in push payload")
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Missing project information",
 		})
 	}
@@ -119,7 +119,7 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	projectID, ok := project["id"].(float64)
 	if !ok {
 		logging.Error("Invalid project ID in push payload")
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid project ID",
 		})
 	}
@@ -128,7 +128,7 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	ref, ok := payload["ref"].(string)
 	if !ok {
 		logging.Warn("Missing ref in push payload")
-		return c.Status(400).JSON(fiber.Map{
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Missing ref in payload",
 		})
 	}
@@ -153,7 +153,7 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	mrIIDs, err := h.gitlabClient.ListOpenMRs(int(projectID))
 	if err != nil {
 		logging.Error("Failed to list open MRs: %v", err)
-		return c.Status(500).JSON(fiber.Map{
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":      "Failed to list open MRs: " + err.Error(),
 			"project_id": int(projectID),
 		})
