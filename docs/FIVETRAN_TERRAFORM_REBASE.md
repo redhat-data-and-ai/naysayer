@@ -205,11 +205,12 @@ GitLab **push event** payload:
 ```json
 {
   "webhook_response": "processed",
-  "status": "success",
-  "message": "No open MRs to rebase",
+  "status": "completed",
   "project_id": 94023,
   "branch": "main",
-  "mrs_rebased": 0
+  "total_mrs": 0,
+  "successful": 0,
+  "failed": 0
 }
 ```
 
