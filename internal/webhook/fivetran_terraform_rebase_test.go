@@ -200,9 +200,10 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_NoOpenMRs(t *testing.T) {
 	_ = json.Unmarshal(body, &response)
 
 	assert.Equal(t, "processed", response["webhook_response"])
-	assert.Equal(t, "success", response["status"])
-	assert.Equal(t, "No open MRs to rebase", response["message"])
-	assert.Equal(t, float64(0), response["mrs_rebased"])
+	assert.Equal(t, "completed", response["status"])
+	assert.Equal(t, float64(0), response["total_mrs"])
+	assert.Equal(t, float64(0), response["successful"])
+	assert.Equal(t, float64(0), response["failed"])
 
 	// Verify rebase was NOT called
 	assert.Len(t, mockClient.capturedRebaseMRs, 0)
