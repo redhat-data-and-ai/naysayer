@@ -163,11 +163,12 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 		logging.Info("No open MRs found to rebase")
 		return c.JSON(fiber.Map{
 			"webhook_response": "processed",
-			"status":           "success",
-			"message":          "No open MRs to rebase",
+			"status":           "completed",
 			"project_id":       int(projectID),
 			"branch":           targetBranch,
-			"mrs_rebased":      0,
+			"total_mrs":        0,
+			"successful":       0,
+			"failed":           0,
 		})
 	}
 
