@@ -582,6 +582,26 @@ func (c *Client) RebaseMR(projectID, mrIID int) error {
 
 // ListOpenMRs returns a list of open MR IIDs for a project
 func (c *Client) ListOpenMRs(projectID int) ([]int, error) {
+	mrDetails, err := c.ListOpenMRsWithDetails(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	mrIIDs := make([]int, len(mrDetails))
+	for i, mr := range mrDetails {
+		mrIIDs[i] = mr.IID
+	}
+
+	return mrIIDs, nil
+}
+
+// ListOpenMRsWithDetails returns detailed information about open MRs for a project
+// Fetches each MR individually to get complete pipeline information.
+// Note: GitLab's list endpoint doesn't include pipeline data, so we need to
+// fetch each MR individually. This results in N+1 API calls but ensures accurate
+// pipeline status for filtering.
+func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
+	// Step 1: Get list of open MR IIDs (fast, no pipeline data)
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID)
 
@@ -604,17 +624,30 @@ func (c *Client) ListOpenMRs(projectID int) ([]int, error) {
 		return nil, fmt.Errorf("list MRs failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var mrs []struct {
+	// Parse basic MR list (just need IIDs)
+	var basicMRs []struct {
 		IID int `json:"iid"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&mrs); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&basicMRs); err != nil {
 		return nil, fmt.Errorf("failed to decode MRs response: %w", err)
 	}
 
-	mrIIDs := make([]int, len(mrs))
-	for i, mr := range mrs {
-		mrIIDs[i] = mr.IID
+	if len(basicMRs) == 0 {
+		return []MRDetails{}, nil
 	}
 
-	return mrIIDs, nil
+	// Step 2: Fetch each MR individually to get complete details including pipeline
+	detailedMRs := make([]MRDetails, 0, len(basicMRs))
+
+	for _, basicMR := range basicMRs {
+		mrDetails, err := c.GetMRDetails(projectID, basicMR.IID)
+		if err != nil {
+			// Log error but continue with other MRs
+			// Don't fail entire operation if one MR fetch fails
+			continue
+		}
+		detailedMRs = append(detailedMRs, *mrDetails)
+	}
+
+	return detailedMRs, nil
 }
