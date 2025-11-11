@@ -1,0 +1,17 @@
+name: example-product
+kind: source
+tags:
+  tier: test
+rover_group: example-team
+service_account:
+  dbt: true
+warehouses:
+- type: user
+  size: SMALL
+- type: service_account
+  size: XSMALL
+data_product_db:
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - dataverse-consumer-example-product-marts

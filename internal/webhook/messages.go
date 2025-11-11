@@ -418,9 +418,33 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 	var summary strings.Builder
 
 	// Enhanced decision with WHY explanation
-	if mb.hasUncoveredFiles(result) {
-		summary.WriteString("**Why manual review is needed:**\n\n")
-		summary.WriteString("This MR contains files that Naysayer doesn't know how to validate.\n\n")
+	hasUncovered := mb.hasUncoveredFiles(result)
+
+	if hasUncovered {
+		summary.WriteString("**Why manual review is needed:**\n")
+		summary.WriteString("One or more files require manual review\n\n")
+	} else {
+		summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n\n", result.FinalDecision.Reason))
+	}
+
+	// Collapsible section for analysis details
+	summary.WriteString("<details>\n")
+	summary.WriteString("<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>\n\n")
+
+	// Show file list if 3+ files
+	if result.TotalFiles >= 3 {
+		summary.WriteString("**Files in this MR:**\n")
+		summary.WriteString(mb.buildFilesSummary(result))
+		summary.WriteString("\n")
+	}
+
+	// Always show what was checked (rule results)
+	summary.WriteString("**What was checked:**\n")
+	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
+
+	// If there are uncovered files, show them in a separate section
+	if hasUncovered {
+		summary.WriteString("\n**Files without validation rules:**\n")
 
 		// Group files by reason
 		filesByReason := make(map[string][]string)
@@ -438,53 +462,18 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 		}
 		sort.Strings(reasons)
 
-		// Use collapsible details for long lists
-		totalFiles := 0
-		for _, files := range filesByReason {
-			totalFiles += len(files)
-		}
-
-		// Always use collapsible section for file lists
-		summary.WriteString("<details>\n")
-		summary.WriteString(fmt.Sprintf("<summary><b>Files requiring manual approval (no automated rules configured)</b> (%d file", totalFiles))
-		if totalFiles != 1 {
-			summary.WriteString("s")
-		}
-		summary.WriteString(")</summary>\n\n")
-
+		// List files grouped by reason
 		for _, reason := range reasons {
 			files := filesByReason[reason]
 			sort.Strings(files)
-			summary.WriteString(fmt.Sprintf("**%s** (%d file", reason, len(files)))
-			if len(files) != 1 {
-				summary.WriteString("s")
-			}
-			summary.WriteString(")\n")
+			summary.WriteString(fmt.Sprintf("\n*%s:*\n", reason))
 			for _, filePath := range files {
-				summary.WriteString(fmt.Sprintf("- `%s`\n", filePath))
+				summary.WriteString(fmt.Sprintf("• `%s`\n", filePath))
 			}
-			summary.WriteString("\n")
 		}
-		summary.WriteString("</details>\n")
-	} else {
-		summary.WriteString(fmt.Sprintf("**Why manual review is needed:**\n%s\n\n", result.FinalDecision.Reason))
-
-		// Collapsible section for analysis details
-		summary.WriteString("<details>\n")
-		summary.WriteString("<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>\n\n")
-
-		// Show file list if 3+ files
-		if result.TotalFiles >= 3 {
-			summary.WriteString("**Files in this MR:**\n")
-			summary.WriteString(mb.buildFilesSummary(result))
-			summary.WriteString("\n")
-		}
-
-		summary.WriteString("**What was checked:**\n")
-		summary.WriteString(mb.buildRulesSummary(result.FileValidations))
-
-		summary.WriteString("\n</details>")
 	}
+
+	summary.WriteString("\n</details>")
 
 	return summary.String()
 }

@@ -10,6 +10,6 @@ One or more files require manual review
 **What was checked:**
 • ✅ Metadata validated: Product metadata changes (name, tags, kind) are safe and don't affect infrastructure
 • ✅ TOC approval check: Changes to existing products in non-critical environments
-• 🚫 Warehouse configuration validated: Warehouse size increase detected: user warehouse: MEDIUM → LARGE, service_account warehouse: SMALL → MEDIUM
+• 🚫 Warehouse configuration validated: Warehouse size increase detected: service_account warehouse: SMALL → MEDIUM, user warehouse: MEDIUM → LARGE
 
 </details>

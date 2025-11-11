@@ -2,13 +2,16 @@
 ⚠️ **Manual review required**
 
 **Why manual review is needed:**
-
-This MR contains files that Naysayer doesn't know how to validate.
+One or more files require manual review
 
 <details>
-<summary><b>Files requiring manual approval (no automated rules configured)</b> (1 file)</summary>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
-**No validation rules configured for SQL migrations** (1 file)
-- `migrations/001_add_column.sql`
+**What was checked:**
+
+**Files without validation rules:**
+
+*No validation rules configured for SQL migrations:*
+• `migrations/001_add_column.sql`
 
 </details>
