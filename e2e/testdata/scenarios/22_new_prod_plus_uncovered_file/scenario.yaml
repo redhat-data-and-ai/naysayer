@@ -1,0 +1,12 @@
+name: "New product (prod) with uncovered file"
+description: "Tests new prod product.yaml requiring TOC approval, with warehouse increases, and an uncovered consumers.yaml file - ensures all rule results are shown even when uncovered files exist"
+expected_decision: "manual_review"
+expected_approval: false
+mr_info:
+  mr_iid: 123
+  project_id: 456
+  author: "testuser"
+  title: "Onboard new product to production with consumer configuration"
+  source_branch: "feature/new-product-prod"
+  target_branch: "main"
+  state: "opened"

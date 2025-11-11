@@ -2,6 +2,7 @@ package warehouse
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
@@ -117,6 +118,8 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 				details = append(details, fmt.Sprintf("%s warehouse: %s → %s", warehouseType, change.FromSize, change.ToSize))
 			}
 		}
+		// Sort details for consistent ordering in comments
+		sort.Strings(details)
 		return shared.ManualReview, fmt.Sprintf("Warehouse size increase detected: %s", strings.Join(details, ", "))
 	}
 
@@ -127,6 +130,8 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 			warehouseType := r.extractWarehouseType(change.FilePath)
 			details = append(details, fmt.Sprintf("%s warehouse: %s → %s", warehouseType, change.FromSize, change.ToSize))
 		}
+		// Sort details for consistent ordering in comments
+		sort.Strings(details)
 		return shared.Approve, fmt.Sprintf("Warehouse size decrease approved: %s", strings.Join(details, ", "))
 	}
 

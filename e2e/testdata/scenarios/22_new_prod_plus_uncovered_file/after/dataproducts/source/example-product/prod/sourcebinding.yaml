@@ -1,0 +1,3 @@
+source_type: snowflake
+connection_name: example_prod
+schema: example_schema
