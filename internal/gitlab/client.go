@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 )
@@ -600,10 +601,14 @@ func (c *Client) ListOpenMRs(projectID int) ([]int, error) {
 // Note: GitLab's list endpoint doesn't include pipeline data, so we need to
 // fetch each MR individually. This results in N+1 API calls but ensures accurate
 // pipeline status for filtering.
+// Only fetches MRs created within the last 7 days to reduce API load.
 func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
-	// Step 1: Get list of open MR IIDs (fast, no pipeline data)
-	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
-		strings.TrimRight(c.config.BaseURL, "/"), projectID)
+	// Calculate created_after date (7 days ago) in ISO 8601 format
+	sevenDaysAgo := time.Now().AddDate(0, 0, -7).Format(time.RFC3339)
+
+	// Step 1: Get list of open MR IIDs created in last 7 days (fast, no pipeline data)
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100&created_after=%s",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, sevenDaysAgo)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

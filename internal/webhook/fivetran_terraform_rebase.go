@@ -3,7 +3,6 @@ package webhook
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
@@ -96,7 +95,28 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 
 	// Handle push events to main branch (rebase all open MRs)
 	if eventType == "push" {
-		return h.handlePushToMain(c, payload)
+		// Extract branch reference
+		ref, ok := payload["ref"].(string)
+		if !ok {
+			logging.Warn("Missing ref in push payload")
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Missing ref in payload",
+			})
+		}
+
+		// Check if push is to main/master branch
+		targetBranch := strings.TrimPrefix(ref, "refs/heads/")
+		if targetBranch != "main" && targetBranch != "master" {
+			logging.Info("Ignoring push to non-main branch: %s", targetBranch)
+			return c.JSON(fiber.Map{
+				"webhook_response": "processed",
+				"status":           "skipped",
+				"reason":           fmt.Sprintf("Push to %s branch, only main/master triggers rebase", targetBranch),
+				"branch":           targetBranch,
+			})
+		}
+
+		return h.handlePushToMain(c, payload, targetBranch)
 	}
 
 	// Unsupported event type
@@ -107,7 +127,8 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 }
 
 // handlePushToMain handles push events to main branch by rebasing all open MRs
-func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload map[string]interface{}) error {
+// targetBranch is already validated to be "main" or "master" by the caller
+func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload map[string]interface{}, targetBranch string) error {
 	// Extract project ID
 	project, ok := payload["project"].(map[string]interface{})
 	if !ok {
@@ -128,32 +149,11 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	// Convert projectID to int once and reuse throughout
 	projectID := int(projectIDFloat)
 
-	// Extract branch reference
-	ref, ok := payload["ref"].(string)
-	if !ok {
-		logging.Warn("Missing ref in push payload")
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing ref in payload",
-		})
-	}
-
-	// Check if push is to main/master branch
-	targetBranch := strings.TrimPrefix(ref, "refs/heads/")
-	if targetBranch != "main" && targetBranch != "master" {
-		logging.Info("Ignoring push to non-main branch: %s", targetBranch)
-		return c.JSON(fiber.Map{
-			"webhook_response": "processed",
-			"status":           "skipped",
-			"reason":           fmt.Sprintf("Push to %s branch, only main/master triggers rebase", targetBranch),
-			"branch":           targetBranch,
-		})
-	}
-
 	logging.Info("Push to main branch detected, rebasing eligible open MRs",
 		zap.String("branch", targetBranch),
 		zap.Int("project_id", projectID))
 
-	// Get all open MRs with details
+	// Get all open MRs with details (already filtered by created_after at API level)
 	allMRs, err := h.gitlabClient.ListOpenMRsWithDetails(projectID)
 	if err != nil {
 		logging.Error("Failed to list open MRs: %v", err)
@@ -163,9 +163,8 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 		})
 	}
 
-	// Filter MRs based on criteria:
-	// 1. Created within last 7 days
-	// 2. No running or failed pipeline
+	// Filter MRs based on pipeline status
+	// Note: Date filtering is already done at API level via created_after parameter
 	filterResult := h.filterEligibleMRs(allMRs)
 	eligibleMRs := filterResult.Eligible
 
@@ -257,38 +256,16 @@ type MRFilterResult struct {
 	Skipped  []MRSkipInfo
 }
 
-// filterEligibleMRs filters MRs based on creation date and pipeline status
+// filterEligibleMRs filters MRs based on pipeline status
 // Returns both eligible MRs and detailed skip information
+// Note: MRs are already filtered by creation date at the API level (last 7 days)
 func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(mrs []gitlab.MRDetails) MRFilterResult {
 	result := MRFilterResult{
 		Eligible: make([]gitlab.MRDetails, 0),
 		Skipped:  make([]MRSkipInfo, 0),
 	}
-	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
 
 	for _, mr := range mrs {
-		// Check if MR was created within last 7 days
-		createdAt, err := time.Parse(time.RFC3339, mr.CreatedAt)
-		if err != nil {
-			logging.Warn("Failed to parse MR creation date", zap.Int("mr_iid", mr.IID), zap.Error(err))
-			result.Skipped = append(result.Skipped, MRSkipInfo{
-				MRIID:     mr.IID,
-				Reason:    "date_parse_error",
-				CreatedAt: mr.CreatedAt,
-			})
-			continue
-		}
-
-		if createdAt.Before(sevenDaysAgo) {
-			logging.Info("Skipping MR older than 7 days", zap.Int("mr_iid", mr.IID), zap.Time("created_at", createdAt))
-			result.Skipped = append(result.Skipped, MRSkipInfo{
-				MRIID:     mr.IID,
-				Reason:    "older_than_7_days",
-				CreatedAt: mr.CreatedAt,
-			})
-			continue
-		}
-
 		// Check pipeline status
 		if mr.Pipeline != nil {
 			status := strings.ToLower(mr.Pipeline.Status)

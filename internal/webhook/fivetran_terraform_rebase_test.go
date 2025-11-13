@@ -518,15 +518,11 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
 
 	// Create test MRs with various statuses
+	// Note: We only test with MRs created within 7 days, since older MRs
+	// are filtered at the GitLab API level via created_after parameter
 	recentMR := gitlab.MRDetails{
 		IID:       123,
 		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // 1 day old
-		Pipeline:  &gitlab.MRPipeline{Status: "success"},
-	}
-
-	oldMR := gitlab.MRDetails{
-		IID:       456,
-		CreatedAt: time.Now().Add(-8 * 24 * time.Hour).Format(time.RFC3339), // 8 days old
 		Pipeline:  &gitlab.MRPipeline{Status: "success"},
 	}
 
@@ -565,11 +561,6 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 			expectedIDs: []int{123},
 		},
 		{
-			name:        "Old MR should be filtered out",
-			mrs:         []gitlab.MRDetails{oldMR},
-			expectedIDs: []int{},
-		},
-		{
 			name:        "Running pipeline should be filtered out",
 			mrs:         []gitlab.MRDetails{runningPipelineMR},
 			expectedIDs: []int{},
@@ -590,8 +581,8 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 			expectedIDs: []int{103},
 		},
 		{
-			name:        "Mixed MRs - only eligible ones included",
-			mrs:         []gitlab.MRDetails{recentMR, oldMR, runningPipelineMR, failedPipelineMR, noPipelineMR},
+			name:        "Mixed MRs - only eligible ones included (note: old MRs filtered by API)",
+			mrs:         []gitlab.MRDetails{recentMR, runningPipelineMR, failedPipelineMR, noPipelineMR},
 			expectedIDs: []int{123, 103},
 		},
 	}
@@ -623,16 +614,13 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_WithFilteredMRs(t *testing
 	}
 
 	// Create MRs with different statuses
+	// Note: Old MRs (> 7 days) would be filtered at API level via created_after parameter
+	// So we only include MRs that are within the 7-day window
 	mockClient := &MockRebaseGitLabClient{
 		openMRDetails: []gitlab.MRDetails{
 			{
 				IID:       123,
 				CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Eligible
-				Pipeline:  &gitlab.MRPipeline{Status: "success"},
-			},
-			{
-				IID:       456,
-				CreatedAt: time.Now().Add(-8 * 24 * time.Hour).Format(time.RFC3339), // Too old
 				Pipeline:  &gitlab.MRPipeline{Status: "success"},
 			},
 			{
@@ -670,11 +658,11 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_WithFilteredMRs(t *testing
 
 	assert.Equal(t, "processed", response["webhook_response"])
 	assert.Equal(t, "completed", response["status"])
-	assert.Equal(t, float64(3), response["total_mrs"])    // 3 total open MRs
+	assert.Equal(t, float64(2), response["total_mrs"])    // 2 total open MRs (old ones filtered by API)
 	assert.Equal(t, float64(1), response["eligible_mrs"]) // Only 1 eligible
 	assert.Equal(t, float64(1), response["successful"])   // 1 successful rebase
 	assert.Equal(t, float64(0), response["failed"])
-	assert.Equal(t, float64(2), response["skipped"]) // 2 skipped (old + running)
+	assert.Equal(t, float64(1), response["skipped"]) // 1 skipped (running pipeline)
 
 	// Verify rebase was only called for eligible MR
 	assert.Len(t, mockClient.capturedRebaseMRs, 1)
