@@ -303,3 +303,38 @@ func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bo
 	}
 	return false
 }
+
+// RebaseMR is a no-op for mock client (rebase functionality is not tested in e2e)
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
+	// In e2e tests, we don't need to test rebase functionality
+	// Just return success
+	return nil
+}
+
+// ListOpenMRs is a stub for mock client
+func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
+	// Return empty list for e2e tests
+	return []int{}, nil
+}
+
+// ListOpenMRsWithDetails is a stub for mock client
+func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// Simulate the new behavior: call GetMRDetails for each open MR
+	// This mimics the real implementation's N+1 query pattern
+	openMRs, err := m.ListOpenMRs(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	details := make([]gitlab.MRDetails, 0, len(openMRs))
+	for _, mrIID := range openMRs {
+		mrDetail, err := m.GetMRDetails(projectID, mrIID)
+		if err != nil {
+			// Skip MRs that fail to fetch
+			continue
+		}
+		details = append(details, *mrDetail)
+	}
+
+	return details, nil
+}
