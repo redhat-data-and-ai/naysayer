@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 )
 
 // Client handles GitLab API operations
@@ -646,12 +647,11 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 
 	for _, basicMR := range basicMRs {
 		mrDetails, err := c.GetMRDetails(projectID, basicMR.IID)
-                if err != nil {
-                        // Log error but continue with other MRs
-                        // Don't fail entire operation if one MR fetch fails
-                        logging.Warn("Failed to get details for MR %d in project %d, skipping: %v", basicMR.IID, projectID, err)
-                        continue
-                }
+		if err != nil {
+			// Log error but continue with other MRs
+			// Don't fail entire operation if one MR fetch fails
+			logging.Warn("Failed to get details for MR %d in project %d, skipping: %v", basicMR.IID, projectID, err)
+			continue
 		}
 		detailedMRs = append(detailedMRs, *mrDetails)
 	}
