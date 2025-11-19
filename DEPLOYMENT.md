@@ -8,6 +8,8 @@
 
 ## ⚡ Initial Deployment
 
+**Note**: Throughout this guide, replace `<your-namespace>` with your actual namespace (e.g., `ddis-asteroid--naysayer`) and `<your-naysayer-route-hostname>` with your route hostname.
+
 ### 1. Configure Secrets
 
 ```bash
@@ -32,24 +34,28 @@ Configure these values in `config/secrets.yaml`:
 # Apply secrets first
 kubectl apply -f config/secrets.yaml
 
-# Deploy all components
-kubectl apply -f config/
+# Deploy remaining components (excluding example files)
+kubectl apply -f config/tenant-namespace.yaml \
+  -f config/serviceaccount.yaml \
+  -f config/deployment.yaml \
+  -f config/service.yaml \
+  -f config/route.yaml
 
 # Wait for deployment to complete
-kubectl rollout status deployment/naysayer -n ddis-asteroid--naysayer
+kubectl rollout status deployment/naysayer -n <your-namespace>
 ```
 
 ### 3. Verify Deployment
 
 ```bash
 # Check pod status
-kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
+kubectl get pods -n <your-namespace> -l app=naysayer
 
 # View logs
-kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=50
+kubectl logs -n <your-namespace> -l app=naysayer --tail=50
 
-# Test health endpoint (replace with your route)
-curl https://naysayer-ddis-asteroid--naysayer.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com/health
+# Test health endpoint
+curl https://<your-naysayer-route-hostname>/health
 ```
 
 ## 🔄 Updating the Deployment
@@ -84,14 +90,14 @@ kubectl create configmap naysayer-rules \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # 7. Restart deployment to pull latest image and pick up any changes
-kubectl rollout restart deployment/naysayer -n ddis-asteroid--naysayer
+kubectl rollout restart deployment/naysayer -n <your-namespace>
 
 # 8. Wait for rollout to complete
-kubectl rollout status deployment/naysayer -n ddis-asteroid--naysayer
+kubectl rollout status deployment/naysayer -n <your-namespace>
 
 # 9. Verify deployment
-kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
-kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=30
+kubectl get pods -n <your-namespace> -l app=naysayer
+kubectl logs -n <your-namespace> -l app=naysayer --tail=30
 ```
 
 **Note**: If you only need to update secrets/config/rules (without rebuilding the image), skip steps 1-3.
@@ -102,33 +108,33 @@ kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=30
 
 ```bash
 # Get pod details
-kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
+kubectl get pods -n <your-namespace> -l app=naysayer
 
 # Describe pod for events
-kubectl describe pod -n ddis-asteroid--naysayer -l app=naysayer
+kubectl describe pod -n <your-namespace> -l app=naysayer
 
 # Check logs
-kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=100
+kubectl logs -n <your-namespace> -l app=naysayer --tail=100
 ```
 
 ### Rollback Deployment
 
 ```bash
 # Rollback to previous version
-kubectl rollout undo deployment/naysayer -n ddis-asteroid--naysayer
+kubectl rollout undo deployment/naysayer -n <your-namespace>
 
 # Check rollout history
-kubectl rollout history deployment/naysayer -n ddis-asteroid--naysayer
+kubectl rollout history deployment/naysayer -n <your-namespace>
 ```
 
 ### Check Secrets
 
 ```bash
 # Verify secret exists
-kubectl get secret naysayer-secrets -n ddis-asteroid--naysayer
+kubectl get secret naysayer-secrets -n <your-namespace>
 
 # View secret keys (not values)
-kubectl get secret naysayer-secrets -n ddis-asteroid--naysayer -o jsonpath='{.data}' | jq 'keys'
+kubectl get secret naysayer-secrets -n <your-namespace> -o jsonpath='{.data}' | jq 'keys'
 ```
 
 ## 📊 Monitoring
@@ -137,7 +143,7 @@ kubectl get secret naysayer-secrets -n ddis-asteroid--naysayer -o jsonpath='{.da
 
 ```bash
 # Port-forward to test locally
-kubectl port-forward -n ddis-asteroid--naysayer deployment/naysayer 3000:3000
+kubectl port-forward -n <your-namespace> deployment/naysayer 3000:3000
 
 # Test health endpoint
 curl http://localhost:3000/health
@@ -147,13 +153,13 @@ curl http://localhost:3000/health
 
 ```bash
 # Get deployment details
-kubectl get deployment naysayer -n ddis-asteroid--naysayer -o wide
+kubectl get deployment naysayer -n <your-namespace> -o wide
 
 # Get route/ingress
-kubectl get route naysayer -n ddis-asteroid--naysayer
+kubectl get route naysayer -n <your-namespace>
 
 # Check resource usage
-kubectl top pod -n ddis-asteroid--naysayer -l app=naysayer
+kubectl top pod -n <your-namespace> -l app=naysayer
 ```
 
 ## 📁 Configuration Files
