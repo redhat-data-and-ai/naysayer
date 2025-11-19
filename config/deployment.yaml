@@ -37,6 +37,12 @@ spec:
                 secretKeyRef:
                   name: naysayer-secrets
                   key: WEBHOOK_SECRET
+            - name: GITLAB_TOKEN_FIVETRAN
+              valueFrom:
+                secretKeyRef:
+                  name: naysayer-secrets
+                  key: GITLAB_TOKEN_FIVETRAN
+                  optional: true
             - name: GITLAB_INSECURE_TLS
               value: "true"
             - name: ENABLE_MR_COMMENTS

@@ -110,14 +110,14 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 
 // MRDetails represents merge request details
 type MRDetails struct {
-	TargetBranch    string     `json:"target_branch"`
-	SourceBranch    string     `json:"source_branch"`
-	IID             int        `json:"iid"`
-	ProjectID       int        `json:"project_id"`        // Target project ID
-	SourceProjectID int        `json:"source_project_id"` // Source project ID (for cross-fork MRs)
-	TargetProjectID int        `json:"target_project_id"` // Target project ID (same as ProjectID)
-	CreatedAt       string     `json:"created_at"`        // ISO 8601 format timestamp
-	Pipeline        *MRPipeline `json:"pipeline"`         // Pipeline info (can be nil if no pipeline)
+	TargetBranch    string      `json:"target_branch"`
+	SourceBranch    string      `json:"source_branch"`
+	IID             int         `json:"iid"`
+	ProjectID       int         `json:"project_id"`        // Target project ID
+	SourceProjectID int         `json:"source_project_id"` // Source project ID (for cross-fork MRs)
+	TargetProjectID int         `json:"target_project_id"` // Target project ID (same as ProjectID)
+	CreatedAt       string      `json:"created_at"`        // ISO 8601 format timestamp
+	Pipeline        *MRPipeline `json:"pipeline"`          // Pipeline info (can be nil if no pipeline)
 }
 
 // MRPipeline represents pipeline information for an MR
