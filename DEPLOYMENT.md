@@ -1,642 +1,177 @@
 # 🚀 Naysayer Deployment Guide
 
-Complete guide for deploying Naysayer in production environments.
-
 ## 📋 Prerequisites
 
-- Kubernetes or OpenShift cluster
+- Kubernetes or OpenShift cluster access
 - GitLab instance with webhook capabilities
-- GitLab API token with `read_repository` scope
-- Container registry access (if building custom images)
+- `kubectl` or `oc` CLI configured
 
-## 🏗️ Deployment Options
+## ⚡ Initial Deployment
 
-### 1. Kubernetes/OpenShift (Recommended)
-
-The Naysayer webhook deployment includes security, reliability, scalability, and monitoring features for production use.
-
-#### Prerequisites
-- **Kubernetes Cluster**: v1.20+
-- **Ingress Controller**: For external webhook access
-- **Prometheus Operator**: For monitoring (optional)
-- **GitLab Instance**: With webhook configuration
-
-#### Configure Secrets
+### 1. Configure Secrets
 
 ```bash
-# Create GitLab token secret with webhook security
-export GITLAB_TOKEN="your-gitlab-token"
-export WEBHOOK_SECRET="your-webhook-secret"
+# Copy the example template
+cp config/secrets.yaml.example config/secrets.yaml
 
-kubectl create secret generic naysayer-secrets \
-  --from-literal=gitlab-token="$GITLAB_TOKEN" \
-  --from-literal=webhook-secret="$WEBHOOK_SECRET"
+# Edit with your actual credentials
+vi config/secrets.yaml
 ```
 
-#### Configure IP Restrictions (Optional)
+Configure these values in `config/secrets.yaml`:
+- `GITLAB_TOKEN`: Your GitLab API token
+- `GITLAB_BASE_URL`: Your GitLab instance URL (e.g., https://gitlab.cee.redhat.com)
+- `WEBHOOK_SECRET`: Webhook validation secret
+- `GITLAB_TOKEN_FIVETRAN`: (Optional) Dedicated token for Fivetran rebase operations
+
+**Note**: `secrets.yaml` is gitignored and won't be committed.
+
+### 2. Deploy to Cluster
 
 ```bash
-# Allow specific IP ranges for webhook security
-kubectl create configmap naysayer-config \
-  --from-literal=allowed-ips="192.168.1.0/24,10.0.0.1"
+# Apply secrets first
+kubectl apply -f config/secrets.yaml
+
+# Deploy all components
+kubectl apply -f config/
+
+# Wait for deployment to complete
+kubectl rollout status deployment/naysayer -n ddis-asteroid--naysayer
 ```
 
-#### Deploy Application
-
-```bash
-# Deploy core components
-kubectl apply -f config/deployment.yaml
-kubectl apply -f config/service.yaml
-kubectl apply -f config/route.yaml
-
-# Deploy monitoring (if Prometheus Operator is available)
-kubectl apply -f config/monitoring.yaml
-```
-
-#### Verify Installation
+### 3. Verify Deployment
 
 ```bash
 # Check pod status
-kubectl get pods -l app=naysayer
-
-# Check service endpoints
-kubectl get endpoints naysayer
-
-# Check HPA status
-kubectl get hpa naysayer-hpa
+kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
 
 # View logs
-kubectl logs -l app=naysayer --tail=100
+kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=50
 
-# Check health endpoint
-kubectl port-forward service/naysayer 3000:3000
-curl http://localhost:3000/health
+# Test health endpoint (replace with your route)
+curl https://naysayer-ddis-asteroid--naysayer.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com/health
 ```
 
-#### High Availability Configuration
+## 🔄 Updating the Deployment
 
-The deployment includes:
-- **Multiple replicas**: 3 minimum (ensures availability during rolling updates)
-- **Auto-scaling**: HPA scales based on CPU (70%) and memory (80%) utilization
-- **Anti-affinity**: Spreads pods across different nodes
-- **Pod Disruption Budget**: Ensures minimum 2 pods remain available during maintenance
+### Building and Deploying Changes
 
-#### Security Features
-
-- **Non-root execution**: Runs as user ID 1001
-- **Read-only filesystem**: Prevents runtime file modifications
-- **Dropped capabilities**: Removes all Linux capabilities
-- **Network policies**: Restricts ingress/egress traffic
-- **RBAC**: Minimal read-only permissions
-
-#### Resource Configuration
-
-Default resource allocation:
-```yaml
-resources:
-  requests:
-    memory: "128Mi"
-    cpu: "100m"
-    ephemeral-storage: "100Mi"
-  limits:
-    memory: "256Mi"
-    cpu: "200m"
-    ephemeral-storage: "500Mi"
-```
-
-Adjust based on your webhook traffic volume.
-
-### 2. Container Deployment
-
-#### Using Pre-built Image
+Use this workflow when you've made code changes or need to update secrets/configuration/rules:
 
 ```bash
-# Pull and run official image
-docker run -d \
-  --name naysayer \
-  -p 3000:3000 \
-  -e GITLAB_TOKEN=your-token-here \
-  -e GITLAB_BASE_URL=https://gitlab.com \
-  quay.io/ddis/naysayer:latest
+# 1. Build and test locally
+make build
+
+# 2. Build Docker image
+make docker-build
+
+# 3. Push to registry
+make docker-push
+
+# 4. (Optional) Update secrets if needed
+vi config/secrets.yaml
+kubectl apply -f config/secrets.yaml
+
+# 5. (Optional) Update deployment config if needed
+vi config/deployment.yaml
+kubectl apply -f config/deployment.yaml
+
+# 6. (Optional) Update validation rules if needed
+vi rules.yaml
+kubectl create configmap naysayer-rules \
+  --from-file=rules.yaml \
+  --namespace=ddis-asteroid--naysayer \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 7. Restart deployment to pull latest image and pick up any changes
+kubectl rollout restart deployment/naysayer -n ddis-asteroid--naysayer
+
+# 8. Wait for rollout to complete
+kubectl rollout status deployment/naysayer -n ddis-asteroid--naysayer
+
+# 9. Verify deployment
+kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
+kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=30
 ```
 
-#### Building Custom Image
+**Note**: If you only need to update secrets/config/rules (without rebuilding the image), skip steps 1-3.
+
+## 🔍 Troubleshooting
+
+### Check Pod Status
 
 ```bash
-# Build image
-make build-image
+# Get pod details
+kubectl get pods -n ddis-asteroid--naysayer -l app=naysayer
 
-# Tag for your registry
-docker tag naysayer:latest your-registry.com/naysayer:latest
+# Describe pod for events
+kubectl describe pod -n ddis-asteroid--naysayer -l app=naysayer
 
-# Push to registry
-docker push your-registry.com/naysayer:latest
+# Check logs
+kubectl logs -n ddis-asteroid--naysayer -l app=naysayer --tail=100
 ```
 
-### 3. Systemd Service (Linux)
-
-#### Service Configuration
-
-```ini
-# /etc/systemd/system/naysayer.service
-[Unit]
-Description=Naysayer GitLab MR Validation Service
-After=network.target
-
-[Service]
-Type=simple
-User=naysayer
-ExecStart=/opt/naysayer/naysayer
-Environment=PORT=3000
-Environment=GITLAB_TOKEN=your_token_here
-Environment=GITLAB_BASE_URL=https://gitlab.com
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-#### Installation
+### Rollback Deployment
 
 ```bash
-# Create user
-sudo useradd -r -s /bin/false naysayer
+# Rollback to previous version
+kubectl rollout undo deployment/naysayer -n ddis-asteroid--naysayer
 
-# Install binary
-sudo mkdir -p /opt/naysayer
-sudo cp naysayer /opt/naysayer/
-sudo chown -R naysayer:naysayer /opt/naysayer
-sudo chmod +x /opt/naysayer/naysayer
-
-# Install and start service
-sudo systemctl daemon-reload
-sudo systemctl enable naysayer
-sudo systemctl start naysayer
-
-# Check status
-sudo systemctl status naysayer
+# Check rollout history
+kubectl rollout history deployment/naysayer -n ddis-asteroid--naysayer
 ```
 
-## ⚙️ Configuration
-
-### Environment Variables
-
-#### Required Configuration
+### Check Secrets
 
 ```bash
-# GitLab Integration
-GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx    # Required: GitLab API token
-GITLAB_BASE_URL=https://gitlab.com          # Optional: GitLab instance URL
-```
+# Verify secret exists
+kubectl get secret naysayer-secrets -n ddis-asteroid--naysayer
 
-#### Optional Configuration
-
-```bash
-# Server Settings
-PORT=3000                                   # Server port
-BIND_ADDRESS=0.0.0.0                       # Bind address
-
-# Rule Engine
-RULES_ENABLED=true                          # Enable/disable all rules
-RULES_TIMEOUT=30                            # Rule execution timeout (seconds)
-RULES_MAX_FILE_SIZE=5242880                 # Max file size (5MB)
-RULES_DEBUG=false                           # Debug logging
-
-# Performance
-MAX_CONCURRENT_RULES=10                     # Concurrent rule execution
-REQUEST_TIMEOUT=30                          # HTTP request timeout
-```
-
-#### Rule-Specific Configuration
-
-```bash
-# Enable/disable individual rules
-RULE_A_ENABLED=true
-RULE_B_ENABLED=true
-
-# Rule-specific settings
-RULE_A_STRICT_MODE=false
-RULE_A_MAX_FILE_SIZE=1048576
-RULE_B_VALIDATE_FORMAT=true
-RULE_B_REQUIRE_APPROVAL=false
-```
-
-### Configuration Files
-
-#### Kubernetes ConfigMap
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: naysayer-config
-data:
-  GITLAB_BASE_URL: "https://gitlab.com"
-  PORT: "3000"
-  RULES_ENABLED: "true"
-  RULES_TIMEOUT: "30"
-  RULE_A_ENABLED: "true"
-  RULE_B_ENABLED: "true"
-```
-
-#### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  naysayer:
-    image: quay.io/ddis/naysayer:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - GITLAB_TOKEN=${GITLAB_TOKEN}
-      - GITLAB_BASE_URL=https://gitlab.com
-      - RULES_ENABLED=true
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-## 🔒 Security
-
-### Network Security
-
-```bash
-# Firewall configuration (iptables example)
-# Allow inbound HTTPS traffic
-iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-
-# Allow internal health checks
-iptables -A INPUT -s 10.0.0.0/8 -p tcp --dport 3000 -j ACCEPT
-
-# Deny all other inbound traffic to application port
-iptables -A INPUT -p tcp --dport 3000 -j DROP
-```
-
-### TLS/SSL Configuration
-
-#### Kubernetes Ingress with TLS
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: naysayer-ingress
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - naysayer.your-domain.com
-    secretName: naysayer-tls
-  rules:
-  - host: naysayer.your-domain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: naysayer
-            port:
-              number: 3000
-```
-
-#### Reverse Proxy (Nginx)
-
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name naysayer.your-domain.com;
-
-    ssl_certificate /path/to/certificate.crt;
-    ssl_certificate_key /path/to/private.key;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Health check endpoint
-    location /health {
-        proxy_pass http://localhost:3000/health;
-        access_log off;
-    }
-}
-```
-
-### Secret Management
-
-#### Kubernetes Secrets
-
-```bash
-# Create from literal
-kubectl create secret generic naysayer-secrets \
-  --from-literal=gitlab-token=your-token
-
-# Create from file
-kubectl create secret generic naysayer-secrets \
-  --from-file=gitlab-token=/path/to/token-file
-
-# Use external secret management
-# Example: External Secrets Operator with Vault
-```
-
-#### HashiCorp Vault Integration
-
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: vault-backend
-spec:
-  provider:
-    vault:
-      server: "https://vault.company.com"
-      path: "secret"
-      auth:
-        kubernetes:
-          mountPath: "kubernetes"
-          role: "naysayer"
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: naysayer-secrets
-spec:
-  secretStoreRef:
-    name: vault-backend
-    kind: SecretStore
-  target:
-    name: naysayer-secrets
-  data:
-  - secretKey: gitlab-token
-    remoteRef:
-      key: naysayer/gitlab
-      property: token
+# View secret keys (not values)
+kubectl get secret naysayer-secrets -n ddis-asteroid--naysayer -o jsonpath='{.data}' | jq 'keys'
 ```
 
 ## 📊 Monitoring
 
-### Health Checks
-
-#### Kubernetes Probes
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: naysayer
-spec:
-  template:
-    spec:
-      containers:
-      - name: naysayer
-        image: quay.io/ddis/naysayer:latest
-        ports:
-        - containerPort: 3000
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
-```
-
-#### External Monitoring
+### Health Check
 
 ```bash
-# Prometheus scraping configuration
-# Add to prometheus.yml
-scrape_configs:
-  - job_name: 'naysayer'
-    static_configs:
-      - targets: ['naysayer.your-domain.com:3000']
-    metrics_path: /metrics
-    scrape_interval: 30s
+# Port-forward to test locally
+kubectl port-forward -n ddis-asteroid--naysayer deployment/naysayer 3000:3000
+
+# Test health endpoint
+curl http://localhost:3000/health
 ```
 
-### Logging
-
-#### Structured Logging Configuration
+### View Metrics
 
 ```bash
-# Enable JSON logging for production
-export LOG_FORMAT=json
-export LOG_LEVEL=info
+# Get deployment details
+kubectl get deployment naysayer -n ddis-asteroid--naysayer -o wide
 
-# Log aggregation (example with Fluentd)
-export LOG_OUTPUT=stdout
+# Get route/ingress
+kubectl get route naysayer -n ddis-asteroid--naysayer
+
+# Check resource usage
+kubectl top pod -n ddis-asteroid--naysayer -l app=naysayer
 ```
 
-#### Log Aggregation (ELK Stack)
+## 📁 Configuration Files
 
-```yaml
-# Filebeat configuration for Kubernetes
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: filebeat-config
-data:
-  filebeat.yml: |
-    filebeat.inputs:
-    - type: container
-      paths:
-        - /var/log/containers/naysayer-*.log
-      processors:
-        - add_kubernetes_metadata:
-            host: ${NODE_NAME}
-            matchers:
-            - logs_path:
-                logs_path: "/var/log/containers/"
-    output.elasticsearch:
-      hosts: ["elasticsearch.logging.svc.cluster.local:9200"]
-      index: "naysayer-%{+yyyy.MM.dd}"
-```
+### Kubernetes Manifests (`config/` directory)
 
-## 🔧 Troubleshooting
+- `secrets.yaml.example` - Secret template (copy to `secrets.yaml`)
+- `deployment.yaml` - Main application deployment
+- `service.yaml` - Kubernetes service
+- `route.yaml` - OpenShift route
+- `serviceaccount.yaml` - Service account
+- `tenant-namespace.yaml` - Namespace definition
 
-### Common Deployment Issues
+### Application Configuration (repository root)
 
-#### 1. **Container Won't Start**
+- `rules.yaml` - Validation rules configuration (deployed as ConfigMap)
 
-```bash
-# Check logs
-kubectl logs deployment/naysayer
+## 🔗 Related Documentation
 
-# Common issues and solutions:
-# - Missing GitLab token → Check secrets
-# - Permission denied → Check user/group in container
-# - Port already in use → Change PORT environment variable
-```
-
-#### 2. **GitLab Connectivity Issues**
-
-```bash
-# Test GitLab API access
-kubectl exec deployment/naysayer -- curl -H "Authorization: Bearer $GITLAB_TOKEN" \
-  https://gitlab.com/api/v4/user
-
-# Check network policies
-kubectl get networkpolicies
-kubectl describe networkpolicy naysayer-netpol
-```
-
-#### 3. **Webhook Not Receiving Events**
-
-```bash
-# Verify webhook configuration in GitLab
-# Check ingress/load balancer configuration
-kubectl get ingress naysayer-ingress
-kubectl describe ingress naysayer-ingress
-
-# Test webhook endpoint
-curl -X POST https://naysayer.your-domain.com/webhook \
-  -H "Content-Type: application/json" \
-  -d '{"object_attributes":{"iid":1},"project":{"id":1}}'
-```
-
-### Performance Tuning
-
-#### Resource Limits
-
-```yaml
-resources:
-  requests:
-    memory: "128Mi"
-    cpu: "100m"
-  limits:
-    memory: "512Mi"
-    cpu: "500m"
-```
-
-#### Scaling
-
-```yaml
-# Horizontal Pod Autoscaler
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: naysayer-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: naysayer
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
-```
-
-## 🔄 Updates and Maintenance
-
-### Rolling Updates
-
-```bash
-# Update deployment image
-kubectl set image deployment/naysayer naysayer=quay.io/ddis/naysayer:v1.2.0
-
-# Monitor rollout
-kubectl rollout status deployment/naysayer
-
-# Rollback if needed
-kubectl rollout undo deployment/naysayer
-```
-
-### Backup and Recovery
-
-#### Configuration Backup
-
-```bash
-# Backup Kubernetes configuration
-kubectl get configmap naysayer-config -o yaml > naysayer-config-backup.yaml
-kubectl get secret naysayer-secrets -o yaml > naysayer-secrets-backup.yaml
-
-# Backup custom configurations
-kubectl get deployment naysayer -o yaml > naysayer-deployment-backup.yaml
-```
-
-#### Disaster Recovery
-
-```bash
-# Restore from backup
-kubectl apply -f naysayer-config-backup.yaml
-kubectl apply -f naysayer-secrets-backup.yaml
-kubectl apply -f naysayer-deployment-backup.yaml
-
-# Verify restoration
-kubectl get pods -l app=naysayer
-curl https://naysayer.your-domain.com/health
-```
-
-## 📈 Production Checklist
-
-### Pre-Deployment
-
-- [ ] GitLab token configured with minimal required permissions
-- [ ] TLS/SSL certificates installed and configured
-- [ ] Resource limits and requests defined
-- [ ] Health checks configured
-- [ ] Monitoring and alerting set up
-- [ ] Log aggregation configured
-- [ ] Backup procedures documented
-- [ ] Security scanning completed
-
-### Post-Deployment
-
-- [ ] Health endpoints responding
-- [ ] GitLab webhook delivering events
-- [ ] Rules executing successfully
-- [ ] Logs flowing to aggregation system
-- [ ] Metrics being collected
-- [ ] Performance within acceptable limits
-- [ ] Security hardening applied
-- [ ] Documentation updated
-
-### Ongoing Maintenance
-
-- [ ] Regular security updates
-- [ ] Performance monitoring
-- [ ] Log rotation and cleanup
-- [ ] Certificate renewal
-- [ ] Backup verification
-- [ ] Capacity planning
-- [ ] Rule performance analysis
-
----
-
-**🔗 Related Documentation:**
-- [Main README](README.md) - Project overview and quick start
-- [Development Guide](DEVELOPMENT.md) - Local development setup
-- [Monitoring Guide](MONITORING.md) - Detailed monitoring and debugging
-- [API Reference](docs/API_REFERENCE.md) - API endpoints and responses
+- [Main README](README.md) - Project overview
+- [config/README.md](config/README.md) - Configuration details
