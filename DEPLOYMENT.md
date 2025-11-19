@@ -180,4 +180,3 @@ kubectl top pod -n <your-namespace> -l app=naysayer
 ## 🔗 Related Documentation
 
 - [Main README](README.md) - Project overview
-- [config/README.md](config/README.md) - Configuration details
