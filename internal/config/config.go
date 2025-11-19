@@ -17,10 +17,11 @@ type Config struct {
 
 // GitLabConfig holds GitLab API configuration
 type GitLabConfig struct {
-	BaseURL     string
-	Token       string
-	InsecureTLS bool   // Skip TLS certificate verification
-	CACertPath  string // Path to custom CA certificate file
+	BaseURL                       string
+	Token                         string
+	GitlabFivetranRepositoryToken string // Optional: separate token for fivetran_terraform rebase
+	InsecureTLS                   bool   // Skip TLS certificate verification
+	CACertPath                    string // Path to custom CA certificate file
 }
 
 // ServerConfig holds server configuration
@@ -104,10 +105,11 @@ type ApprovalConfig struct {
 func Load() *Config {
 	return &Config{
 		GitLab: GitLabConfig{
-			BaseURL:     getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
-			Token:       getEnv("GITLAB_TOKEN", ""),
-			InsecureTLS: getEnv("GITLAB_INSECURE_TLS", "false") == "true",
-			CACertPath:  getEnv("GITLAB_CA_CERT_PATH", ""),
+			BaseURL:                       getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
+			Token:                         getEnv("GITLAB_TOKEN", ""),
+			GitlabFivetranRepositoryToken: getEnv("GITLAB_TOKEN_FIVETRAN", ""), // Dedicated token for fivetran_terraform rebase
+			InsecureTLS:                   getEnv("GITLAB_INSECURE_TLS", "false") == "true",
+			CACertPath:                    getEnv("GITLAB_CA_CERT_PATH", ""),
 		},
 		Server: ServerConfig{
 			Port: getEnv("PORT", "3000"),
