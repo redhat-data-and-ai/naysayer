@@ -139,7 +139,7 @@ export PORT="3000"
 curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
   "$GITLAB_BASE_URL/api/v4/personal_access_tokens/self" | jq '.scopes'
 
-# Expected output should include: ["api", "read_api", "write_repository"]
+# Expected output should include: ["api"]
 ```
 
 **Test Webhook Endpoint**:
