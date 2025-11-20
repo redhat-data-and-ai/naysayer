@@ -58,7 +58,7 @@ graph TB
 ### 1. Create GitLab Access Token
 
 **Step 1**: Navigate to GitLab Personal Access Tokens
-- Go to **GitLab** → **User Settings** → **Access Tokens** (or **Preferences** → **Access Tokens`)
+- Go to **GitLab** → **User Settings** → **Access Tokens** (or **Preferences** → **Access Tokens**)
 - Or visit: `https://your-gitlab-instance.com/-/user_settings/personal_access_tokens`
 
 **Step 2**: Create New Token

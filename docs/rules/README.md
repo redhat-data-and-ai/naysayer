@@ -36,7 +36,7 @@ This directory contains detailed documentation for each validation rule implemen
 **Purpose**: Streamlined consumer access management across all environments
 **Key behavior**: Auto-approves consumer-only changes with data product owner approval (no TOC needed)
 
-### 🔄 [Fivetran Terraform Auto-Rebase Rule](FIVETRAN_RULE.md)
+### 🔄 [Fivetran Terraform Auto-Rebase Rule](AUTOREBASE_RULE_AND_SETUP.md)
 **Validates**: Automated rebase operations for Fivetran Terraform repository
 **Triggers on**: Push events to `main`/`master` branch
 **Purpose**: Automatically rebase eligible merge requests to keep them up-to-date
