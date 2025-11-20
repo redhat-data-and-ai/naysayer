@@ -36,6 +36,12 @@ This directory contains detailed documentation for each validation rule implemen
 **Purpose**: Streamlined consumer access management across all environments
 **Key behavior**: Auto-approves consumer-only changes with data product owner approval (no TOC needed)
 
+### 🔄 [Fivetran Terraform Auto-Rebase Rule](AUTOREBASE_RULE_AND_SETUP.md)
+**Validates**: Automated rebase operations for Fivetran Terraform repository
+**Triggers on**: Push events to `main`/`master` branch
+**Purpose**: Automatically rebase eligible merge requests to keep them up-to-date
+**Key behavior**: Rebases MRs created within last 7 days with successful/skipped pipelines, skips MRs with active/failed pipelines
+
 ## 🎯 Quick Problem Resolution
 
 ### My MR is Blocked - What Now?
@@ -85,6 +91,7 @@ NAYSAYER uses a **Section-Based Validation Architecture** where rules can target
 | 👥 **Access Management** | Streamline data access workflows | Consumer access auto-approval |
 | 📋 **Compliance** | Meet organizational standards | Naming conventions, documentation |
 | 🔧 **Configuration** | Ensure valid configurations | YAML syntax, required fields |
+| 🔄 **Automation** | Automate maintenance tasks | Fivetran Terraform auto-rebase |
 
 ## 🎯 For Different Audiences
 
@@ -123,6 +130,7 @@ Understanding security controls:
 | 👥 **Consumer** | ✅ Active | ~100% | Mixed changes (<1%) |
 | ⚖️ **TOC Approval** | ✅ Active | N/A | New prod deployments |
 | 📄 **Metadata** | ✅ Active | ~100% | File access issues (<1%) |
+| 🔄 **Fivetran Rebase** | ✅ Active | N/A | Webhook configuration, token permissions |
 
 ### Performance Metrics
 
