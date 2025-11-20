@@ -144,13 +144,14 @@ curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 
 **Test Webhook Endpoint**:
 ```bash
-# Test webhook endpoint (should return health check)
+# Test webhook endpoint to trigger rebase
 curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
   -H "Content-Type: application/json" \
   -d '{
     "object_kind": "push",
     "ref": "refs/heads/main",
-    "project": {"id": YOUR_PROJECT_ID}
+    "project": {"id": YOUR_PROJECT_ID},
+    "commits": [{"id": "abc123", "message": "Test commit"}]
   }'
 ```
 
