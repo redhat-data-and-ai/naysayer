@@ -44,7 +44,7 @@ curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
 
 **Response Codes**:
 - `200 OK` - Webhook processed successfully
-- `400 Bad Request` - Invalid request format, unsupported event type, or non-main branch push
+- `400 Bad Request` - Invalid request format or unsupported event type
 - `500 Internal Server Error` - Internal processing error
 
 **Success Response Example** (200):
