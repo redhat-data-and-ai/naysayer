@@ -383,7 +383,7 @@ NAYSAYER is configured through environment variables and a `rules.yaml` file.
 > **📋 Configuration Details**: For complete configuration options and examples, see:
 > - [Development Setup Guide](DEVELOPMENT_SETUP.md) - Environment variables and setup
 > - [Section-Based Architecture Guide](SECTION_BASED_ARCHITECTURE.md) - rules.yaml configuration
-> - [Fivetran Rule Documentation](rules/FIVETRAN_RULE_AND_SETUP.md) - Fivetran-specific setup
+> - [Fivetran Rule Documentation](rules/AUTOREBASE_RULE_AND_SETUP.md) - Fivetran-specific setup
 
 
 ## 🔍 **Error Handling**
