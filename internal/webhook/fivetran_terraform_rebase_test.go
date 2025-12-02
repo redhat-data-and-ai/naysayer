@@ -165,8 +165,9 @@ func (m *MockRebaseGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipeline
 }
 
 func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
-	// Return false by default (no plan failures, allow rebase)
-	return false, ""
+	// Return true, "atlantis_comment_not_found" by default (no atlantis comment found, skip rebase)
+	// This matches the actual implementation behavior
+	return true, "atlantis_comment_not_found"
 }
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
@@ -590,7 +591,7 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 			expectedIDs: []int{},
 		},
 		{
-			name:        "Failed pipeline should be filtered out",
+			name:        "Failed pipeline should be filtered out (jobs failed or plan error)",
 			mrs:         []gitlab.MRDetails{failedPipelineMR},
 			expectedIDs: []int{},
 		},
