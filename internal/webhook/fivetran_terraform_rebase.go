@@ -283,10 +283,7 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []
 
 			// For successful pipelines, proceed with rebase directly
 			// Pipeline status = "success" means no failures, so no need to check jobs or atlantis comments
-			if status == "success" {
-				// Pipeline is successful, allow rebase
-				// Continue to add MR to eligible list
-			}
+			// Just continue to add MR to eligible list (no special handling needed)
 
 			// For failed pipelines, check all jobs first
 			// If all jobs succeeded, then check atlantis comment for plan failures
