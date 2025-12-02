@@ -165,7 +165,7 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 
 	// Filter MRs based on pipeline status
 	// Note: Date filtering is already done at API level via created_after parameter
-	filterResult := h.filterEligibleMRs(allMRs)
+	filterResult := h.filterEligibleMRs(projectID, allMRs)
 	eligibleMRs := filterResult.Eligible
 
 	if len(eligibleMRs) == 0 {
@@ -256,10 +256,10 @@ type MRFilterResult struct {
 	Skipped  []MRSkipInfo
 }
 
-// filterEligibleMRs filters MRs based on pipeline status
+// filterEligibleMRs filters MRs based on pipeline status, jobs, and atlantis comments
 // Returns both eligible MRs and detailed skip information
 // Note: MRs are already filtered by creation date at the API level (last 7 days)
-func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(mrs []gitlab.MRDetails) MRFilterResult {
+func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []gitlab.MRDetails) MRFilterResult {
 	result := MRFilterResult{
 		Eligible: make([]gitlab.MRDetails, 0),
 		Skipped:  make([]MRSkipInfo, 0),
@@ -269,7 +269,9 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(mrs []gitlab.MRDetail
 		// Check pipeline status
 		if mr.Pipeline != nil {
 			status := strings.ToLower(mr.Pipeline.Status)
-			if status == "running" || status == "pending" || status == "failed" {
+
+			// Skip MRs with running or pending pipelines
+			if status == "running" || status == "pending" {
 				logging.Info("Skipping MR with %s pipeline", status, zap.Int("mr_iid", mr.IID))
 				result.Skipped = append(result.Skipped, MRSkipInfo{
 					MRIID:      mr.IID,
@@ -277,6 +279,52 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(mrs []gitlab.MRDetail
 					PipelineID: mr.Pipeline.ID,
 				})
 				continue
+			}
+
+			// For successful pipelines, proceed with rebase directly
+			// Pipeline status = "success" means no failures, so no need to check jobs or atlantis comments
+			if status == "success" {
+				// Pipeline is successful, allow rebase
+				// Continue to add MR to eligible list
+			}
+
+			// For failed pipelines, check all jobs first
+			// If all jobs succeeded, then check atlantis comment for plan failures
+			if status == "failed" {
+				allJobsSucceeded, err := h.gitlabClient.AreAllPipelineJobsSucceeded(projectID, mr.Pipeline.ID)
+				if err != nil {
+					logging.Warn("Failed to check pipeline jobs for MR, skipping", zap.Int("mr_iid", mr.IID), zap.Error(err))
+					result.Skipped = append(result.Skipped, MRSkipInfo{
+						MRIID:      mr.IID,
+						Reason:     "failed_to_check_jobs",
+						PipelineID: mr.Pipeline.ID,
+					})
+					continue
+				}
+
+				if !allJobsSucceeded {
+					logging.Info("Skipping MR with failed jobs", zap.Int("mr_iid", mr.IID))
+					result.Skipped = append(result.Skipped, MRSkipInfo{
+						MRIID:      mr.IID,
+						Reason:     "pipeline_jobs_failed",
+						PipelineID: mr.Pipeline.ID,
+					})
+					continue
+				}
+
+				// All jobs succeeded but pipeline is marked as failed
+				// Check atlantis comment to determine if it's a state lock (allow rebase) or plan error (skip rebase)
+				shouldSkip, skipReason := h.gitlabClient.CheckAtlantisCommentForPlanFailures(projectID, mr.IID)
+				if shouldSkip && skipReason != "atlantis_plan_locked" {
+					logging.Info("Skipping MR with failed pipeline due to plan error", zap.Int("mr_iid", mr.IID), zap.String("reason", skipReason))
+					result.Skipped = append(result.Skipped, MRSkipInfo{
+						MRIID:      mr.IID,
+						Reason:     fmt.Sprintf("pipeline_failed_%s", skipReason),
+						PipelineID: mr.Pipeline.ID,
+					})
+					continue
+				}
+				// If skipReason is "atlantis_plan_locked" or no plan failure detected, we allow rebase (continue to eligible)
 			}
 		}
 

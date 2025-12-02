@@ -145,6 +145,30 @@ func (m *MockRebaseGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab
 	return details, nil
 }
 
+func (m *MockRebaseGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	// Return empty jobs by default (all succeeded)
+	return []gitlab.PipelineJob{}, nil
+}
+
+func (m *MockRebaseGitLabClient) GetJobTrace(projectID, jobID int) (string, error) {
+	return "", nil
+}
+
+func (m *MockRebaseGitLabClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	// Return nil by default (no atlantis comment)
+	return nil, nil
+}
+
+func (m *MockRebaseGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	// Return true by default (all jobs succeeded)
+	return true, nil
+}
+
+func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	// Return false by default (no plan failures, allow rebase)
+	return false, ""
+}
+
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()
 	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
@@ -589,7 +613,8 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := handler.filterEligibleMRs(tt.mrs)
+			// Use a test project ID
+			result := handler.filterEligibleMRs(456, tt.mrs)
 			assert.Len(t, result.Eligible, len(tt.expectedIDs))
 
 			actualIDs := make([]int, len(result.Eligible))
