@@ -127,56 +127,87 @@ func (mb *MessageBuilder) buildDebugSummary(result *shared.RuleEvaluation, mrInf
 	return summary.String()
 }
 
-// buildRulesSummary creates a summary of rule evaluation results, filtering out noise
+// buildRulesSummary creates a summary of rule evaluation results, using actual rule messages
 func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.FileValidationSummary) string {
 	var summary strings.Builder
 	ruleMessages := make(map[string]string)
+	ruleFilesSeen := make(map[string]map[string]bool) // Track unique files per rule
 
-	// Collect messages by rule, filtering out noise
-	for _, fileValidation := range fileValidations {
+	// Sort file paths for deterministic iteration order
+	var filePaths []string
+	for filePath := range fileValidations {
+		filePaths = append(filePaths, filePath)
+	}
+	sort.Strings(filePaths)
+
+	// Collect messages by rule in sorted file order
+	for _, filePath := range filePaths {
+		fileValidation := fileValidations[filePath]
 		for _, ruleResult := range fileValidation.RuleResults {
-			// Skip noise messages
-			if mb.isNoiseMessage(ruleResult.Reason) {
+			// Only show rules that were actually evaluated
+			if !ruleResult.WasEvaluated {
 				continue
 			}
 
-			// Skip rules that didn't actually validate anything
-			if len(ruleResult.LineRanges) == 0 {
-				continue
-			}
+			// Use the internal rule name as the key to deduplicate
+			ruleKey := ruleResult.RuleName
+			hasLineRanges := len(ruleResult.LineRanges) > 0
 
-			ruleName := mb.formatRuleName(ruleResult.RuleName)
+			// Track unique files per rule (only for approvals with line ranges)
+			if ruleResult.Decision == shared.Approve && hasLineRanges {
+				if ruleFilesSeen[ruleKey] == nil {
+					ruleFilesSeen[ruleKey] = make(map[string]bool)
+				}
+				ruleFilesSeen[ruleKey][filePath] = true
+			}
 
 			switch ruleResult.Decision {
 			case shared.Approve:
 				// Only store if not already present
-				if _, exists := ruleMessages[ruleName]; !exists {
-					explanation := mb.getApprovalExplanation(ruleResult.RuleName, ruleResult.Reason)
-					ruleMessages[ruleName] = fmt.Sprintf("✅ %s%s", ruleName, explanation)
+				if _, exists := ruleMessages[ruleKey]; !exists {
+					if hasLineRanges {
+						// Use the actual rule reason message for meaningful context
+						ruleMessages[ruleKey] = fmt.Sprintf("✅ %s", ruleResult.Reason)
+					} else {
+						// When rule didn't find applicable changes, use the reason directly
+						ruleMessages[ruleKey] = fmt.Sprintf("✅ %s", ruleResult.Reason)
+					}
 				}
 			case shared.ManualReview:
-				// Manual review messages always override
-				ruleMessages[ruleName] = fmt.Sprintf("🚫 %s: %s", ruleName, ruleResult.Reason)
+				// Manual review messages always override, use actual reason
+				ruleMessages[ruleKey] = fmt.Sprintf("🚫 %s", ruleResult.Reason)
 			}
 		}
 	}
 
-	// Sort rule names alphabetically for consistent output
-	var ruleNames []string
-	for ruleName := range ruleMessages {
-		ruleNames = append(ruleNames, ruleName)
+	// Update messages for rules that validated multiple files
+	// Only use generic messages for rules where the specific message doesn't add value
+	for ruleKey := range ruleMessages {
+		if fileCount := len(ruleFilesSeen[ruleKey]); fileCount > 1 {
+			// Use generic messages for metadata and TOC rules
+			// Keep specific messages for warehouse and consumer rules (they contain valuable details)
+			if mb.shouldUseGenericMessage(ruleKey) {
+				ruleMessages[ruleKey] = mb.getGenericRuleMessage(ruleKey, fileCount)
+			}
+		}
 	}
-	sort.Strings(ruleNames)
+
+	// Sort rule keys alphabetically for consistent output
+	var ruleKeys []string
+	for ruleKey := range ruleMessages {
+		ruleKeys = append(ruleKeys, ruleKey)
+	}
+	sort.Strings(ruleKeys)
 
 	// Output unique rule messages in sorted order
-	for _, ruleName := range ruleNames {
-		summary.WriteString(fmt.Sprintf("• %s\n", ruleMessages[ruleName]))
+	for _, ruleKey := range ruleKeys {
+		summary.WriteString(fmt.Sprintf("• %s\n", ruleMessages[ruleKey]))
 	}
 
 	return summary.String()
 }
 
-// isNoiseMessage checks if a message should be filtered out
+// isNoiseMessage checks if a message should be filtered out (used only in debug mode)
 func (mb *MessageBuilder) isNoiseMessage(message string) bool {
 	noisePatterns := []string{
 		"Not a ",
@@ -192,7 +223,7 @@ func (mb *MessageBuilder) isNoiseMessage(message string) bool {
 	return false
 }
 
-// formatRuleName converts internal rule names to user-friendly descriptions
+// formatRuleName converts internal rule names to user-friendly descriptions (used only in debug mode)
 func (mb *MessageBuilder) formatRuleName(ruleName string) string {
 	friendlyNames := map[string]string{
 		"warehouse_rule":            "Warehouse configuration validated",
@@ -208,24 +239,38 @@ func (mb *MessageBuilder) formatRuleName(ruleName string) string {
 	return ruleName
 }
 
-// getApprovalExplanation provides meaningful context for why a rule auto-approved
-func (mb *MessageBuilder) getApprovalExplanation(ruleName string, reason string) string {
+// shouldUseGenericMessage determines if a rule should use a generic message for multiple files
+// Returns true for rules where specific messages don't add much value (metadata, TOC)
+// Returns false for rules with valuable details (warehouse, consumer)
+func (mb *MessageBuilder) shouldUseGenericMessage(ruleName string) bool {
+	switch ruleName {
+	case "metadata_rule", "toc_approval_rule", "service_account_rule":
+		// These rules have generic messages, so use generic for multiple files
+		return true
+	case "warehouse_rule", "dataproduct_consumer_rule":
+		// These rules have specific details (sizes, environments), keep the specific message
+		return false
+	default:
+		// Default to generic for unknown rules
+		return true
+	}
+}
+
+// getGenericRuleMessage returns a generic message when a rule validates multiple files
+func (mb *MessageBuilder) getGenericRuleMessage(ruleName string, fileCount int) string {
 	switch ruleName {
 	case "metadata_rule":
-		return ": Product metadata changes (name, tags, kind) are safe and don't affect infrastructure"
-	case "dataproduct_consumer_rule":
-		return ": Data product owner can grant consumer access without TOC approval"
+		return fmt.Sprintf("✅ Metadata changes validated across %d files", fileCount)
 	case "warehouse_rule":
-		if strings.Contains(reason, "decrease") {
-			return ": Warehouse size decrease saves costs and is safe to auto-approve"
-		}
-		return ": Warehouse configuration changes validated"
+		return fmt.Sprintf("✅ Warehouse configuration validated across %d files", fileCount)
 	case "toc_approval_rule":
-		return ": Changes to existing products in non-critical environments"
+		return fmt.Sprintf("✅ TOC approval validated across %d files", fileCount)
+	case "dataproduct_consumer_rule":
+		return fmt.Sprintf("✅ Consumer access validated across %d files", fileCount)
 	case "service_account_rule":
-		return ": Service account configuration is valid"
+		return fmt.Sprintf("✅ Service account validated across %d files", fileCount)
 	default:
-		return ""
+		return fmt.Sprintf("✅ Changes validated across %d files", fileCount)
 	}
 }
 

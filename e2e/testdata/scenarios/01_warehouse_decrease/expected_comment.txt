@@ -5,8 +5,9 @@
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ Metadata validated: Product metadata changes (name, tags, kind) are safe and don't affect infrastructure
-• ✅ TOC approval check: Changes to existing products in non-critical environments
-• ✅ Warehouse configuration validated: Warehouse size decrease saves costs and is safe to auto-approve
+• ✅ No consumer-only changes detected
+• ✅ Auto-approved: Product metadata changes are safe
+• ✅ Existing product.yaml file or not in critical environment - no TOC approval required
+• ✅ Warehouse size decrease approved: user warehouse: MEDIUM → SMALL
 
 </details>
