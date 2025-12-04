@@ -338,3 +338,33 @@ func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDet
 
 	return details, nil
 }
+
+// GetPipelineJobs is a stub for mock client
+func (m *MockGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	// Return empty jobs for e2e tests
+	return []gitlab.PipelineJob{}, nil
+}
+
+// GetJobTrace is a stub for mock client
+func (m *MockGitLabClient) GetJobTrace(projectID, jobID int) (string, error) {
+	// Return empty trace for e2e tests
+	return "", nil
+}
+
+// FindLatestAtlantisComment is a stub for mock client
+func (m *MockGitLabClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	// Return nil for e2e tests (no atlantis comments)
+	return nil, nil
+}
+
+// AreAllPipelineJobsSucceeded is a stub for mock client
+func (m *MockGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	// Return true for e2e tests (all jobs succeeded)
+	return true, nil
+}
+
+// CheckAtlantisCommentForPlanFailures is a stub for mock client
+func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	// Return false for e2e tests (no plan failures, allow rebase)
+	return false, ""
+}
