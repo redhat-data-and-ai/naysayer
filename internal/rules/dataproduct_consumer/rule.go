@@ -63,13 +63,20 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 		return []shared.LineRange{}
 	}
 
-	// Get consumer sections from YAML
-	consumerRanges := r.findConsumerSections(filePath, fileContent)
-	if len(consumerRanges) == 0 {
+	// Check if file has content
+	if len(strings.TrimSpace(fileContent)) == 0 {
 		return []shared.LineRange{}
 	}
 
-	return consumerRanges
+	// For section-based validation, we return a placeholder range to indicate
+	// this rule wants to participate in validation. The actual section content
+	// (data_product_db) will be provided by the section manager.
+	return []shared.LineRange{
+		{
+			StartLine: 1,
+			EndLine:   1,
+		},
+	}
 }
 
 // analyzeFile analyzes a file to determine if consumer rule applies

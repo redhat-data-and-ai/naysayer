@@ -1,0 +1,7 @@
+consumers:
+  - name: analytics_consumer
+data_product: analytics
+database: fivetran_db
+kind: SourceBinding
+schema: analytics
+type: fivetran
