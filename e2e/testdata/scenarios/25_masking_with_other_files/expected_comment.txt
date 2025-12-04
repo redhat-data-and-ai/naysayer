@@ -1,0 +1,26 @@
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
+
+<details>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
+
+**Files in this MR:**
+• `dataproducts/analytics/prod/pii_string_data_masking.yaml` 🚫
+• `dataproducts/analytics/prod/product.yaml` ✅
+• `dataproducts/analytics/prod/sourcebinding.yaml` ✅
+
+**What was checked:**
+• ✅ No consumer-only changes detected
+• ✅ Metadata changes validated across 2 files
+• ✅ Existing product.yaml file or not in critical environment - no TOC approval required
+• ✅ No warehouse size changes detected - approved
+
+**Files without validation rules:**
+
+*No validation rules configured for this file type:*
+• `dataproducts/analytics/prod/pii_string_data_masking.yaml`
+
+</details>

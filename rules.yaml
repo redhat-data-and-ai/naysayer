@@ -27,8 +27,8 @@ files:
         auto_approve: false
 
       # Consumer access changes - auto-approve with data product owner approval
-      - name: consumers
-        yaml_path: data_product_db[*].presentation_schemas[*].consumers
+      - name: data_product_db_validation
+        yaml_path: data_product_db
         rule_configs:
           - name: dataproduct_consumer_rule
             enabled: true
@@ -117,6 +117,20 @@ files:
     filename: "developers.yaml"
     parser_type: yaml
     enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true
+
+  # Masking files - Low risk, can auto-approve
+  - name: "masking_files"
+    path: "dataproducts/**/"
+    filename: "*masking.{yaml,yml}"
+    parser_type: yaml
+    enabled: false
     sections:
       - name: full_file
         yaml_path: .

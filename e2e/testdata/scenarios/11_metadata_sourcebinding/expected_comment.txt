@@ -5,6 +5,6 @@
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ Metadata validated: Product metadata changes (name, tags, kind) are safe and don't affect infrastructure
+• ✅ Auto-approved: Product metadata changes are safe
 
 </details>
