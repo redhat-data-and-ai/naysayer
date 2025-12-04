@@ -1,0 +1,8 @@
+kind: Tag
+name: analytics_pii
+description: String tag for pii data masking
+data_product: analytics
+masking_policies:
+- name: analytics_pii_string_policy
+allowed_values:
+- default

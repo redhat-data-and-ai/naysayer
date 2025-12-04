@@ -31,10 +31,11 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 30}},
 				RuleResults: []shared.LineValidationResult{
 					{
-						RuleName:   "warehouse_rule",
-						Decision:   shared.Approve,
-						Reason:     "Warehouse decreases detected",
-						LineRanges: []shared.LineRange{{StartLine: 1, EndLine: 30}},
+						RuleName:     "warehouse_rule",
+						Decision:     shared.Approve,
+						Reason:       "Warehouse decreases detected",
+						LineRanges:   []shared.LineRange{{StartLine: 1, EndLine: 30}},
+						WasEvaluated: true,
 					},
 				},
 				FileDecision: shared.Approve,
@@ -58,7 +59,7 @@ func TestBuildApprovalComment_BasicVerbosity(t *testing.T) {
 
 	assert.Contains(t, comment, "✅ **Auto-approved**")
 	assert.Contains(t, comment, "**What was checked:**")
-	assert.Contains(t, comment, "Warehouse configuration validated")
+	assert.Contains(t, comment, "Warehouse decreases detected")
 }
 
 func TestBuildApprovalComment_ContainsIdentifier(t *testing.T) {

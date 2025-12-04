@@ -85,10 +85,11 @@ type LineRange struct {
 
 // LineValidationResult represents validation result for specific lines
 type LineValidationResult struct {
-	RuleName   string       `json:"rule_name"`
-	LineRanges []LineRange  `json:"line_ranges"`
-	Decision   DecisionType `json:"decision"`
-	Reason     string       `json:"reason"`
+	RuleName     string       `json:"rule_name"`
+	LineRanges   []LineRange  `json:"line_ranges"`
+	Decision     DecisionType `json:"decision"`
+	Reason       string       `json:"reason"`
+	WasEvaluated bool         `json:"was_evaluated"` // true if rule actually executed (vs skipped)
 }
 
 // FileValidationSummary shows validation results for a single file

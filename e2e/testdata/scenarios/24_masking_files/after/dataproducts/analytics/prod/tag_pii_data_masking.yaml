@@ -1,0 +1,10 @@
+kind: Tag
+name: analytics_pii
+description: String and number tag for pii data masking
+data_product: analytics
+masking_policies:
+- name: analytics_pii_string_policy
+- name: analytics_pii_number_policy
+allowed_values:
+- default
+- custom

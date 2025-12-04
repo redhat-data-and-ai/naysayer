@@ -1,0 +1,12 @@
+kind: DataProduct
+name: analytics
+rover_group: analytics-team
+tags:
+  environment: prod
+  version: v1.1.0
+  owner: analytics-team
+warehouses:
+  - name: analytics_wh
+    type: user
+    size: XSMALL
+data_product_db: []

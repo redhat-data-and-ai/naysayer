@@ -8,7 +8,7 @@
 
 ## ⚡ Initial Deployment
 
-**Note**: Throughout this guide, replace `<your-namespace>` with your actual namespace (e.g., `ddis-asteroid--naysayer`) and `<your-naysayer-route-hostname>` with your route hostname.
+**Note**: Throughout this guide, replace `<your-namespace>` with your actual namespace and `<your-naysayer-route-hostname>` with your route hostname.
 
 ### 1. Configure Secrets
 
@@ -180,3 +180,4 @@ kubectl top pod -n <your-namespace> -l app=naysayer
 ## 🔗 Related Documentation
 
 - [Main README](README.md) - Project overview
+- [config/README.md](config/README.md) - Configuration details
