@@ -658,3 +658,111 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 
 	return detailedMRs, nil
 }
+
+// ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
+// This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
+func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
+	// Get ALL open MRs without date filter (pagination handled)
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create list MRs request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list MRs: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list MRs failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse basic MR list (just need IIDs)
+	var basicMRs []struct {
+		IID int `json:"iid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&basicMRs); err != nil {
+		return nil, fmt.Errorf("failed to decode MRs response: %w", err)
+	}
+
+	if len(basicMRs) == 0 {
+		return []MRDetails{}, nil
+	}
+
+	// Fetch each MR individually to get complete details including UpdatedAt
+	detailedMRs := make([]MRDetails, 0, len(basicMRs))
+
+	for _, basicMR := range basicMRs {
+		mrDetails, err := c.GetMRDetails(projectID, basicMR.IID)
+		if err != nil {
+			// Log error but continue with other MRs
+			logging.Warn("Failed to get details for MR %d in project %d, skipping: %v", basicMR.IID, projectID, err)
+			continue
+		}
+		detailedMRs = append(detailedMRs, *mrDetails)
+	}
+
+	return detailedMRs, nil
+}
+
+// CloseMR closes a merge request
+func (c *Client) CloseMR(projectID, mrIID int) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	payload := map[string]string{
+		"state_event": "close",
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal close MR payload: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create close MR request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to close MR: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("close MR failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
+	return nil
+}
+
+// FindCommentByPattern checks if a comment containing the specified pattern exists on an MR
+func (c *Client) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	// Search through comments for the pattern
+	for _, comment := range comments {
+		if strings.Contains(comment.Body, pattern) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}

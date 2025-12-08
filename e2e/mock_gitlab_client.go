@@ -338,3 +338,28 @@ func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDet
 
 	return details, nil
 }
+
+// ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
+func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// For mock, return same as ListOpenMRsWithDetails
+	return m.ListOpenMRsWithDetails(projectID)
+}
+
+// CloseMR closes a merge request (mock implementation)
+func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error {
+	// Mock implementation - just log the action
+	return nil
+}
+
+// FindCommentByPattern checks if a comment with the pattern exists (mock implementation)
+func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	// Mock implementation - check captured comments
+	for _, comment := range m.CapturedComments {
+		if comment.ProjectID == projectID && comment.MRIID == mrIID {
+			if strings.Contains(comment.Comment, pattern) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
