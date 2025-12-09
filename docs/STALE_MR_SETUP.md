@@ -1,50 +1,18 @@
 # How to Enable Stale MR Cleanup
 
+> **Want to understand the architecture first?** See [STALE_MR_ARCHITECTURE.md](./STALE_MR_ARCHITECTURE.md)
+
 ## Overview
 
 This guide shows you how to enable automated cleanup of stale merge requests in your GitLab repository. The feature automatically closes MRs after a configurable period of inactivity (default: 30 days).
 
-### Setup Process Overview
-
-```mermaid
-flowchart TD
-    START[🚀 Start: Ready to Enable?]
-    PREREQ{✓ Have Prerequisites?}
-    STEP1[📝 Step 1: Add CI Job to .gitlab-ci.yml]
-    STEP2[⏰ Step 2: Create GitLab Schedule]
-    STEP3[🔐 Step 3: Add WEBHOOK_SECRET Variable]
-    STEP4[🧪 Step 4: Run Dry Run Test]
-    REVIEW{📊 Results Look Good?}
-    ADJUST[⚙️ Adjust Thresholds]
-    STEP5[🚀 Step 5: Enable Production Mode]
-    STEP6[👀 Step 6: Monitor First Week]
-    DONE[✅ Feature Enabled]
-
-    START --> PREREQ
-    PREREQ -->|No| PREREQ
-    PREREQ -->|Yes| STEP1
-    STEP1 --> STEP2
-    STEP2 --> STEP3
-    STEP3 --> STEP4
-    STEP4 --> REVIEW
-    REVIEW -->|No| ADJUST
-    ADJUST --> STEP4
-    REVIEW -->|Yes| STEP5
-    STEP5 --> STEP6
-    STEP6 --> DONE
-
-    style START fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style DONE fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
-    style PREREQ fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
-    style REVIEW fill:#FFC107,stroke:#F57C00,stroke-width:2px,color:#000
-    style ADJUST fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
-    style STEP1 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-    style STEP2 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-    style STEP3 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-    style STEP4 fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
-    style STEP5 fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
-    style STEP6 fill:#E8F5E9,stroke:#388E3C,stroke-width:2px
-```
+**Setup steps:**
+1. Add CI job to `.gitlab-ci.yml`
+2. Create GitLab schedule
+3. Add webhook secret variable
+4. Test with dry run
+5. Enable production mode
+6. Monitor first week
 
 ---
 

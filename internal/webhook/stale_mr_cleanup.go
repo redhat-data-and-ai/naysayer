@@ -37,9 +37,15 @@ type StaleMRCleanupResponse struct {
 
 // NewStaleMRCleanupHandler creates a new stale MR cleanup handler
 func NewStaleMRCleanupHandler(cfg *config.Config) *StaleMRCleanupHandler {
+	clientCfg := cfg.GitLab
+	if clientCfg.GitlabStaleMRToken != "" {
+		// Use the dedicated token for this handler's client
+		clientCfg.Token = clientCfg.GitlabStaleMRToken
+	}
+
 	return &StaleMRCleanupHandler{
 		config: cfg,
-		client: gitlab.NewClient(cfg.GitLab),
+		client: gitlab.NewClient(clientCfg),
 	}
 }
 
