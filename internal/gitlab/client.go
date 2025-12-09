@@ -760,11 +760,11 @@ func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 		}
 
 		var mrs []MRDetails
-		if err := json.NewDecoder(resp.Body).Decode(&mrs); err != nil {
-			_ = resp.Body.Close()
+		err = json.NewDecoder(resp.Body).Decode(&mrs)
+		_ = resp.Body.Close()
+		if err != nil {
 			return nil, fmt.Errorf("failed to decode MRs response: %w", err)
 		}
-		_ = resp.Body.Close()
 
 		allMRs = append(allMRs, mrs...)
 

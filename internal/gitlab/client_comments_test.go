@@ -381,7 +381,7 @@ func TestListMRComments_Pagination(t *testing.T) {
 			}
 			w.Header().Set("Link", fmt.Sprintf(`<%s?page=2>; rel="next"`, serverURL))
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(comments)
+			_ = json.NewEncoder(w).Encode(comments)
 		} else {
 			// Page 2: Return 50 comments, no Link header
 			comments := make([]MRComment, 50)
@@ -389,7 +389,7 @@ func TestListMRComments_Pagination(t *testing.T) {
 				comments[i] = MRComment{ID: i + 101, Body: fmt.Sprintf("Comment %d", i+101)}
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(comments)
+			_ = json.NewEncoder(w).Encode(comments)
 		}
 	}))
 	defer server.Close()
