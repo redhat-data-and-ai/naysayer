@@ -412,13 +412,14 @@ func (c *Client) ListMRComments(projectID, mrIID int) ([]MRComment, error) {
 			logging.Warn("Failed to fetch comment page %d for MR %d, returning %d comments", pageCount, mrIID, len(allComments))
 			return allComments, nil
 		}
-		defer func() { _ = resp.Body.Close() }()
 
 		// Handle HTTP status
 		switch resp.StatusCode {
 		case 200:
 			var pageComments []MRComment
-			if err := json.NewDecoder(resp.Body).Decode(&pageComments); err != nil {
+			err = json.NewDecoder(resp.Body).Decode(&pageComments)
+			_ = resp.Body.Close()
+			if err != nil {
 				if pageCount == 1 {
 					return nil, fmt.Errorf("failed to decode comments response: %w", err)
 				}
@@ -432,15 +433,19 @@ func (c *Client) ListMRComments(projectID, mrIID int) ([]MRComment, error) {
 			nextURL = parseNextLink(resp.Header.Get("Link"))
 
 		case 401:
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("list comments failed: insufficient permissions")
 		case 404:
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("list comments failed: MR not found")
 		default:
 			// For first page, return error. For subsequent pages, gracefully degrade
 			if pageCount == 1 {
 				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
 				return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
 			}
+			_ = resp.Body.Close()
 			logging.Warn("Comment page %d failed with status %d for MR %d, returning %d comments", pageCount, resp.StatusCode, mrIID, len(allComments))
 			return allComments, nil
 		}

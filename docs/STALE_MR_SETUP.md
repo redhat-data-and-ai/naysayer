@@ -42,11 +42,7 @@ stale-mr-cleanup:
       curl -X POST https://naysayer.example.com/stale-mr-cleanup \
         -H "Content-Type: application/json" \
         -H "X-Gitlab-Token: ${WEBHOOK_SECRET}" \
-        -d "{
-          \"project_id\": ${CI_PROJECT_ID},
-          \"closure_days\": 30,
-          \"dry_run\": true
-        }"
+        -d "{\"project_id\": ${CI_PROJECT_ID}, \"closure_days\": 30, \"dry_run\": true}"
   allow_failure: true
 ```
 
