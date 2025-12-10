@@ -514,6 +514,18 @@ func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDet
 	return nil, nil
 }
 
+func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	return m.ListOpenMRsWithDetails(projectID)
+}
+
+func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error {
+	return nil
+}
+
+func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	return false, nil
+}
+
 // Test empty MR detection
 func TestEvaluateRules_EmptyMR(t *testing.T) {
 	setupTestRulesFile(t)
