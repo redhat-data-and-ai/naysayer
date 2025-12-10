@@ -511,11 +511,14 @@ func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
 }
 
 func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
-	return nil, nil
+	// Returns MRs created in last 7 days (mocked as empty)
+	return []gitlab.MRDetails{}, nil
 }
 
 func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
-	return m.ListOpenMRsWithDetails(projectID)
+	// Returns ALL open MRs without date filter (mocked as empty)
+	// This is used by stale MR cleanup to find MRs older than 27-30 days
+	return []gitlab.MRDetails{}, nil
 }
 
 func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error {
