@@ -38,6 +38,11 @@ type GitLabClient interface {
 	FindLatestAtlantisComment(projectID, mrIID int) (*MRComment, error)
 	AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error)
 	CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string)
+
+	// Stale MR cleanup operations
+	ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error)
+	CloseMR(projectID, mrIID int) error
+	FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error)
 }
 
 // Verify that Client implements GitLabClient interface

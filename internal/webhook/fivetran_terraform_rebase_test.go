@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -143,6 +144,29 @@ func (m *MockRebaseGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab
 	}
 
 	return details, nil
+}
+
+// ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
+func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// For mock, return same as ListOpenMRsWithDetails
+	return m.ListOpenMRsWithDetails(projectID)
+}
+
+// CloseMR closes a merge request (mock implementation)
+func (m *MockRebaseGitLabClient) CloseMR(projectID, mrIID int) error {
+	// Mock implementation - just return nil
+	return nil
+}
+
+// FindCommentByPattern checks if a comment with the pattern exists (mock implementation)
+func (m *MockRebaseGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	// Mock implementation - check captured comments
+	for _, comment := range m.capturedComments {
+		if strings.Contains(comment, pattern) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (m *MockRebaseGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
