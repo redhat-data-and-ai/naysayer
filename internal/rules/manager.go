@@ -527,6 +527,18 @@ func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRa
 }
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
+	// Safety check: if there are no file validations, require manual review
+	// This catches edge cases like net-zero changes that slip through earlier checks
+	if len(fileValidations) == 0 {
+		logging.Warn("No files to validate - requiring manual review for safety")
+		return shared.Decision{
+			Type:    shared.ManualReview,
+			Reason:  "MR has no files to validate",
+			Summary: "⚠️ No files to validate",
+			Details: "Cannot auto-approve an MR with zero validated files. This may indicate net-zero changes or an edge case.",
+		}
+	}
+
 	var manualReviewFiles []string
 	var approvedFiles []string
 
