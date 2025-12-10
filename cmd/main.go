@@ -25,6 +25,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 	dataProductConfigMrReviewHandler := webhook.NewDataProductConfigMrReviewHandler(cfg)
 	healthHandler := webhook.NewHealthHandler(cfg)
 	fivetranTerraformRebaseHandler := webhook.NewFivetranTerraformRebaseHandler(cfg)
+	staleMRCleanupHandler := webhook.NewStaleMRCleanupHandler(cfg)
 
 	// Health and monitoring routes
 	app.Get("/health", healthHandler.HandleHealth)
@@ -35,6 +36,9 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 
 	// Fivetran-Terraform rebase routes
 	app.Post("/fivetran-terraform-rebase", fivetranTerraformRebaseHandler.HandleWebhook)
+
+	// Stale MR cleanup routes
+	app.Post("/stale-mr-cleanup", staleMRCleanupHandler.HandleWebhook)
 }
 
 func main() {

@@ -31,6 +31,11 @@ type GitLabClient interface {
 	RebaseMR(projectID, mrIID int) error
 	ListOpenMRs(projectID int) ([]int, error)
 	ListOpenMRsWithDetails(projectID int) ([]MRDetails, error)
+
+	// Stale MR cleanup operations
+	ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error)
+	CloseMR(projectID, mrIID int) error
+	FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error)
 }
 
 // Verify that Client implements GitLabClient interface

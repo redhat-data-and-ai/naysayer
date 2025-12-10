@@ -117,6 +117,7 @@ type MRDetails struct {
 	SourceProjectID int         `json:"source_project_id"` // Source project ID (for cross-fork MRs)
 	TargetProjectID int         `json:"target_project_id"` // Target project ID (same as ProjectID)
 	CreatedAt       string      `json:"created_at"`        // ISO 8601 format timestamp
+	UpdatedAt       string      `json:"updated_at"`        // ISO 8601 format timestamp of last activity
 	Pipeline        *MRPipeline `json:"pipeline"`          // Pipeline info (can be nil if no pipeline)
 }
 
