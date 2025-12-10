@@ -147,8 +147,11 @@ func (m *MockRebaseGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab
 }
 
 // ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
+// Returns ALL open MRs without date filter (unlike ListOpenMRsWithDetails which filters to last 7 days)
 func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
-	// For mock, return same as ListOpenMRsWithDetails
+	// For this mock, we return the same data since the rebase feature doesn't
+	// distinguish between recent and old MRs. In a real scenario, this would
+	// return MRs older than 7 days as well.
 	return m.ListOpenMRsWithDetails(projectID)
 }
 
