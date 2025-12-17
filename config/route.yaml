@@ -8,7 +8,7 @@ metadata:
   annotations:
     haproxy.router.openshift.io/timeout: 180s
 spec:
-  host: naysayer-ddis-asteroid--naysayer.apps.int.spoke.preprod.us-west-2.aws.paas.redhat.com
+  host: www.cluster-url.com
   to:
     kind: Service
     name: naysayer

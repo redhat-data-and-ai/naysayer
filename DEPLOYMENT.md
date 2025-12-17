@@ -6,7 +6,35 @@
 - GitLab instance with webhook capabilities
 - `kubectl` or `oc` CLI configured
 
-## ⚡ Initial Deployment
+## 🏗️ Deployment Architecture
+
+Naysayer deployment configurations are maintained in this repository under `/config/`.
+
+### Configuration Flow
+
+```
+Naysayer Repo (config/)
+        ↓
+   [Apply to Kubernetes/OpenShift]
+        ↓
+   Production Deployment
+```
+
+**Key Principle**: All deployment configs are maintained in the naysayer repository.
+
+## 🎯 Deployment
+
+**Use for:** Local testing, development, hotfixes
+
+**Process:**
+```bash
+# Deploy directly from naysayer/config/
+kubectl apply -f config/
+```
+
+See [Deployment Setup](#⚡-deployment-setup) for details.
+
+## ⚡ Deployment Setup
 
 **Note**: Throughout this guide, replace `<your-namespace>` with your actual namespace and `<your-naysayer-route-hostname>` with your route hostname.
 
