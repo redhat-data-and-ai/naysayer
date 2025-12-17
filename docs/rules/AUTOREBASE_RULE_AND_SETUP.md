@@ -1,8 +1,8 @@
-# 🔄 Fivetran Terraform Auto-Rebase Rule
+# 🔄 Auto-Rebase Rule (Generic)
 
-**Business Purpose**: Automatically rebases eligible merge requests in the Fivetran Terraform repository when changes are pushed to the main branch, reducing manual maintenance overhead and keeping MRs up-to-date.
+**Business Purpose**: Automatically rebases eligible merge requests when changes are pushed to the main branch, reducing manual maintenance overhead and keeping MRs up-to-date across any repository.
 
-**Compliance Scope**: Provides automated Git operations for the Fivetran Terraform repository to maintain merge request freshness and reduce merge conflicts.
+**Compliance Scope**: Provides automated Git operations for any repository to maintain merge request freshness and reduce merge conflicts. Can be configured with optional atlantis comment checking for repositories using Terraform/Atlantis.
 
 ## 📊 Policy Overview
 
@@ -19,8 +19,15 @@ graph TB
         E --> F{MR Created < 7 days?}
         F -->|No| G[Skip: Too Old]
         F -->|Yes| H{Pipeline Status?}
-        H -->|Running/Pending/Failed| I[Skip: Active Pipeline]
-        H -->|Success/Skipped/Canceled| J[Eligible for Rebase]
+        H -->|Running/Pending| I[Skip: Active Pipeline]
+        H -->|Success| J[Eligible for Rebase]
+        H -->|Failed| K{All Jobs Succeeded?}
+        K -->|No| I
+        K -->|Yes| L{Check Atlantis?}
+        L -->|No| I
+        L -->|Yes| M{State Lock?}
+        M -->|Yes| J
+        M -->|No| I
     end
     
     subgraph "⚡ Rebase Action"
@@ -36,7 +43,7 @@ graph TB
     classDef skip fill:#f8d7da,stroke:#721c24,stroke-width:2px
     
     class A,B,C trigger
-    class E,F,H filter
+    class E,F,H,K,L,M filter
     class J,K,L,M action
     class D,G,I,N skip
 ```
@@ -46,12 +53,15 @@ graph TB
 **This feature**:
 - Automatically rebases eligible merge requests when code is pushed to the main branch
 - Filters MRs based on age (only MRs created within the last 7 days)
-- Skips MRs with active or failed pipelines to avoid disrupting CI/CD
+- Checks pipeline status and job success before rebasing
+- Optionally checks atlantis comments for state lock vs plan failures (configurable)
 - Posts comments to successfully rebased MRs to inform users
 
-**Trigger**: Push events to `main` or `master` branch in the Fivetran Terraform repository
+**Trigger**: Push events to `main` or `master` branch in any repository
 
-**Endpoint**: `POST /fivetran-terraform-rebase`
+**Endpoints**: 
+- `POST /auto-rebase` (generic endpoint, recommended)
+- `POST /fivetran-terraform-rebase` (legacy endpoint, backward compatibility)
 
 ## ⚙️ Setup Instructions
 
@@ -63,7 +73,7 @@ graph TB
 
 **Step 2**: Create New Token
 1. Click **"Add new token"**
-2. **Token name**: `naysayer-fivetran-rebase` (or descriptive name)
+2. **Token name**: `naysayer-auto-rebase` (or descriptive name)
 3. **Expiration date**: Set appropriate expiration (recommended: 1 year)
 4. **Select scopes** (required):
    - ✅ `api` - Full API access
@@ -79,15 +89,17 @@ graph TB
 
 ### 2. Configure Environment Variables
 
-**Option A: Dedicated Token (Recommended)**
+**Option A: Repository-Specific Token (Recommended)**
 ```bash
-# Set dedicated token for Fivetran repository
-export GITLAB_TOKEN_FIVETRAN="glpat-your-fivetran-token-here"
+# Set repository-specific token (supports both new and legacy env var names)
+export AUTO_REBASE_REPOSITORY_TOKEN="glpat-your-repository-token-here"
+# Or use legacy name for backward compatibility:
+export GITLAB_TOKEN_FIVETRAN="glpat-your-repository-token-here"
 ```
 
 **Option B: Use Main Token**
 ```bash
-# If GITLAB_TOKEN_FIVETRAN is not set, the system will use GITLAB_TOKEN
+# If repository-specific token is not set, the system will use GITLAB_TOKEN
 export GITLAB_TOKEN="glpat-your-main-token-here"
 ```
 
@@ -98,20 +110,28 @@ export GITLAB_BASE_URL="https://your-gitlab-instance.com"
 
 # Server port (default: 3000)
 export PORT="3000"
+
+# Enable auto-rebase feature (default: true)
+export AUTO_REBASE_ENABLED="true"
+
+# Enable atlantis comment checking (default: false)
+# Set to true for repositories using Terraform/Atlantis
+export AUTO_REBASE_CHECK_ATLANTIS_COMMENTS="true"
 ```
 
 ### 3. Configure GitLab Webhook
 
 **Step 1**: Navigate to Project Webhooks
-- Go to your **Fivetran Terraform repository** in GitLab
+- Go to your **repository** in GitLab
 - Navigate to **Settings** → **Webhooks**
-- Or visit: `https://your-gitlab-instance.com/your-group/fivetran-terraform/-/hooks`
+- Or visit: `https://your-gitlab-instance.com/your-group/your-repo/-/hooks`
 
 **Step 2**: Add New Webhook
 1. Click **"Add webhook"**
-2. **URL**: `https://your-naysayer-domain.com/fivetran-terraform-rebase`
+2. **URL**: `https://your-naysayer-domain.com/auto-rebase`
    - Replace `your-naysayer-domain.com` with your actual Naysayer deployment URL
-   - Example: `https://naysayer.example.com/fivetran-terraform-rebase`
+   - Example: `https://naysayer.example.com/auto-rebase`
+   - **Note**: Legacy endpoint `/fivetran-terraform-rebase` is also supported for backward compatibility
 3. **Secret token** (optional but recommended):
    - Generate a secure random token
    - Store it in `WEBHOOK_SECRET` environment variable
@@ -144,7 +164,17 @@ curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 
 **Test Webhook Endpoint**:
 ```bash
-# Test webhook endpoint to trigger rebase
+# Test webhook endpoint to trigger rebase (generic endpoint)
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_kind": "push",
+    "ref": "refs/heads/main",
+    "project": {"id": YOUR_PROJECT_ID},
+    "commits": [{"id": "abc123", "message": "Test commit"}]
+  }'
+
+# Legacy endpoint (also supported)
 curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
   -H "Content-Type: application/json" \
   -d '{
@@ -158,10 +188,10 @@ curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
 **Check Service Logs**:
 ```bash
 # View Naysayer logs to verify webhook processing
-kubectl logs -f deployment/naysayer | grep fivetran
+kubectl logs -f deployment/naysayer | grep -i "auto-rebase\|rebase"
 
 # Or if running locally
-./naysayer | grep fivetran
+./naysayer | grep -i "auto-rebase\|rebase"
 ```
 
 ## 🔍 How It Works
@@ -171,7 +201,10 @@ kubectl logs -f deployment/naysayer | grep fivetran
 An MR is eligible for auto-rebase if **ALL** of the following are true:
 
 1. ✅ **Age**: Created within the last **7 days**
-2. ✅ **Pipeline Status**: Pipeline is `success`, `skipped`, `canceled`, or `null` (no pipeline)
+2. ✅ **Pipeline Status**: 
+   - Pipeline is `success` → Rebase directly
+   - Pipeline is `failed` → Check jobs and optionally atlantis comments (see below)
+   - Pipeline is `null` (no pipeline) → Rebase
 3. ✅ **State**: MR is in `opened` state
 
 ### Skip Conditions
@@ -180,13 +213,29 @@ An MR is **skipped** (not rebased) if **ANY** of the following are true:
 
 1. ❌ **Too Old**: Created more than 7 days ago
 2. ❌ **Active Pipeline**: Pipeline status is `running` or `pending`
-3. ❌ **Failed Pipeline**: Pipeline status is `failed`
+3. ❌ **Failed Pipeline**: 
+   - If `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=false`: Skip all failed pipelines
+   - If `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`: 
+     - Skip if jobs failed
+     - Skip if atlantis comment indicates plan error (not state lock)
+     - Allow rebase if atlantis comment indicates state lock
+
+### Atlantis Comment Checking (Optional)
+
+When `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`:
+- **Checks for atlantis-bot comments** in failed pipelines
+- **State Lock Detection**: If comment contains "Error: Error acquiring the state lock" → Allow rebase
+- **Plan Error Detection**: If comment contains other errors → Skip rebase
+- **No Comment Found**: Skip rebase (safe default)
 
 ### Rebase Process
 
 1. **Webhook Trigger**: Push to `main`/`master` branch triggers webhook
 2. **MR Discovery**: System fetches all open MRs created in last 7 days
-3. **Filtering**: MRs are filtered based on pipeline status
+3. **Filtering**: MRs are filtered based on:
+   - Pipeline status (success → rebase, failed → check jobs)
+   - Job status (all jobs must succeed for failed pipelines)
+   - Atlantis comments (if enabled, check for state lock vs plan errors)
 4. **Rebase**: Eligible MRs are rebased sequentially
 5. **Notification**: Successfully rebased MRs receive an automated comment
 
@@ -285,13 +334,13 @@ An MR is **skipped** (not rebased) if **ANY** of the following are true:
 
 **Debug Commands**:
 ```bash
-# Test webhook endpoint directly
-curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
+# Test webhook endpoint directly (generic endpoint)
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
   -H "Content-Type: application/json" \
   -d '{"object_kind": "push", "ref": "refs/heads/main", "project": {"id": YOUR_PROJECT_ID}}'
 
 # Check Naysayer service logs
-kubectl logs -f deployment/naysayer
+kubectl logs -f deployment/naysayer | grep -i "auto-rebase\|rebase"
 ```
 
 ### Token Permission Errors
@@ -306,12 +355,12 @@ kubectl logs -f deployment/naysayer
 
 **Debug Commands**:
 ```bash
-# Test token permissions
-curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+# Test token permissions (use your repository token)
+curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/user" | jq '.'
 
 # Verify token scopes
-curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/personal_access_tokens/self" | jq '.scopes'
 ```
 
@@ -328,12 +377,12 @@ curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 **Debug Commands**:
 ```bash
 # List open MRs and their details
-curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/projects/YOUR_PROJECT_ID/merge_requests?state=opened" \
   | jq '.[] | {iid: .iid, created_at: .created_at, pipeline: .pipeline}'
 
 # Check specific MR details
-curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/projects/YOUR_PROJECT_ID/merge_requests/MR_IID" \
   | jq '{iid: .iid, created_at: .created_at, pipeline: .pipeline, state: .state}'
 ```
@@ -351,12 +400,12 @@ curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 **Debug Commands**:
 ```bash
 # Check MR mergeability
-curl -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/projects/YOUR_PROJECT_ID/merge_requests/MR_IID" \
   | jq '{mergeable: .mergeable, merge_status: .merge_status, rebase_in_progress: .rebase_in_progress}'
 
 # Manually trigger rebase to test
-curl -X PUT -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
+curl -X PUT -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
   "$GITLAB_BASE_URL/api/v4/projects/YOUR_PROJECT_ID/merge_requests/MR_IID/rebase"
 ```
 
@@ -365,7 +414,7 @@ curl -X PUT -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 ### Token Security
 
 - **Never commit tokens to version control**
-- **Use dedicated tokens** for Fivetran repository (recommended)
+- **Use repository-specific tokens** (recommended) for better security isolation
 - **Rotate tokens regularly** (recommended: every 90 days)
 - **Use least privilege**: Only grant required scopes
 - **Store tokens securely**: Use secret management systems (Kubernetes secrets, Vault, etc.)
@@ -379,9 +428,10 @@ curl -X PUT -H "Authorization: Bearer $GITLAB_TOKEN_FIVETRAN" \
 
 ### Access Control
 
-- **Repository permissions**: Ensure token only has access to Fivetran Terraform repository
+- **Repository permissions**: Ensure token only has access to the target repository
 - **Branch protection**: Consider branch protection rules for main branch
 - **Audit logging**: Monitor webhook and rebase activities in logs
+- **Configuration**: Use `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` to enable/disable atlantis checking per repository
 
 ## 📊 Monitoring
 
@@ -402,11 +452,13 @@ Monitor these metrics to ensure the feature is working correctly:
 - `Successfully triggered rebase for MR` - Successful rebase
 - `Failed to rebase MR` - Rebase failure
 - `Skipping MR with X pipeline` - MR skipped due to pipeline status
+- `Skipping MR with failed pipeline due to plan error` - Plan error detected (atlantis check enabled)
+- `Skipping MR with failed pipeline (no atlantis comment found)` - No atlantis comment (atlantis check enabled)
 
 **Example log query**:
 ```bash
-# Filter logs for Fivetran rebase activity
-kubectl logs -f deployment/naysayer | grep -i fivetran
+# Filter logs for auto-rebase activity
+kubectl logs -f deployment/naysayer | grep -i "auto-rebase\|rebase"
 
 # Count successful rebases
 kubectl logs deployment/naysayer | grep "Successfully triggered rebase" | wc -l

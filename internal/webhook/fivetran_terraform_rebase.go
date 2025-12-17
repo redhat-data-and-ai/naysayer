@@ -12,50 +12,70 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 )
 
-// FivetranTerraformRebaseHandler handles Fivetran Terraform rebase requests
-type FivetranTerraformRebaseHandler struct {
+// AutoRebaseHandler handles auto-rebase requests (generic, reusable across repositories)
+type AutoRebaseHandler struct {
 	gitlabClient gitlab.GitLabClient
 	config       *config.Config
 }
 
-// NewFivetranTerraformRebaseHandler creates a new Fivetran Terraform rebase handler
-func NewFivetranTerraformRebaseHandler(cfg *config.Config) *FivetranTerraformRebaseHandler {
-	// Create GitLab client with Fivetran-specific token if available
-	gitlabConfig := cfg.GitLab
+// FivetranTerraformRebaseHandler is an alias for backward compatibility
+// Deprecated: Use AutoRebaseHandler instead
+type FivetranTerraformRebaseHandler = AutoRebaseHandler
 
-	// Use dedicated Fivetran token if configured, otherwise fall back to main token
-	token := gitlabConfig.GitlabFivetranRepositoryToken
+// NewAutoRebaseHandler creates a new auto-rebase handler
+func NewAutoRebaseHandler(cfg *config.Config) *AutoRebaseHandler {
+	// Use repository-specific token if configured, otherwise use main token
+	token := cfg.AutoRebase.RepositoryToken
 	if token == "" {
-		token = gitlabConfig.Token
-		logging.Info("Using main GITLAB_TOKEN for Fivetran rebase (GITLAB_TOKEN_FIVETRAN not set)")
+		token = cfg.GitLab.Token
+		logging.Info("Using main GITLAB_TOKEN for auto-rebase")
 	} else {
-		logging.Info("Using dedicated GITLAB_TOKEN_FIVETRAN for Fivetran rebase")
+		logging.Info("Using repository-specific token for auto-rebase")
 	}
 
 	// Create a custom config with the appropriate token
-	fivetranConfig := config.GitLabConfig{
-		BaseURL:     gitlabConfig.BaseURL,
+	gitlabConfig := config.GitLabConfig{
+		BaseURL:     cfg.GitLab.BaseURL,
 		Token:       token,
-		InsecureTLS: gitlabConfig.InsecureTLS,
-		CACertPath:  gitlabConfig.CACertPath,
+		InsecureTLS: cfg.GitLab.InsecureTLS,
+		CACertPath:  cfg.GitLab.CACertPath,
 	}
 
-	gitlabClient := gitlab.NewClient(fivetranConfig)
-	return NewFivetranTerraformRebaseHandlerWithClient(cfg, gitlabClient)
+	gitlabClient := gitlab.NewClient(gitlabConfig)
+	return NewAutoRebaseHandlerWithClient(cfg, gitlabClient)
 }
 
-// NewFivetranTerraformRebaseHandlerWithClient creates a handler with a custom GitLab client
+// NewAutoRebaseHandlerWithClient creates a handler with a custom GitLab client
 // This is primarily used for testing with mock clients
-func NewFivetranTerraformRebaseHandlerWithClient(cfg *config.Config, client gitlab.GitLabClient) *FivetranTerraformRebaseHandler {
-	logging.Info("Fivetran Terraform Rebase handler initialized")
-	return &FivetranTerraformRebaseHandler{
+func NewAutoRebaseHandlerWithClient(cfg *config.Config, client gitlab.GitLabClient) *AutoRebaseHandler {
+	atlantisCheckStatus := "disabled"
+	if cfg.AutoRebase.CheckAtlantisComments {
+		atlantisCheckStatus = "enabled"
+	}
+	logging.Info("Auto-rebase handler initialized",
+		zap.Bool("atlantis_comment_check_enabled", cfg.AutoRebase.CheckAtlantisComments),
+		zap.String("atlantis_check_status", atlantisCheckStatus),
+		zap.Bool("auto_rebase_enabled", cfg.AutoRebase.Enabled))
+	return &AutoRebaseHandler{
 		gitlabClient: client,
 		config:       cfg,
 	}
 }
 
-// HandleWebhook handles Fivetran Terraform rebase requests
-func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
+// NewFivetranTerraformRebaseHandler creates a new handler (backward compatibility)
+// Deprecated: Use NewAutoRebaseHandler instead
+func NewFivetranTerraformRebaseHandler(cfg *config.Config) *AutoRebaseHandler {
+	return NewAutoRebaseHandler(cfg)
+}
+
+// NewFivetranTerraformRebaseHandlerWithClient creates a handler with a custom GitLab client (backward compatibility)
+// Deprecated: Use NewAutoRebaseHandlerWithClient instead
+func NewFivetranTerraformRebaseHandlerWithClient(cfg *config.Config, client gitlab.GitLabClient) *AutoRebaseHandler {
+	return NewAutoRebaseHandlerWithClient(cfg, client)
+}
+
+// HandleWebhook handles auto-rebase requests
+func (h *AutoRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/json")
 
 	// Quick validation of content type
@@ -128,7 +148,7 @@ func (h *FivetranTerraformRebaseHandler) HandleWebhook(c *fiber.Ctx) error {
 
 // handlePushToMain handles push events to main branch by rebasing all open MRs
 // targetBranch is already validated to be "main" or "master" by the caller
-func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload map[string]interface{}, targetBranch string) error {
+func (h *AutoRebaseHandler) handlePushToMain(c *fiber.Ctx, payload map[string]interface{}, targetBranch string) error {
 	// Extract project ID
 	project, ok := payload["project"].(map[string]interface{})
 	if !ok {
@@ -256,10 +276,10 @@ type MRFilterResult struct {
 	Skipped  []MRSkipInfo
 }
 
-// filterEligibleMRs filters MRs based on pipeline status, jobs, and atlantis comments
+// filterEligibleMRs filters MRs based on pipeline status, jobs, and optionally atlantis comments
 // Returns both eligible MRs and detailed skip information
 // Note: MRs are already filtered by creation date at the API level (last 7 days)
-func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []gitlab.MRDetails) MRFilterResult {
+func (h *AutoRebaseHandler) filterEligibleMRs(projectID int, mrs []gitlab.MRDetails) MRFilterResult {
 	result := MRFilterResult{
 		Eligible: make([]gitlab.MRDetails, 0),
 		Skipped:  make([]MRSkipInfo, 0),
@@ -286,7 +306,7 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []
 			// Just continue to add MR to eligible list (no special handling needed)
 
 			// For failed pipelines, check all jobs first
-			// If all jobs succeeded, then check atlantis comment for plan failures
+			// If all jobs succeeded, optionally check atlantis comment for plan failures
 			if status == "failed" {
 				allJobsSucceeded, err := h.gitlabClient.AreAllPipelineJobsSucceeded(projectID, mr.Pipeline.ID)
 				if err != nil {
@@ -310,18 +330,58 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []
 				}
 
 				// All jobs succeeded but pipeline is marked as failed
-				// Check atlantis comment to determine if it's a state lock (allow rebase) or plan error (skip rebase)
-				shouldSkip, skipReason := h.gitlabClient.CheckAtlantisCommentForPlanFailures(projectID, mr.IID)
-				if shouldSkip && skipReason != "atlantis_plan_locked" {
-					logging.Info("Skipping MR with failed pipeline due to plan error", zap.Int("mr_iid", mr.IID), zap.String("reason", skipReason))
+				// Check if we should check atlantis comments (configurable)
+				logging.Info("Checking atlantis comment configuration",
+					zap.Int("mr_iid", mr.IID),
+					zap.Bool("check_atlantis_enabled", h.config.AutoRebase.CheckAtlantisComments))
+
+				if h.config.AutoRebase.CheckAtlantisComments {
+					logging.Info("Atlantis comment check enabled, checking for atlantis comments", zap.Int("mr_iid", mr.IID))
+					// Check for atlantis comments
+					atlantisComment, err := h.gitlabClient.FindLatestAtlantisComment(projectID, mr.IID)
+					if err != nil {
+						logging.Warn("Failed to find atlantis comment", zap.Int("mr_iid", mr.IID), zap.Error(err))
+					}
+					if err != nil || atlantisComment == nil {
+						// No atlantis comment found - skip rebase (safe default)
+						logging.Info("Skipping MR with failed pipeline (no atlantis comment found)", zap.Int("mr_iid", mr.IID))
+						result.Skipped = append(result.Skipped, MRSkipInfo{
+							MRIID:      mr.IID,
+							Reason:     "pipeline_failed_atlantis_comment_not_found",
+							PipelineID: mr.Pipeline.ID,
+						})
+						continue
+					}
+
+					logging.Info("Found atlantis comment, checking for plan failures", zap.Int("mr_iid", mr.IID))
+					// Check atlantis comment to determine if it's a state lock (allow rebase) or plan error (skip rebase)
+					shouldSkip, skipReason := h.gitlabClient.CheckAtlantisCommentForPlanFailures(projectID, mr.IID)
+					logging.Info("Atlantis comment check result",
+						zap.Int("mr_iid", mr.IID),
+						zap.Bool("should_skip", shouldSkip),
+						zap.String("skip_reason", skipReason))
+
+					if shouldSkip && skipReason != "atlantis_plan_locked" {
+						logging.Info("Skipping MR with failed pipeline due to plan error", zap.Int("mr_iid", mr.IID), zap.String("reason", skipReason))
+						result.Skipped = append(result.Skipped, MRSkipInfo{
+							MRIID:      mr.IID,
+							Reason:     fmt.Sprintf("pipeline_failed_%s", skipReason),
+							PipelineID: mr.Pipeline.ID,
+						})
+						continue
+					}
+					// If skipReason is "atlantis_plan_locked", we allow rebase (continue to eligible)
+					logging.Info("Allowing rebase (state lock detected or no plan failure)", zap.Int("mr_iid", mr.IID), zap.String("skip_reason", skipReason))
+				} else {
+					// CheckAtlantisComments = false: Simple behavior - skip failed pipelines
+					logging.Info("Skipping MR with failed pipeline (atlantis check disabled)", zap.Int("mr_iid", mr.IID))
 					result.Skipped = append(result.Skipped, MRSkipInfo{
 						MRIID:      mr.IID,
-						Reason:     fmt.Sprintf("pipeline_failed_%s", skipReason),
+						Reason:     "pipeline_failed",
 						PipelineID: mr.Pipeline.ID,
 					})
 					continue
 				}
-				// If skipReason is "atlantis_plan_locked" or no plan failure detected, we allow rebase (continue to eligible)
 			}
 		}
 
@@ -333,7 +393,7 @@ func (h *FivetranTerraformRebaseHandler) filterEligibleMRs(projectID int, mrs []
 }
 
 // validateWebhookPayload performs validation on webhook payload
-func (h *FivetranTerraformRebaseHandler) validateWebhookPayload(payload map[string]interface{}) error {
+func (h *AutoRebaseHandler) validateWebhookPayload(payload map[string]interface{}) error {
 	// Check for required top-level fields
 	if payload == nil {
 		return fmt.Errorf("payload is nil")

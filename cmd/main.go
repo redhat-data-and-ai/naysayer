@@ -24,7 +24,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 	// Create handlers
 	dataProductConfigMrReviewHandler := webhook.NewDataProductConfigMrReviewHandler(cfg)
 	healthHandler := webhook.NewHealthHandler(cfg)
-	fivetranTerraformRebaseHandler := webhook.NewFivetranTerraformRebaseHandler(cfg)
+	autoRebaseHandler := webhook.NewAutoRebaseHandler(cfg)
 
 	// Health and monitoring routes
 	app.Get("/health", healthHandler.HandleHealth)
@@ -33,8 +33,11 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 	// Webhook routes
 	app.Post("/dataverse-product-config-review", dataProductConfigMrReviewHandler.HandleWebhook)
 
-	// Fivetran-Terraform rebase routes
-	app.Post("/fivetran-terraform-rebase", fivetranTerraformRebaseHandler.HandleWebhook)
+	// Auto-rebase routes (generic, reusable)
+	app.Post("/auto-rebase", autoRebaseHandler.HandleWebhook)
+
+	// Legacy Fivetran-Terraform rebase route (backward compatibility)
+	app.Post("/fivetran-terraform-rebase", autoRebaseHandler.HandleWebhook)
 }
 
 func main() {

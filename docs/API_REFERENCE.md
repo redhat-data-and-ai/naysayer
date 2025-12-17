@@ -10,11 +10,22 @@ NAYSAYER provides HTTP endpoints for webhook processing, health monitoring, and 
 
 ## 📡 **Webhook Endpoints**
 
+### **POST /auto-rebase**
+
+Generic webhook endpoint for auto-rebase feature (works across all repositories).
+
+**Description**: Automatically rebases eligible merge requests when code is pushed to the main branch. Only processes push events to `main` or `master` branches. Supports optional atlantis comment checking for repositories using Terraform/Atlantis.
+
+**Configuration**: Controlled via environment variables:
+- `AUTO_REBASE_ENABLED` - Enable/disable feature (default: `true`)
+- `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` - Check atlantis comments for plan failures (default: `false`)
+- `AUTO_REBASE_REPOSITORY_TOKEN` - Repository-specific token (optional)
+
 ### **POST /fivetran-terraform-rebase**
 
-Webhook endpoint for Fivetran Terraform repository auto-rebase feature.
+Legacy webhook endpoint for backward compatibility.
 
-**Description**: Automatically rebases eligible merge requests when code is pushed to the main branch. Only processes push events to `main` or `master` branches.
+**Description**: Same functionality as `/auto-rebase`. This endpoint is maintained for backward compatibility with existing Fivetran Terraform repository webhooks.
 
 **Request Headers**:
 ```http
@@ -23,7 +34,26 @@ Content-Type: application/json
 
 **Request Body**: GitLab push webhook payload (JSON)
 
-**Example Request**:
+**Example Request** (Generic Endpoint):
+```bash
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_kind": "push",
+    "ref": "refs/heads/main",
+    "project": {
+      "id": 456
+    },
+    "commits": [
+      {
+        "id": "abc123",
+        "message": "Update configuration"
+      }
+    ]
+  }'
+```
+
+**Example Request** (Legacy Endpoint):
 ```bash
 curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
   -H "Content-Type: application/json" \
@@ -129,7 +159,7 @@ curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
 | Field | Type | Description |
 |-------|------|-------------|
 | `mr_iid` | number | Merge request IID |
-| `reason` | string | Skip reason (`pipeline_running`, `pipeline_pending`, `pipeline_failed`, `too_old`) |
+| `reason` | string | Skip reason (`pipeline_running`, `pipeline_pending`, `pipeline_failed`, `pipeline_failed_atlantis_comment_not_found`, `pipeline_failed_atlantis_plan_failed`, `pipeline_jobs_failed`, `too_old`) |
 | `pipeline_id` | number | Pipeline ID (if skipped due to pipeline status) |
 | `created_at` | string | MR creation date (if skipped due to age) |
 
@@ -141,9 +171,19 @@ curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
 
 **Eligibility Criteria**:
 - MR must be created within the last **7 days**
-- MR pipeline status must be `success`, `skipped`, `canceled`, or `null` (no pipeline)
-- MRs with `running`, `pending`, or `failed` pipelines are skipped
+- MR pipeline status:
+  - `success` → Rebase directly
+  - `failed` → Check all jobs succeeded, then optionally check atlantis comments (if `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`)
+  - `null` (no pipeline) → Rebase
+- MRs with `running` or `pending` pipelines are skipped
 - Only push events to `main` or `master` branches trigger rebase operations
+
+**Atlantis Comment Checking** (when `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`):
+- For failed pipelines with all jobs succeeded:
+  - Checks latest atlantis-bot comment
+  - If comment contains "Error: Error acquiring the state lock" → Allow rebase
+  - If comment contains other plan errors → Skip rebase
+  - If no atlantis comment found → Skip rebase (safe default)
 
 **Error Response Examples**:
 
@@ -376,14 +416,17 @@ NAYSAYER is configured through environment variables and a `rules.yaml` file.
 - `GITLAB_BASE_URL` - GitLab instance URL (default: `https://gitlab.com`)
 
 **Optional Environment Variables**:
-- `GITLAB_TOKEN_FIVETRAN` - Dedicated GitLab token for Fivetran Terraform repository (falls back to `GITLAB_TOKEN` if not set)
+- `AUTO_REBASE_ENABLED` - Enable/disable auto-rebase feature (default: `true`)
+- `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` - Check atlantis comments for plan failures (default: `false`)
+- `AUTO_REBASE_REPOSITORY_TOKEN` - Repository-specific token (falls back to `GITLAB_TOKEN` if not set)
+- `GITLAB_TOKEN_FIVETRAN` - Legacy name for repository-specific token (backward compatibility, maps to `AUTO_REBASE_REPOSITORY_TOKEN`)
 - `WEBHOOK_SECRET` - Webhook secret token for additional security
 - `PORT` - Server port (default: `3000`)
 
 > **📋 Configuration Details**: For complete configuration options and examples, see:
 > - [Development Setup Guide](DEVELOPMENT_SETUP.md) - Environment variables and setup
 > - [Section-Based Architecture Guide](SECTION_BASED_ARCHITECTURE.md) - rules.yaml configuration
-> - [Fivetran Rule Documentation](rules/AUTOREBASE_RULE_AND_SETUP.md) - Fivetran-specific setup
+> - [Auto-Rebase Rule Documentation](rules/AUTOREBASE_RULE_AND_SETUP.md) - Auto-rebase setup and configuration
 
 
 ## 🔍 **Error Handling**
@@ -443,7 +486,18 @@ curl -X POST https://your-naysayer-domain.com/dataverse-product-config-review \
   -d '{"object_kind": "merge_request", "object_attributes": {"id": 123, "iid": 456}}'
 ```
 
-**Test Fivetran Terraform Rebase Webhook**:
+**Test Auto-Rebase Webhook** (Generic Endpoint):
+```bash
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_kind": "push",
+    "ref": "refs/heads/main",
+    "project": {"id": 456}
+  }'
+```
+
+**Test Auto-Rebase Webhook** (Legacy Endpoint):
 ```bash
 curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
   -H "Content-Type: application/json" \

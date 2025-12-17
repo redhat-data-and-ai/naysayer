@@ -735,30 +735,89 @@ func (c *Client) FindLatestAtlantisComment(projectID, mrIID int) (*MRComment, er
 		return nil, fmt.Errorf("failed to list comments: %w", err)
 	}
 
+	// Log all comments for debugging
+	logging.Info("Found %d comments for MR %d", len(comments), mrIID)
+	for i, comment := range comments {
+		if i < 5 { // Log first 5 comments for debugging
+			authorUsername := "unknown"
+			authorName := "unknown"
+			if username, ok := comment.Author["username"].(string); ok {
+				authorUsername = username
+			}
+			if name, ok := comment.Author["name"].(string); ok {
+				authorName = name
+			}
+			isAtlantis := c.isAtlantisBotComment(comment.Author)
+			bodyPreview := truncateString(comment.Body, 100)
+			logging.Info("Comment %d: author=%s/%s, is_atlantis=%v, preview=%s (MR %d)",
+				i, authorUsername, authorName, isAtlantis, bodyPreview, mrIID)
+		}
+	}
+
 	// Find the latest atlantis comment
 	// Comments are already sorted by created_at desc from ListMRComments
 	for _, comment := range comments {
 		// Check if comment is from atlantis-bot
 		if c.isAtlantisBotComment(comment.Author) {
+			logging.Info("Found atlantis comment for MR %d", mrIID)
 			return &comment, nil
 		}
 	}
 
+	logging.Info("No atlantis comment found in %d comments for MR %d", len(comments), mrIID)
 	return nil, nil // No atlantis comment found
+}
+
+// truncateString truncates a string to maxLen characters
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // isAtlantisBotComment checks if a comment is from atlantis-bot
 func (c *Client) isAtlantisBotComment(author map[string]interface{}) bool {
-	// Check username patterns
+	// Common atlantis bot username patterns
+	atlantisPatterns := []string{
+		"atlantis",
+		"atlatnis", // Common typo
+		"atlantis-bot",
+		"atlantisbot",
+		"atlatnisbot",
+	}
+
+	// Check username field (primary check)
 	if username, ok := author["username"].(string); ok {
 		usernameLower := strings.ToLower(username)
-		return strings.Contains(usernameLower, "atlantis") || strings.Contains(usernameLower, "atlatnis")
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(usernameLower, pattern) {
+				return true
+			}
+		}
 	}
 
 	// Check name field as fallback
 	if name, ok := author["name"].(string); ok {
 		nameLower := strings.ToLower(name)
-		return strings.Contains(nameLower, "atlantis") || strings.Contains(nameLower, "atlatnis")
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(nameLower, pattern) {
+				return true
+			}
+		}
+	}
+
+	// Check if author is a bot (some GitLab instances mark bots differently)
+	if bot, ok := author["bot"].(bool); ok && bot {
+		// If it's marked as a bot, check if username/name contains atlantis
+		if username, ok := author["username"].(string); ok {
+			usernameLower := strings.ToLower(username)
+			for _, pattern := range atlantisPatterns {
+				if strings.Contains(usernameLower, pattern) {
+					return true
+				}
+			}
+		}
 	}
 
 	return false
