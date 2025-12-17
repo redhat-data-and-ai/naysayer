@@ -1,16 +1,28 @@
-# 🛡️ Naysayer - GitLab MR Validation System
+# 🛡️ Naysayer - GitLab Automation Platform
 
-A GitLab webhook service that automatically validates merge requests using configurable rules, helping teams maintain quality and compliance through smart automation.
+A multi-purpose GitLab webhook service that automates merge request validation, repository maintenance, and workflow optimization.
 
-> **🎯 Smart Decisions**: Auto-approves safe changes, flags risky ones for human review
+> **🎯 Smart Automation**: Validates MRs, maintains repositories, and keeps projects clean
 
 ## 🚀 What Naysayer Does
 
-Naysayer analyzes GitLab merge requests and automatically:
+Naysayer provides three core capabilities through webhook endpoints:
+
+### 1. 📋 **MR Validation & Auto-Approval** (`/dataverse-product-config-review`)
 - ✅ **Auto-approves** safe changes (cost reductions, compliant configurations)
 - ⚠️ **Flags for review** risky changes (cost increases, security violations)
 - 🔍 **Validates** file content against organizational policies
 - 📝 **Documents** decisions with clear reasoning
+
+### 2. 🔄 **Fivetran Terraform Auto-Rebase** (`/fivetran-terraform-rebase`)
+- 🔀 **Automatically rebases** Fivetran terraform repository MRs
+- ⚡ **Reduces merge conflicts** through proactive rebasing
+- 🤖 **Streamlines workflows** for infrastructure-as-code
+
+### 3. 🧹 **Stale MR Cleanup** (`/stale-mr-cleanup`)
+- 🗑️ **Closes stale MRs** (30+ days old)
+- 📊 **Maintains clean project state** across repositories
+- 🔄 **Stateless, pull-based** design (repos opt-in via CI)
 
 ## 🛡️ Validation Rules
 
@@ -198,9 +210,45 @@ For complete development setup, testing guides, and project structure details, s
 
 ## 🚀 Deployment
 
-**Production**: See [Deployment Guide](DEPLOYMENT.md) for complete Kubernetes/OpenShift setup
+Naysayer deployment configs are maintained in this repository (`/config/`).
 
-**Container**: `quay.io/ddis/naysayer:latest`
+### Deployment Configuration
+
+- **Source of Truth**: This repository (`/config/`)
+- **Image Registry**: `images.paas.redhat.com/ddis-asteroid/naysayer`
+- **Container**: `images.paas.redhat.com/ddis-asteroid/naysayer:latest`
+
+### Release Process
+
+Creating a new release automatically builds and tests:
+
+```bash
+# 1. Make code and config changes
+git add .
+git commit -m "Add new feature"
+git push origin main
+
+# 2. Create and push version tag
+git tag v1.2.3
+git push origin v1.2.3
+
+# 3. GitHub Actions automatically:
+#    - Runs full test suite
+#    - Builds Docker image (v1.2.3 and latest)
+#    - Pushes to image registry
+#    - Creates GitHub Release
+
+# 4. Deploy to production using the versioned image
+```
+
+### Quick Deploy
+
+```bash
+# Deploy directly from this repo
+kubectl apply -f config/
+```
+
+**For complete setup**: See [Deployment Guide](DEPLOYMENT.md) and [config/README.md](config/README.md)
 
 **Health Check**: `GET /health`
 

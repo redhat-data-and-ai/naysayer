@@ -6,6 +6,114 @@
 - GitLab instance with webhook capabilities
 - `kubectl` or `oc` CLI configured
 
+## 🏗️ Deployment Architecture
+
+Naysayer deployment configurations are maintained in this repository under `/config/`.
+
+### Configuration Flow
+
+```
+Naysayer Repo (config/)
+        ↓
+   [Apply to Kubernetes/OpenShift]
+        ↓
+   Production Deployment
+```
+
+**Key Principle**: All deployment configs are maintained in the naysayer repository.
+
+## 🎯 Deployment Options
+
+Choose your deployment method based on use case:
+
+### Option 1: Production Releases (Recommended)
+
+**Use for:** Official releases, production deployments
+
+**Process:**
+1. Make code/config changes in naysayer repo
+2. Create version tag (e.g., `v1.2.3`)
+3. GitHub Actions automatically:
+   - Builds and tests
+   - Creates Docker image
+   - Creates GitHub Release
+4. Deploy using the versioned image
+
+See [Release Process](#-automated-release-process) for details.
+
+### Option 2: Direct Deployment (For Testing/Hotfixes)
+
+**Use for:** Quick testing, development, hotfixes
+
+**Process:**
+```bash
+# Deploy directly from naysayer/config/
+kubectl apply -f config/
+```
+
+See [Manual Deployment](#⚡-initial-deployment) for details.
+
+## 🚀 Automated Release Process
+
+The recommended way to deploy Naysayer is through the automated release workflow.
+
+### Step-by-Step Release
+
+1. **Make your changes**
+   ```bash
+   # Edit code or deployment configs
+   vim internal/rules/warehouse/warehouse_rule.go
+   vim config/deployment.yaml
+
+   # Commit changes
+   git add .
+   git commit -m "Add new warehouse size validation"
+   git push origin main
+   ```
+
+2. **Create release tag**
+   ```bash
+   # Use semantic versioning
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+3. **GitHub Actions runs automatically**
+   - ✅ Runs full test suite (unit + E2E)
+   - ✅ Builds Docker image with version tag
+   - ✅ Pushes to `images.paas.redhat.com/ddis-asteroid/naysayer:v1.2.3`
+   - ✅ Pushes to `images.paas.redhat.com/ddis-asteroid/naysayer:latest`
+   - ✅ Creates GitHub Release with changelog
+
+4. **Deploy to production**
+   - Update deployment config with new image tag if needed
+   - Apply configs using kubectl/oc
+
+### Required GitHub Secrets
+
+Configure these in your GitHub repository settings:
+
+```
+REGISTRY_USERNAME     # Container registry username
+REGISTRY_PASSWORD     # Container registry password/token
+```
+
+### Versioning Strategy
+
+Follow [Semantic Versioning](https://semver.org/):
+
+- **v1.0.0** → **v2.0.0**: Breaking changes (API changes, removed features)
+- **v1.0.0** → **v1.1.0**: New features (new endpoints, new rules)
+- **v1.0.0** → **v1.0.1**: Bug fixes (rule fixes, performance improvements)
+
+Examples:
+```bash
+git tag v1.0.0   # Initial release
+git tag v1.1.0   # Added stale MR cleanup endpoint
+git tag v1.1.1   # Fixed warehouse rule bug
+git tag v2.0.0   # Changed API response format (breaking)
+```
+
 ## ⚡ Initial Deployment
 
 **Note**: Throughout this guide, replace `<your-namespace>` with your actual namespace and `<your-naysayer-route-hostname>` with your route hostname.
