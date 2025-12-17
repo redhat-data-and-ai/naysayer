@@ -7,13 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Automated release workflow with Docker image building
-- Semantic versioning and tagging strategy
-
 ### Documentation
 - Added comprehensive deployment documentation
-- Documented release process
 
 ## How to Use This Changelog
 

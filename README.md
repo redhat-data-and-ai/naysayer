@@ -212,43 +212,14 @@ For complete development setup, testing guides, and project structure details, s
 
 Naysayer deployment configs are maintained in this repository (`/config/`).
 
-### Deployment Configuration
-
-- **Source of Truth**: This repository (`/config/`)
-- **Image Registry**: `images.paas.redhat.com/ddis-asteroid/naysayer`
-- **Container**: `images.paas.redhat.com/ddis-asteroid/naysayer:latest`
-
-### Release Process
-
-Creating a new release automatically builds and tests:
-
-```bash
-# 1. Make code and config changes
-git add .
-git commit -m "Add new feature"
-git push origin main
-
-# 2. Create and push version tag
-git tag v1.2.3
-git push origin v1.2.3
-
-# 3. GitHub Actions automatically:
-#    - Runs full test suite
-#    - Builds Docker image (v1.2.3 and latest)
-#    - Pushes to image registry
-#    - Creates GitHub Release
-
-# 4. Deploy to production using the versioned image
-```
-
 ### Quick Deploy
 
 ```bash
-# Deploy directly from this repo
+# Deploy from this repository
 kubectl apply -f config/
 ```
 
-**For complete setup**: See [Deployment Guide](DEPLOYMENT.md) and [config/README.md](config/README.md)
+**For complete setup**: See [Deployment Guide](DEPLOYMENT.md)
 
 **Health Check**: `GET /health`
 
