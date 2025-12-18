@@ -193,42 +193,30 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	var ruleResults []shared.LineValidationResult
 	var sectionResults []shared.SectionValidationResult
 
-	// Delta validation: only validate sections that were affected by changes
+	// Validate ALL sections to ensure all rules appear in comments
+	// Track which sections were actually affected for potential future optimizations
+	affectedSections := make(map[string]bool)
 	if len(changedLines) > 0 {
-		affectedSections := srm.getAffectedSections(sections, changedLines)
-		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
-
-		// Validate only affected sections
-		for _, section := range affectedSections {
-			// Get enabled rules for this section
-			sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
-
-			// Validate the section
-			sectionResult := parser.ValidateSection(&section, sectionRules)
-			sectionResults = append(sectionResults, *sectionResult)
-
-			// Add to overall results
-			for _, ruleResult := range sectionResult.RuleResults {
-				ruleResults = append(ruleResults, ruleResult)
-				allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
-			}
+		affected := srm.getAffectedSections(sections, changedLines)
+		for _, section := range affected {
+			affectedSections[section.Name] = true
 		}
-	} else {
-		// No changes detected - validate all sections (fallback)
-		logging.Info("No changes detected for %s, validating all sections", filePath)
-		for _, section := range sections {
-			// Get enabled rules for this section
-			sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
+		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
+	}
 
-			// Validate the section
-			sectionResult := parser.ValidateSection(&section, sectionRules)
-			sectionResults = append(sectionResults, *sectionResult)
+	// Validate all sections (not just affected ones) to show complete rule evaluation
+	for _, section := range sections {
+		// Get enabled rules for this section
+		sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
 
-			// Add to overall results
-			for _, ruleResult := range sectionResult.RuleResults {
-				ruleResults = append(ruleResults, ruleResult)
-				allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
-			}
+		// Validate the section
+		sectionResult := parser.ValidateSection(&section, sectionRules)
+		sectionResults = append(sectionResults, *sectionResult)
+
+		// Add to overall results
+		for _, ruleResult := range sectionResult.RuleResults {
+			ruleResults = append(ruleResults, ruleResult)
+			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
 		}
 	}
 
@@ -539,6 +527,18 @@ func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRa
 }
 
 func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
+	// Safety check: if there are no file validations, require manual review
+	// This catches edge cases like net-zero changes that slip through earlier checks
+	if len(fileValidations) == 0 {
+		logging.Warn("No files to validate - requiring manual review for safety")
+		return shared.Decision{
+			Type:    shared.ManualReview,
+			Reason:  "MR has no files to validate",
+			Summary: "⚠️ No files to validate",
+			Details: "Cannot auto-approve an MR with zero validated files. This may indicate net-zero changes or an edge case.",
+		}
+	}
+
 	var manualReviewFiles []string
 	var approvedFiles []string
 

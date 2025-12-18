@@ -63,13 +63,20 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 		return []shared.LineRange{}
 	}
 
-	// Get consumer sections from YAML
-	consumerRanges := r.findConsumerSections(filePath, fileContent)
-	if len(consumerRanges) == 0 {
+	// Check if file has content
+	if len(strings.TrimSpace(fileContent)) == 0 {
 		return []shared.LineRange{}
 	}
 
-	return consumerRanges
+	// For section-based validation, we return a placeholder range to indicate
+	// this rule wants to participate in validation. The actual section content
+	// (data_product_db) will be provided by the section manager.
+	return []shared.LineRange{
+		{
+			StartLine: 1,
+			EndLine:   1,
+		},
+	}
 }
 
 // analyzeFile analyzes a file to determine if consumer rule applies
@@ -167,93 +174,6 @@ func (r *DataProductConsumerRule) isConsumerRelatedLine(line string) bool {
 	}
 
 	return false
-}
-
-// findConsumerSections finds all consumer sections in the YAML file using yaml.Node API
-func (r *DataProductConsumerRule) findConsumerSections(filePath string, fileContent string) []shared.LineRange {
-	var ranges []shared.LineRange
-
-	// Parse YAML into Node structure for accurate line tracking
-	var node yaml.Node
-	if err := yaml.Unmarshal([]byte(fileContent), &node); err != nil {
-		return ranges
-	}
-
-	// Find all "consumers" nodes in the YAML tree
-	r.findConsumersNodes(&node, filePath, &ranges)
-
-	return ranges
-}
-
-// findConsumersNodes recursively traverses the YAML node tree to find all "consumers" keys
-func (r *DataProductConsumerRule) findConsumersNodes(node *yaml.Node, filePath string, ranges *[]shared.LineRange) {
-	if node == nil {
-		return
-	}
-
-	// Process mapping nodes (key-value pairs)
-	if node.Kind == yaml.MappingNode {
-		// Mapping nodes have content in pairs: [key1, value1, key2, value2, ...]
-		for i := 0; i < len(node.Content); i += 2 {
-			keyNode := node.Content[i]
-			valueNode := node.Content[i+1]
-
-			// Check if this is a "consumers" key
-			if keyNode.Value == "consumers" && valueNode.Kind == yaml.SequenceNode {
-				// Found a consumers section - extract line range
-				startLine := keyNode.Line
-				endLine := valueNode.Line
-
-				// For sequences, find the last line
-				if len(valueNode.Content) > 0 {
-					lastItem := valueNode.Content[len(valueNode.Content)-1]
-					endLine = r.getNodeEndLine(lastItem)
-				}
-
-				*ranges = append(*ranges, shared.LineRange{
-					StartLine: startLine,
-					EndLine:   endLine,
-					FilePath:  filePath,
-				})
-			}
-
-			// Recursively search in value node
-			r.findConsumersNodes(valueNode, filePath, ranges)
-		}
-	}
-
-	// Process sequence nodes (arrays)
-	if node.Kind == yaml.SequenceNode {
-		for _, item := range node.Content {
-			r.findConsumersNodes(item, filePath, ranges)
-		}
-	}
-
-	// Document nodes contain the root content
-	if node.Kind == yaml.DocumentNode {
-		for _, item := range node.Content {
-			r.findConsumersNodes(item, filePath, ranges)
-		}
-	}
-}
-
-// getNodeEndLine recursively finds the last line number in a YAML node
-func (r *DataProductConsumerRule) getNodeEndLine(node *yaml.Node) int {
-	if node == nil {
-		return 0
-	}
-
-	endLine := node.Line
-
-	// Check all content nodes and find the maximum line number
-	for _, child := range node.Content {
-		childEndLine := r.getNodeEndLine(child)
-		if childEndLine > endLine {
-			endLine = childEndLine
-		}
-	}
-
-	return endLine
 }
 
 // extractEnvironmentFromPath attempts to extract the environment name from the file path

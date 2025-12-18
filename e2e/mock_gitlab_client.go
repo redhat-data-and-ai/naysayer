@@ -367,4 +367,29 @@ func (m *MockGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int
 func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
 	// Return false for e2e tests (no plan failures, allow rebase)
 	return false, ""
+// ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
+// Returns ALL open MRs without date filter (unlike ListOpenMRsWithDetails which filters to last 7 days)
+func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// For this e2e mock, we return the same data since ListOpenMRs returns empty anyway.
+	// In a real scenario, this would return MRs older than 7 days as well.
+	return m.ListOpenMRsWithDetails(projectID)
+}
+
+// CloseMR closes a merge request (mock implementation)
+func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error {
+	// Mock implementation - just log the action
+	return nil
+}
+
+// FindCommentByPattern checks if a comment with the pattern exists (mock implementation)
+func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	// Mock implementation - check captured comments
+	for _, comment := range m.CapturedComments {
+		if comment.ProjectID == projectID && comment.MRIID == mrIID {
+			if strings.Contains(comment.Comment, pattern) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }

@@ -336,6 +336,39 @@ func (c *Client) ResetNaysayerApproval(projectID, mrIID int) error {
 	}
 }
 
+// parseNextLink extracts the "next" page URL from GitLab's Link header
+// GitLab follows RFC 5988 format: <URL>; rel="next", <URL>; rel="prev"
+// Returns empty string if no next link exists
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
+	}
+
+	// Split by comma to handle multiple links
+	links := strings.Split(linkHeader, ",")
+
+	for _, link := range links {
+		link = strings.TrimSpace(link)
+
+		// Check if this is a "next" rel
+		if !strings.Contains(link, `rel="next"`) {
+			continue
+		}
+
+		// Extract URL from angle brackets
+		startIdx := strings.Index(link, "<")
+		endIdx := strings.Index(link, ">")
+
+		if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
+			continue
+		}
+
+		return link[startIdx+1 : endIdx]
+	}
+
+	return ""
+}
+
 // MRComment represents a GitLab merge request comment
 type MRComment struct {
 	ID        int                    `json:"id"`
@@ -345,40 +378,85 @@ type MRComment struct {
 	Author    map[string]interface{} `json:"author"`
 }
 
-// ListMRComments retrieves all comments for a merge request
+// ListMRComments retrieves all comments for a merge request with pagination support
 func (c *Client) ListMRComments(projectID, mrIID int) ([]MRComment, error) {
-	// Use a larger page size to get more comments (GitLab API supports up to 100 per page)
-	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
+	const maxPages = 20 // Safety limit to prevent infinite loops (20 pages = 2000 comments)
+
+	allComments := make([]MRComment, 0, 200) // Pre-allocate for typical case
+
+	// Initial URL with pagination params
+	nextURL := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create list comments request: %w", err)
-	}
+	pageCount := 0
 
-	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	for nextURL != "" && pageCount < maxPages {
+		pageCount++
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list comments: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case 200:
-		var comments []MRComment
-		if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
-			return nil, fmt.Errorf("failed to decode comments response: %w", err)
+		// Create request
+		req, err := http.NewRequest("GET", nextURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create list comments request (page %d): %w", pageCount, err)
 		}
-		return comments, nil
-	case 401:
-		return nil, fmt.Errorf("list comments failed: insufficient permissions")
-	case 404:
-		return nil, fmt.Errorf("list comments failed: MR not found")
-	default:
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
+
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+
+		// Execute request
+		resp, err := c.http.Do(req)
+		if err != nil {
+			// First page failure is fatal
+			if pageCount == 1 {
+				return nil, fmt.Errorf("failed to list comments: %w", err)
+			}
+			// Subsequent page failures - log and return what we have
+			logging.Warn("Failed to fetch comment page %d for MR %d, returning %d comments", pageCount, mrIID, len(allComments))
+			return allComments, nil
+		}
+
+		// Handle HTTP status
+		switch resp.StatusCode {
+		case 200:
+			var pageComments []MRComment
+			err = json.NewDecoder(resp.Body).Decode(&pageComments)
+			_ = resp.Body.Close()
+			if err != nil {
+				if pageCount == 1 {
+					return nil, fmt.Errorf("failed to decode comments response: %w", err)
+				}
+				logging.Warn("Failed to decode comment page %d for MR %d, returning %d comments", pageCount, mrIID, len(allComments))
+				return allComments, nil
+			}
+
+			allComments = append(allComments, pageComments...)
+
+			// Extract next page URL from Link header
+			nextURL = parseNextLink(resp.Header.Get("Link"))
+
+		case 401:
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list comments failed: insufficient permissions")
+		case 404:
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list comments failed: MR not found")
+		default:
+			// For first page, return error. For subsequent pages, gracefully degrade
+			if pageCount == 1 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
+			}
+			_ = resp.Body.Close()
+			logging.Warn("Comment page %d failed with status %d for MR %d, returning %d comments", pageCount, resp.StatusCode, mrIID, len(allComments))
+			return allComments, nil
+		}
 	}
+
+	// Check if we hit the page limit
+	if pageCount >= maxPages && nextURL != "" {
+		logging.Warn("Reached max page limit (%d) for MR %d, returning %d comments", maxPages, mrIID, len(allComments))
+	}
+
+	return allComments, nil
 }
 
 // UpdateMRComment updates an existing comment on a merge request
@@ -704,6 +782,66 @@ func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create job trace request: %w", err)
+// ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
+// This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
+func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
+	var allMRs []MRDetails
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID)
+
+	for url != "" {
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create list MRs request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list MRs: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list MRs failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var mrs []MRDetails
+		err = json.NewDecoder(resp.Body).Decode(&mrs)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode MRs response: %w", err)
+		}
+
+		allMRs = append(allMRs, mrs...)
+
+		// Get next page URL from Link header using parseNextLink helper
+		url = parseNextLink(resp.Header.Get("Link"))
+	}
+
+	return allMRs, nil
+}
+
+// CloseMR closes a merge request
+func (c *Client) CloseMR(projectID, mrIID int) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	payload := map[string]string{
+		"state_event": "close",
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal close MR payload: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create close MR request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.config.Token)
@@ -712,6 +850,7 @@ func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to get job trace: %w", err)
+		return fmt.Errorf("failed to close MR: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -884,4 +1023,26 @@ func (c *Client) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool
 
 	// Not a state lock error - skip rebase
 	return true, "atlantis_plan_failed"
+		return fmt.Errorf("close MR failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
+	return nil
+}
+
+// FindCommentByPattern checks if a comment containing the specified pattern exists on an MR
+func (c *Client) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	// Search through comments for the pattern
+	for _, comment := range comments {
+		if strings.Contains(comment.Body, pattern) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

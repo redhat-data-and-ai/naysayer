@@ -279,10 +279,11 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 
 			result.AppliedRules = append(result.AppliedRules, rule.Name())
 			result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
-				RuleName:   rule.Name(),
-				LineRanges: lineRanges,
-				Decision:   decision,
-				Reason:     reason,
+				RuleName:     rule.Name(),
+				LineRanges:   lineRanges,
+				Decision:     decision,
+				Reason:       reason,
+				WasEvaluated: true, // Mark that this rule actually executed
 			})
 
 			lastRuleReason = reason

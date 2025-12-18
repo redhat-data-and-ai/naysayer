@@ -1,0 +1,17 @@
+name: "Update masking files"
+description: "Masking file updates require manual review (no rules configured yet - see masking-policy-validation.md plan)"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "No validation rules configured for this file type"
+
+mr_metadata:
+  title: "Update masking policies and tags"
+  author: "testuser"
+  source_branch: "feature/update-masking"
+  target_branch: "main"

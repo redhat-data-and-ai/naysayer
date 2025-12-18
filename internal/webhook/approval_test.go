@@ -409,7 +409,8 @@ func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
 						"new_path": "dataproducts/agg/test/prod/product.yaml",
 						"new_file": false,
 						"renamed_file": false,
-						"deleted_file": false
+						"deleted_file": false,
+						"diff": "@@ -10,7 +10,7 @@\n warehouses:\n-  - name: old\n+  - name: new"
 					}
 				]
 			}`))

@@ -123,6 +123,42 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 		}, nil
 	}
 
+	// Validate MR has substantive changes
+	// Performance: O(1) for empty check, O(n) with early-exit for diff check
+	if len(changes) == 0 {
+		logging.MRWarn(mrID, "Empty MR detected - no file changes")
+		return &shared.RuleEvaluation{
+			FinalDecision: shared.Decision{
+				Type:    shared.ManualReview,
+				Reason:  "MR contains no file changes",
+				Summary: "Empty MR",
+			},
+			FileValidations: make(map[string]*shared.FileValidationSummary),
+		}, nil
+	}
+
+	// Check for net-zero changes (all diffs empty)
+	hasSubstantiveChange := false
+	for _, change := range changes {
+		if change.Diff != "" {
+			hasSubstantiveChange = true
+			break // Early exit optimization
+		}
+	}
+
+	if !hasSubstantiveChange {
+		logging.MRWarn(mrID, "Net-zero changes detected",
+			zap.Int("file_count", len(changes)))
+		return &shared.RuleEvaluation{
+			FinalDecision: shared.Decision{
+				Type:    shared.ManualReview,
+				Reason:  "MR has no substantive changes",
+				Summary: "Net-zero changes",
+			},
+			FileValidations: make(map[string]*shared.FileValidationSummary),
+		}, nil
+	}
+
 	// Create MR context for rule evaluation
 	mrContext := &shared.MRContext{
 		ProjectID: projectID,

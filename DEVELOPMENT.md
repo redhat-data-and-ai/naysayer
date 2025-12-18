@@ -601,6 +601,18 @@ dlv debug cmd/main.go
 # Use ngrok for external access
 ngrok http 3000
 
+# Clone and setup
+git clone <repo>
+cd naysayer && go mod tidy
+
+# Set environment
+export GITLAB_TOKEN=glpat-xxxx
+export GITLAB_BASE_URL=https://gitlab.example.com
+
+# Run locally
+go run cmd/main.go
+# Server on http://localhost:3000
+
 # Test webhook payload
 curl -X POST http://localhost:3000/webhook \
   -H "Content-Type: application/json" \
@@ -613,7 +625,12 @@ curl -X POST http://localhost:3000/webhook \
       "id": 456
     }
   }'
+
+
+  
 ```
+
+
 
 ### Profiling
 

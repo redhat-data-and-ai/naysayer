@@ -93,3 +93,49 @@ func TestPatternMatching(t *testing.T) {
 		})
 	}
 }
+
+func TestSectionRuleManager_DetermineOverallDecision_ZeroFiles(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// Test with empty file validations - should require manual review
+	emptyValidations := make(map[string]*shared.FileValidationSummary)
+	decision := manager.determineOverallDecision(emptyValidations)
+
+	assert.Equal(t, shared.ManualReview, decision.Type)
+	assert.Contains(t, decision.Reason, "no files to validate")
+	assert.Contains(t, decision.Summary, "No files to validate")
+}
+
+func TestSectionRuleManager_DetermineOverallDecision_WithFiles(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// Test with approved files - should approve
+	approvedValidations := map[string]*shared.FileValidationSummary{
+		"test.yaml": {
+			FilePath:     "test.yaml",
+			FileDecision: shared.Approve,
+		},
+	}
+	decision := manager.determineOverallDecision(approvedValidations)
+
+	assert.Equal(t, shared.Approve, decision.Type)
+
+	// Test with manual review files - should require manual review
+	reviewValidations := map[string]*shared.FileValidationSummary{
+		"test.yaml": {
+			FilePath:     "test.yaml",
+			FileDecision: shared.ManualReview,
+		},
+	}
+	decision = manager.determineOverallDecision(reviewValidations)
+
+	assert.Equal(t, shared.ManualReview, decision.Type)
+}

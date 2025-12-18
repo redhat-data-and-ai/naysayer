@@ -1,0 +1,13 @@
+# String Masking Policy
+kind: MaskingPolicy
+name: analytics_pii_string_policy
+data_product: analytics
+datatype: string
+mask: "***REDACTED***"
+cases:
+  - strategy: UNMASKED
+    consumers:
+      - kind: consumer_group
+        name: dataverse-aggregate-analytics
+      - kind: consumer_group
+        name: dataverse-analytics-team

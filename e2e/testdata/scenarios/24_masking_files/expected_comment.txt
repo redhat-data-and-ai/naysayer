@@ -1,0 +1,18 @@
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
+
+<details>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
+
+**What was checked:**
+
+**Files without validation rules:**
+
+*No validation rules configured for this file type:*
+• `dataproducts/analytics/prod/pii_string_data_masking.yaml`
+• `dataproducts/analytics/prod/tag_pii_data_masking.yaml`
+
+</details>

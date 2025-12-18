@@ -5,7 +5,9 @@
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ Metadata validated: Product metadata changes (name, tags, kind) are safe and don't affect infrastructure
-• ✅ TOC approval check: Changes to existing products in non-critical environments
+• ✅ No consumer-only changes detected
+• ✅ Metadata changes validated across 2 files
+• ✅ TOC approval validated across 2 files
+• ✅ No warehouse size changes detected - approved
 
 </details>

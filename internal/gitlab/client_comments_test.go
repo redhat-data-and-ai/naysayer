@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -362,4 +363,42 @@ func TestApproveMR_CallsApproveMRWithMessage(t *testing.T) {
 	err := client.ApproveMR(123, 456)
 
 	assert.NoError(t, err)
+}
+
+// TestListMRComments_Pagination tests basic pagination functionality
+func TestListMRComments_Pagination(t *testing.T) {
+	requestCount := 0
+	var serverURL string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+
+		if requestCount == 1 {
+			// Page 1: Return 100 comments with Link header
+			comments := make([]MRComment, 100)
+			for i := 0; i < 100; i++ {
+				comments[i] = MRComment{ID: i + 1, Body: fmt.Sprintf("Comment %d", i+1)}
+			}
+			w.Header().Set("Link", fmt.Sprintf(`<%s?page=2>; rel="next"`, serverURL))
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(comments)
+		} else {
+			// Page 2: Return 50 comments, no Link header
+			comments := make([]MRComment, 50)
+			for i := 0; i < 50; i++ {
+				comments[i] = MRComment{ID: i + 101, Body: fmt.Sprintf("Comment %d", i+101)}
+			}
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(comments)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+
+	client := NewClient(config.GitLabConfig{BaseURL: server.URL, Token: "test-token"})
+	comments, err := client.ListMRComments(123, 456)
+
+	assert.NoError(t, err)
+	assert.Len(t, comments, 150)
+	assert.Equal(t, 2, requestCount)
 }
