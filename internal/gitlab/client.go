@@ -875,12 +875,14 @@ func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
-=======
->>>>>>> 4c5c41a (Fixed the lint errors)
 	}
 
-	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
-	return nil
+	var trace JobTrace
+	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
+		return "", fmt.Errorf("failed to decode job trace response: %w", err)
+	}
+
+	return trace.Content, nil
 }
 
 // FindLatestAtlantisComment finds the latest comment from atlantis-bot

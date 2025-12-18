@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -195,6 +194,20 @@ func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, 
 	// Return true, "atlantis_comment_not_found" by default (no atlantis comment found, skip rebase)
 	// This matches the actual implementation behavior
 	return true, "atlantis_comment_not_found"
+}
+
+func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// Returns ALL open MRs without date filter (mocked as empty)
+	// This is used by stale MR cleanup to find MRs older than 27-30 days
+	return []gitlab.MRDetails{}, nil
+}
+
+func (m *MockRebaseGitLabClient) CloseMR(projectID, mrIID int) error {
+	return nil
+}
+
+func (m *MockRebaseGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	return false, nil
 }
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
