@@ -736,7 +736,6 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 
 	return detailedMRs, nil
 }
-
 // ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
 // This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
 func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
@@ -876,14 +875,12 @@ func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
+=======
+>>>>>>> 4c5c41a (Fixed the lint errors)
 	}
 
-	var trace JobTrace
-	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
-		return "", fmt.Errorf("failed to decode job trace response: %w", err)
-	}
-
-	return trace.Content, nil
+	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
+	return nil
 }
 
 // FindLatestAtlantisComment finds the latest comment from atlantis-bot
