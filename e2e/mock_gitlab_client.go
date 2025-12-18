@@ -367,6 +367,8 @@ func (m *MockGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int
 func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
 	// Return false for e2e tests (no plan failures, allow rebase)
 	return false, ""
+}
+
 // ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
 // Returns ALL open MRs without date filter (unlike ListOpenMRsWithDetails which filters to last 7 days)
 func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
