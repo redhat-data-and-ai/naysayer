@@ -782,6 +782,30 @@ func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create job trace request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get job trace: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var trace JobTrace
+	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
+		return "", fmt.Errorf("failed to decode job trace response: %w", err)
+	}
+
+	return trace.Content, nil
+}
+
 // ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
 // This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
 func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
@@ -849,22 +873,17 @@ func (c *Client) CloseMR(projectID, mrIID int) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to get job trace: %w", err)
 		return fmt.Errorf("failed to close MR: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("close MR failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var trace JobTrace
-	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
-		return "", fmt.Errorf("failed to decode job trace response: %w", err)
-	}
-
-	return trace.Content, nil
+	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
+	return nil
 }
 
 // FindLatestAtlantisComment finds the latest comment from atlantis-bot
@@ -1023,11 +1042,6 @@ func (c *Client) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool
 
 	// Not a state lock error - skip rebase
 	return true, "atlantis_plan_failed"
-		return fmt.Errorf("close MR failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
-	return nil
 }
 
 // FindCommentByPattern checks if a comment containing the specified pattern exists on an MR
