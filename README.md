@@ -14,10 +14,11 @@ Naysayer provides three core capabilities through webhook endpoints:
 - 🔍 **Validates** file content against organizational policies
 - 📝 **Documents** decisions with clear reasoning
 
-### 2. 🔄 **Fivetran Terraform Auto-Rebase** (`/fivetran-terraform-rebase`)
-- 🔀 **Automatically rebases** Fivetran terraform repository MRs
+### 2. 🔄 **Auto-Rebase** (`/auto-rebase`)
+- 🔀 **Automatically rebases** repository MRs when main branch is updated
 - ⚡ **Reduces merge conflicts** through proactive rebasing
 - 🤖 **Streamlines workflows** for infrastructure-as-code
+- 🔍 **Smart failure detection** - distinguishes state locks from actual plan failures
 
 ### 3. 🧹 **Stale MR Cleanup** (`/stale-mr-cleanup`)
 - 🗑️ **Closes stale MRs** (30+ days old)

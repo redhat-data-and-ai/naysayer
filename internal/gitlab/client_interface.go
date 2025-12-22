@@ -32,6 +32,12 @@ type GitLabClient interface {
 	ListOpenMRs(projectID int) ([]int, error)
 	ListOpenMRsWithDetails(projectID int) ([]MRDetails, error)
 
+	// Pipeline and job operations
+	GetPipelineJobs(projectID, pipelineID int) ([]PipelineJob, error)
+	GetJobTrace(projectID, jobID int) (string, error)
+	FindLatestAtlantisComment(projectID, mrIID int) (*MRComment, error)
+	AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error)
+	CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string)
 	// Stale MR cleanup operations
 	ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error)
 	CloseMR(projectID, mrIID int) error

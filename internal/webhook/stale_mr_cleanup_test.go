@@ -83,7 +83,7 @@ func (m *MockStaleMRClient) UpdateMRComment(projectID, mrIID, commentID int, new
 func (m *MockStaleMRClient) FindLatestNaysayerComment(projectID, mrIID int, commentType ...string) (*gitlab.MRComment, error) {
 	return nil, nil
 }
-func (m *MockStaleMRClient) ApproveMR(projectID, mrIID int) error                        { return nil }
+func (m *MockStaleMRClient) ApproveMR(projectID, mrIID int) error { return nil }
 func (m *MockStaleMRClient) ApproveMRWithMessage(projectID, mrIID int, message string) error {
 	return nil
 }
@@ -98,6 +98,26 @@ func (m *MockStaleMRClient) ListOpenMRs(projectID int) ([]int, error) {
 }
 func (m *MockStaleMRClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
 	return nil, nil
+}
+
+func (m *MockStaleMRClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	return []gitlab.PipelineJob{}, nil
+}
+
+func (m *MockStaleMRClient) GetJobTrace(projectID, jobID int) (string, error) {
+	return "", nil
+}
+
+func (m *MockStaleMRClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	return nil, nil
+}
+
+func (m *MockStaleMRClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	return true, nil
+}
+
+func (m *MockStaleMRClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	return false, ""
 }
 
 func createStaleMRTestConfig() *config.Config {

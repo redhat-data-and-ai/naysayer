@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -146,35 +145,48 @@ func (m *MockRebaseGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab
 	return details, nil
 }
 
-// ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
-// Returns ALL open MRs without date filter (unlike ListOpenMRsWithDetails which filters to last 7 days)
-func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
-	// For this mock, we return the same data since the rebase feature doesn't
-	// distinguish between recent and old MRs. In a real scenario, this would
-	// return MRs older than 7 days as well.
-	return m.ListOpenMRsWithDetails(projectID)
+func (m *MockRebaseGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	// Return empty jobs by default (all succeeded)
+	return []gitlab.PipelineJob{}, nil
 }
 
-// CloseMR closes a merge request (mock implementation)
+func (m *MockRebaseGitLabClient) GetJobTrace(projectID, jobID int) (string, error) {
+	return "", nil
+}
+
+func (m *MockRebaseGitLabClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	// Return nil by default (no atlantis comment)
+	return nil, nil
+}
+
+func (m *MockRebaseGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	// Return true by default (all jobs succeeded)
+	return true, nil
+}
+
+func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	// Return true, "atlantis_comment_not_found" by default (no atlantis comment found, skip rebase)
+	// This matches the actual implementation behavior
+	return true, "atlantis_comment_not_found"
+}
+
+func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// Returns ALL open MRs without date filter (mocked as empty)
+	// This is used by stale MR cleanup to find MRs older than 27-30 days
+	return []gitlab.MRDetails{}, nil
+}
+
 func (m *MockRebaseGitLabClient) CloseMR(projectID, mrIID int) error {
-	// Mock implementation - just return nil
 	return nil
 }
 
-// FindCommentByPattern checks if a comment with the pattern exists (mock implementation)
 func (m *MockRebaseGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
-	// Mock implementation - check captured comments
-	for _, comment := range m.capturedComments {
-		if strings.Contains(comment, pattern) {
-			return true, nil
-		}
-	}
 	return false, nil
 }
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
+	handler := NewAutoRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, cfg, handler.config)
@@ -195,7 +207,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_Success(t *testing.T) {
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{123, 456, 789},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -253,7 +265,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_NoOpenMRs(t *testing.T) {
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{}, // No open MRs
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -306,7 +318,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 		openMRs:     []int{123, 456},
 		rebaseError: fmt.Errorf("rebase failed: conflicts detected"),
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -354,7 +366,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -376,7 +388,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidContentType(t *test
 func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -398,7 +410,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidJSON(t *testing.T) 
 func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -428,7 +440,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *te
 func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingProject(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -458,7 +470,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_PushToNonMainBranch(t *tes
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{123},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -495,7 +507,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_PushToNonMainBranch(t *tes
 func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	tests := []struct {
 		name        string
@@ -542,7 +554,7 @@ func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	// Create test MRs with various statuses
 	// Note: We only test with MRs created within 7 days, since older MRs
@@ -593,7 +605,7 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 			expectedIDs: []int{},
 		},
 		{
-			name:        "Failed pipeline should be filtered out",
+			name:        "Failed pipeline should be filtered out (jobs failed or plan error)",
 			mrs:         []gitlab.MRDetails{failedPipelineMR},
 			expectedIDs: []int{},
 		},
@@ -616,7 +628,8 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := handler.filterEligibleMRs(tt.mrs)
+			// Use a test project ID
+			result := handler.filterEligibleMRs(456, tt.mrs)
 			assert.Len(t, result.Eligible, len(tt.expectedIDs))
 
 			actualIDs := make([]int, len(result.Eligible))
@@ -657,7 +670,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_WithFilteredMRs(t *testing
 			},
 		},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
