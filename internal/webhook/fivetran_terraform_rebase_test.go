@@ -186,7 +186,7 @@ func (m *MockRebaseGitLabClient) FindCommentByPattern(projectID, mrIID int, patt
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
+	handler := NewAutoRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, cfg, handler.config)
@@ -207,7 +207,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_Success(t *testing.T) {
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{123, 456, 789},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -265,7 +265,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_NoOpenMRs(t *testing.T) {
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{}, // No open MRs
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -318,7 +318,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 		openMRs:     []int{123, 456},
 		rebaseError: fmt.Errorf("rebase failed: conflicts detected"),
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -366,7 +366,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_RebaseError(t *testing.T) 
 func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidContentType(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -388,7 +388,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidContentType(t *test
 func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidJSON(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -410,7 +410,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_InvalidJSON(t *testing.T) 
 func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -440,7 +440,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_UnsupportedEventType(t *te
 func TestFivetranTerraformRebaseHandler_HandleWebhook_MissingProject(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -470,7 +470,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_PushToNonMainBranch(t *tes
 	mockClient := &MockRebaseGitLabClient{
 		openMRs: []int{123},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)
@@ -507,7 +507,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_PushToNonMainBranch(t *tes
 func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	tests := []struct {
 		name        string
@@ -554,7 +554,7 @@ func TestFivetranTerraformRebaseHandler_ValidateWebhookPayload(t *testing.T) {
 func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 	cfg := createTestConfig()
 	mockClient := &MockRebaseGitLabClient{}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	// Create test MRs with various statuses
 	// Note: We only test with MRs created within 7 days, since older MRs
@@ -670,7 +670,7 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_WithFilteredMRs(t *testing
 			},
 		},
 	}
-	handler := NewFivetranTerraformRebaseHandlerWithClient(cfg, mockClient)
+	handler := NewAutoRebaseHandlerWithClient(cfg, mockClient)
 
 	app := createTestApp()
 	app.Post("/rebase", handler.HandleWebhook)

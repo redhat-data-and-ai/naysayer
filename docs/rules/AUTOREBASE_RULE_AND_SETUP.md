@@ -59,9 +59,8 @@ graph TB
 
 **Trigger**: Push events to `main` or `master` branch in any repository
 
-**Endpoints**: 
-- `POST /auto-rebase` (generic endpoint, recommended)
-- `POST /fivetran-terraform-rebase` (legacy endpoint, backward compatibility)
+**Endpoint**: 
+- `POST /auto-rebase` (generic endpoint for all repositories)
 
 ## ⚙️ Setup Instructions
 
@@ -131,7 +130,6 @@ export AUTO_REBASE_CHECK_ATLANTIS_COMMENTS="true"
 2. **URL**: `https://your-naysayer-domain.com/auto-rebase`
    - Replace `your-naysayer-domain.com` with your actual Naysayer deployment URL
    - Example: `https://naysayer.example.com/auto-rebase`
-   - **Note**: Legacy endpoint `/fivetran-terraform-rebase` is also supported for backward compatibility
 3. **Secret token** (optional but recommended):
    - Generate a secure random token
    - Store it in `WEBHOOK_SECRET` environment variable
@@ -174,15 +172,6 @@ curl -X POST https://your-naysayer-domain.com/auto-rebase \
     "commits": [{"id": "abc123", "message": "Test commit"}]
   }'
 
-# Legacy endpoint (also supported)
-curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
-  -H "Content-Type: application/json" \
-  -d '{
-    "object_kind": "push",
-    "ref": "refs/heads/main",
-    "project": {"id": YOUR_PROJECT_ID},
-    "commits": [{"id": "abc123", "message": "Test commit"}]
-  }'
 ```
 
 **Check Service Logs**:
@@ -329,7 +318,7 @@ When `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`:
 **Solutions**:
 1. **Verify webhook URL**: Check webhook configuration in GitLab matches your Naysayer URL
 2. **Check webhook logs**: In GitLab, go to **Settings** → **Webhooks** → Click webhook → View **Recent events**
-3. **Verify endpoint**: Ensure `/fivetran-terraform-rebase` endpoint is accessible
+3. **Verify endpoint**: Ensure `/auto-rebase` endpoint is accessible
 4. **Check Naysayer logs**: Look for webhook receipt logs
 
 **Debug Commands**:

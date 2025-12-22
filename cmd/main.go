@@ -34,11 +34,8 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 	// Webhook routes
 	app.Post("/dataverse-product-config-review", dataProductConfigMrReviewHandler.HandleWebhook)
 
-	// Auto-rebase routes (generic, reusable)
+	// Auto-rebase route (generic, reusable)
 	app.Post("/auto-rebase", autoRebaseHandler.HandleWebhook)
-
-	// Legacy Fivetran-Terraform rebase route (backward compatibility)
-	app.Post("/fivetran-terraform-rebase", autoRebaseHandler.HandleWebhook)
 
 	// Stale MR cleanup route
 	app.Post("/stale-mr-cleanup", staleMRCleanupHandler.HandleWebhook)
