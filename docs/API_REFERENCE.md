@@ -21,12 +21,6 @@ Generic webhook endpoint for auto-rebase feature (works across all repositories)
 - `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` - Check atlantis comments for plan failures (default: `false`)
 - `AUTO_REBASE_REPOSITORY_TOKEN` - Repository-specific token (optional)
 
-### **POST /fivetran-terraform-rebase**
-
-Legacy webhook endpoint for backward compatibility.
-
-**Description**: Same functionality as `/auto-rebase`. This endpoint is maintained for backward compatibility with existing Fivetran Terraform repository webhooks.
-
 **Request Headers**:
 ```http
 Content-Type: application/json
@@ -34,28 +28,9 @@ Content-Type: application/json
 
 **Request Body**: GitLab push webhook payload (JSON)
 
-**Example Request** (Generic Endpoint):
+**Example Request**:
 ```bash
 curl -X POST https://your-naysayer-domain.com/auto-rebase \
-  -H "Content-Type: application/json" \
-  -d '{
-    "object_kind": "push",
-    "ref": "refs/heads/main",
-    "project": {
-      "id": 456
-    },
-    "commits": [
-      {
-        "id": "abc123",
-        "message": "Update configuration"
-      }
-    ]
-  }'
-```
-
-**Example Request** (Legacy Endpoint):
-```bash
-curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
   -H "Content-Type: application/json" \
   -d '{
     "object_kind": "push",
@@ -497,16 +472,6 @@ curl -X POST https://your-naysayer-domain.com/auto-rebase \
   }'
 ```
 
-**Test Auto-Rebase Webhook** (Legacy Endpoint):
-```bash
-curl -X POST https://your-naysayer-domain.com/fivetran-terraform-rebase \
-  -H "Content-Type: application/json" \
-  -d '{
-    "object_kind": "push",
-    "ref": "refs/heads/main",
-    "project": {"id": 456}
-  }'
-```
 
 > **🧪 Development & Testing**: For comprehensive testing strategies and examples, see:
 > - [Development Setup Guide](DEVELOPMENT_SETUP.md) - General testing guide

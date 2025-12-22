@@ -34,10 +34,14 @@ func setupRoutes(app *fiber.App, cfg *config.Config) {
 	// Webhook routes
 	app.Post("/dataverse-product-config-review", dataProductConfigMrReviewHandler.HandleWebhook)
 
-	// Auto-rebase routes (generic, reusable)
+	// Auto-rebase route (generic, reusable)
 	app.Post("/auto-rebase", autoRebaseHandler.HandleWebhook)
 
+<<<<<<< HEAD
 	// Stale MR cleanup routes
+=======
+	// Stale MR cleanup route
+>>>>>>> a6f7a11 (Removed the legacy fivetran endpoint and routed to new endpoint)
 	app.Post("/stale-mr-cleanup", staleMRCleanupHandler.HandleWebhook)
 }
 
