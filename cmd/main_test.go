@@ -402,9 +402,10 @@ func TestApplication_RouteConfiguration(t *testing.T) {
 
 			// Check that route exists (not 404) and matches expected status
 			// For routes with "200|500", accept either (500 = route exists but API failed)
-			if expectedStatus == "200" {
+			switch expectedStatus {
+			case "200":
 				assert.Equal(t, 200, resp.StatusCode, "Route should return 200")
-			} else if expectedStatus == "200|500" {
+			case "200|500":
 				assert.Contains(t, []int{200, 500}, resp.StatusCode, "Route should exist (200 or 500, not 404)")
 			}
 		})
