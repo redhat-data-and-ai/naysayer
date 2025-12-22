@@ -83,7 +83,7 @@ func (m *MockStaleMRClient) UpdateMRComment(projectID, mrIID, commentID int, new
 func (m *MockStaleMRClient) FindLatestNaysayerComment(projectID, mrIID int, commentType ...string) (*gitlab.MRComment, error) {
 	return nil, nil
 }
-func (m *MockStaleMRClient) ApproveMR(projectID, mrIID int) error                        { return nil }
+func (m *MockStaleMRClient) ApproveMR(projectID, mrIID int) error { return nil }
 func (m *MockStaleMRClient) ApproveMRWithMessage(projectID, mrIID int, message string) error {
 	return nil
 }
