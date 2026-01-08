@@ -737,6 +737,75 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 	return detailedMRs, nil
 }
 
+// GetPipelineJobs retrieves all jobs for a pipeline
+func (c *Client) GetPipelineJobs(projectID, pipelineID int) ([]PipelineJob, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/pipelines/%d/jobs",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, pipelineID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipeline jobs request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pipeline jobs: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get pipeline jobs failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var jobs []PipelineJob
+	if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline jobs response: %w", err)
+	}
+
+	return jobs, nil
+}
+
+// JobTrace represents the trace content from a GitLab job
+type JobTrace struct {
+	Content string `json:"content"`
+}
+
+// GetJobTrace retrieves the trace/logs for a specific job
+func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/jobs/%d/trace",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, jobID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create job trace request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get job trace: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var trace JobTrace
+	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
+		return "", fmt.Errorf("failed to decode job trace response: %w", err)
+	}
+
+	return trace.Content, nil
+}
+
 // ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
 // This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
 func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
@@ -815,6 +884,164 @@ func (c *Client) CloseMR(projectID, mrIID int) error {
 
 	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
 	return nil
+}
+
+// FindLatestAtlantisComment finds the latest comment from atlantis-bot
+func (c *Client) FindLatestAtlantisComment(projectID, mrIID int) (*MRComment, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	// Log all comments for debugging
+	logging.Info("Found %d comments for MR %d", len(comments), mrIID)
+	for i, comment := range comments {
+		if i < 5 { // Log first 5 comments for debugging
+			authorUsername := "unknown"
+			authorName := "unknown"
+			if username, ok := comment.Author["username"].(string); ok {
+				authorUsername = username
+			}
+			if name, ok := comment.Author["name"].(string); ok {
+				authorName = name
+			}
+			isAtlantis := c.isAtlantisBotComment(comment.Author)
+			bodyPreview := truncateString(comment.Body, 100)
+			logging.Info("Comment %d: author=%s/%s, is_atlantis=%v, preview=%s (MR %d)",
+				i, authorUsername, authorName, isAtlantis, bodyPreview, mrIID)
+		}
+	}
+
+	// Find the latest atlantis comment
+	// Comments are already sorted by created_at desc from ListMRComments
+	for _, comment := range comments {
+		// Check if comment is from atlantis-bot
+		if c.isAtlantisBotComment(comment.Author) {
+			logging.Info("Found atlantis comment for MR %d", mrIID)
+			return &comment, nil
+		}
+	}
+
+	logging.Info("No atlantis comment found in %d comments for MR %d", len(comments), mrIID)
+	return nil, nil // No atlantis comment found
+}
+
+// truncateString truncates a string to maxLen characters
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// isAtlantisBotComment checks if a comment is from atlantis-bot
+func (c *Client) isAtlantisBotComment(author map[string]interface{}) bool {
+	// Common atlantis bot username patterns
+	atlantisPatterns := []string{
+		"atlantis",
+		"atlatnis", // Common typo
+		"atlantis-bot",
+		"atlantisbot",
+		"atlatnisbot",
+	}
+
+	// Check username field (primary check)
+	if username, ok := author["username"].(string); ok {
+		usernameLower := strings.ToLower(username)
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(usernameLower, pattern) {
+				return true
+			}
+		}
+	}
+
+	// Check name field as fallback
+	if name, ok := author["name"].(string); ok {
+		nameLower := strings.ToLower(name)
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(nameLower, pattern) {
+				return true
+			}
+		}
+	}
+
+	// Check if author is a bot (some GitLab instances mark bots differently)
+	if bot, ok := author["bot"].(bool); ok && bot {
+		// If it's marked as a bot, check if username/name contains atlantis
+		if username, ok := author["username"].(string); ok {
+			usernameLower := strings.ToLower(username)
+			for _, pattern := range atlantisPatterns {
+				if strings.Contains(usernameLower, pattern) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// AreAllPipelineJobsSucceeded checks if all non-allow-failure jobs in a pipeline succeeded
+func (c *Client) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	jobs, err := c.GetPipelineJobs(projectID, pipelineID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get pipeline jobs: %w", err)
+	}
+
+	if len(jobs) == 0 {
+		// No jobs found, consider it as succeeded
+		return true, nil
+	}
+
+	// Check if all non-allow-failure jobs succeeded
+	for _, job := range jobs {
+		// Skip jobs that are allowed to fail
+		if job.AllowFailure {
+			continue
+		}
+
+		// Check job status
+		status := strings.ToLower(job.Status)
+		if status != "success" && status != "skipped" {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// CheckAtlantisCommentForPlanFailures checks the latest atlantis comment for plan failures
+// Returns (shouldSkip, reason) where:
+// - shouldSkip=true means rebase should be skipped
+// - reason explains why (e.g., "atlantis_plan_failed", "atlantis_plan_locked")
+// - If shouldSkip=false, reason will be empty or "atlantis_plan_locked"
+func (c *Client) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	atlantisComment, err := c.FindLatestAtlantisComment(projectID, mrIID)
+	if err != nil {
+		// If we can't find the comment, don't skip (safer to allow rebase)
+		return false, ""
+	}
+
+	if atlantisComment == nil {
+		// No atlantis comment found - if pipeline is failed, skip rebase to be safe
+		// (We can't determine if it's a state lock or real error without the comment)
+		return true, "atlantis_comment_not_found"
+	}
+
+	commentBody := strings.ToLower(atlantisComment.Body)
+
+	// Check if failure is due to state lock (which we can ignore)
+	// Only check for the specific Terraform state lock error message
+	// If it's state lock, allow rebase; otherwise, skip rebase
+	hasStateLock := strings.Contains(commentBody, "error acquiring the state lock")
+
+	if hasStateLock {
+		// State lock detected - this is temporary, allow rebase
+		return false, "atlantis_plan_locked"
+	}
+
+	// Not a state lock error - skip rebase
+	return true, "atlantis_plan_failed"
 }
 
 // FindCommentByPattern checks if a comment containing the specified pattern exists on an MR

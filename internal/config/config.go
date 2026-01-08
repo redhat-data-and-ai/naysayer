@@ -8,13 +8,14 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	GitLab   GitLabConfig
-	Server   ServerConfig
-	Webhook  WebhookConfig
-	Comments CommentsConfig
-	Rules    RulesConfig
-	Approval ApprovalConfig
-	StaleMR  StaleMRConfig
+	GitLab     GitLabConfig
+	Server     ServerConfig
+	Webhook    WebhookConfig
+	Comments   CommentsConfig
+	Rules      RulesConfig
+	Approval   ApprovalConfig
+	AutoRebase AutoRebaseConfig
+	StaleMR    StaleMRConfig
 }
 
 // GitLabConfig holds GitLab API configuration
@@ -104,6 +105,13 @@ type ApprovalConfig struct {
 	PlatformGroupID        string // GitLab group ID for platform team
 }
 
+// AutoRebaseConfig holds auto-rebase configuration
+type AutoRebaseConfig struct {
+	Enabled               bool   // Enable/disable auto-rebase feature
+	CheckAtlantisComments bool   // Check atlantis comments for plan failures (default: false)
+	RepositoryToken       string // Optional: repository-specific token (for backward compat with Fivetran)
+}
+
 // StaleMRConfig holds stale MR cleanup configuration
 type StaleMRConfig struct {
 	ClosureDays int // Days before closure (default: 30)
@@ -168,6 +176,12 @@ func Load() *Config {
 			EnablePlatformWorkflow: getEnv("ENABLE_PLATFORM_WORKFLOW", "true") == "true",
 			TOCGroupID:             getEnv("TOC_GROUP_ID", ""),
 			PlatformGroupID:        getEnv("PLATFORM_GROUP_ID", ""),
+		},
+		AutoRebase: AutoRebaseConfig{
+			Enabled:               getEnv("AUTO_REBASE_ENABLED", "true") == "true",
+			CheckAtlantisComments: getEnv("AUTO_REBASE_CHECK_ATLANTIS_COMMENTS", "false") == "true",
+			// Support both new and old env var names for backward compatibility
+			RepositoryToken: getEnv("AUTO_REBASE_REPOSITORY_TOKEN", getEnv("GITLAB_TOKEN_FIVETRAN", "")),
 		},
 		StaleMR: StaleMRConfig{
 			ClosureDays: getEnvInt("STALE_MR_CLOSURE_DAYS", 30),

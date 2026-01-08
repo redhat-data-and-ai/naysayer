@@ -529,6 +529,26 @@ func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern st
 	return false, nil
 }
 
+func (m *MockGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	return []gitlab.PipelineJob{}, nil
+}
+
+func (m *MockGitLabClient) GetJobTrace(projectID, jobID int) (string, error) {
+	return "", nil
+}
+
+func (m *MockGitLabClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	return nil, nil
+}
+
+func (m *MockGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	return true, nil
+}
+
+func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	return false, ""
+}
+
 // Test empty MR detection
 func TestEvaluateRules_EmptyMR(t *testing.T) {
 	setupTestRulesFile(t)

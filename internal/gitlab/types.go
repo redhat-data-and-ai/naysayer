@@ -36,3 +36,13 @@ type MRInfo struct {
 	TargetBranch string
 	State        string
 }
+
+// PipelineJob represents a GitLab CI job
+type PipelineJob struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Status        string `json:"status"`
+	Stage         string `json:"stage"`
+	FailureReason string `json:"failure_reason"`
+	AllowFailure  bool   `json:"allow_failure"`
+}
