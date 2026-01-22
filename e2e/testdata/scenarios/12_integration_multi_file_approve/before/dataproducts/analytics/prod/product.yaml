@@ -1,5 +1,9 @@
 ---
 name: analytics
+kind: source
+rover_group: dataverse-analytics-old
 warehouses:
 - type: user
-  size: MEDIUM
+  size: SMALL
+tags:
+  data_product: analytics

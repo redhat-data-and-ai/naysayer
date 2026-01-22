@@ -1,14 +1,13 @@
 name: "Two products both warehouse decreases"
-description: "Multiple products with warehouse decreases should be auto-approved (cost reduction)"
+description: "Multiple products with warehouse decreases require manual review (all warehouse changes need manual approval)"
 
 expected:
-  decision: Approve
-  reason: "All files passed validation - all changes covered by approved rules"
-  approved: true
+  decision: ManualReview
+  approved: false
 
   comment_contains:
-    - "✅ **Auto-approved**"
-    - "Warehouse configuration validated"
+    - "Warehouse size decrease detected"
+    - "user warehouse"
 
 mr_metadata:
   title: "Scale down warehouses across products to reduce costs"

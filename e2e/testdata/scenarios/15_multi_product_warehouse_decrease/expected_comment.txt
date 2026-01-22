@@ -1,5 +1,8 @@
-<!-- naysayer-comment-id: approval -->
-✅ **Auto-approved**
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
 
 <details>
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
@@ -7,6 +10,6 @@
 **What was checked:**
 • ✅ Metadata changes validated across 2 files
 • ✅ TOC approval validated across 2 files
-• ✅ Warehouse size decrease approved: service_account warehouse: LARGE → MEDIUM, user warehouse: XLARGE → LARGE
+• 🚫 Warehouse size decrease detected: service_account warehouse: MEDIUM → SMALL, user warehouse: LARGE → MEDIUM
 
 </details>

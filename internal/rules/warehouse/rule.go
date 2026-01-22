@@ -36,7 +36,7 @@ func (r *Rule) Name() string {
 
 // Description returns human-readable description
 func (r *Rule) Description() string {
-	return "Validates warehouse size changes in product.yaml files - auto-approves size decreases, requires review for increases. Other sections handled by respective rules."
+	return "Validates warehouse size changes in product.yaml files - all warehouse changes require manual review for cost control and governance."
 }
 
 // SetMRContext implements ContextAwareRule interface
@@ -69,73 +69,116 @@ func (r *Rule) GetCoveredLines(filePath string, fileContent string) []shared.Lin
 
 // ValidateLines validates warehouse configuration changes
 // When called by section-based validation, fileContent contains the warehouses section content
+// ALL warehouse changes require manual review - no auto-approval
 func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
 	if !r.isWarehouseFile(filePath) {
 		return shared.Approve, "Not a warehouse file"
 	}
 
-	// If we don't have analyzer or MR context, fall back to simplified validation
+	// If we don't have analyzer or MR context, require manual review for safety
+	// Never auto-approve warehouse changes without proper analysis
 	if r.analyzer == nil || r.mrCtx == nil {
-		return shared.Approve, "Warehouse file validated (simplified validation - no context)"
+		return shared.ManualReview, "Warehouse changes require manual review"
 	}
 
-	// Use the analyzer to detect warehouse changes - but focus only on warehouse changes
+	// Use the analyzer to detect warehouse changes
 	changes, err := r.analyzer.AnalyzeChanges(r.mrCtx.ProjectID, r.mrCtx.MRIID, r.mrCtx.Changes)
 	if err != nil {
 		// If analysis fails, require manual review for safety
 		return shared.ManualReview, fmt.Sprintf("Warehouse analysis failed: %v", err)
 	}
 
-	// Check if this specific file has warehouse size changes (ignore non-warehouse changes)
+	// Check if this specific file has ANY warehouse changes
+	// Categories: additions, removals, increases, decreases
+	var warehouseAdditions []WarehouseChange
+	var warehouseRemovals []WarehouseChange
 	var warehouseIncreases []WarehouseChange
 	var warehouseDecreases []WarehouseChange
 
 	for _, change := range changes {
 		// Check if this change affects the current file
 		if strings.Contains(change.FilePath, filePath) {
-			// ONLY process actual warehouse size changes - ignore non-warehouse changes
-			if change.FromSize != "N/A" && change.ToSize != "N/A" {
+			// Categorize ALL warehouse changes (not just size changes to existing)
+			// Note: FromSize can be "N/A" or empty string "" for new warehouses
+			isNewWarehouse := (change.FromSize == "N/A" || change.FromSize == "") && change.ToSize != "N/A" && change.ToSize != ""
+			isRemovedWarehouse := change.FromSize != "N/A" && change.FromSize != "" && (change.ToSize == "N/A" || change.ToSize == "")
+
+			if isNewWarehouse {
+				// New warehouse added
+				warehouseAdditions = append(warehouseAdditions, change)
+			} else if isRemovedWarehouse {
+				// Warehouse removed
+				warehouseRemovals = append(warehouseRemovals, change)
+			} else if change.FromSize != "N/A" && change.FromSize != "" && change.ToSize != "N/A" && change.ToSize != "" {
+				// Size change to existing warehouse
 				if change.IsDecrease {
 					warehouseDecreases = append(warehouseDecreases, change)
 				} else {
 					warehouseIncreases = append(warehouseIncreases, change)
 				}
 			}
-			// Skip non-warehouse changes (FromSize == "N/A" && ToSize == "N/A")
-			// These will be handled by other rules (metadata_rule, etc.)
 		}
 	}
 
-	// If there are warehouse size increases, require manual review
-	if len(warehouseIncreases) > 0 {
-		details := []string{}
-		for _, change := range warehouseIncreases {
-			// Extract warehouse type from FilePath (format: "path (type: user)")
+	// ALL warehouse changes require manual review - no auto-approval
+	allChanges := len(warehouseAdditions) + len(warehouseRemovals) + len(warehouseIncreases) + len(warehouseDecreases)
+	if allChanges > 0 {
+		var details []string
+
+		// Report additions (using old format: "New X warehouse: SIZE")
+		for _, change := range warehouseAdditions {
 			warehouseType := r.extractWarehouseType(change.FilePath)
-			if change.FromSize == "" {
-				details = append(details, fmt.Sprintf("New %s warehouse: %s", warehouseType, change.ToSize))
-			} else {
-				details = append(details, fmt.Sprintf("%s warehouse: %s → %s", warehouseType, change.FromSize, change.ToSize))
+			details = append(details, fmt.Sprintf("New %s warehouse: %s", warehouseType, change.ToSize))
+		}
+
+		// Report removals
+		for _, change := range warehouseRemovals {
+			warehouseType := r.extractWarehouseType(change.FilePath)
+			details = append(details, fmt.Sprintf("%s warehouse removed: was %s", warehouseType, change.FromSize))
+		}
+
+		// Count the number of different change types present
+		changeTypesPresent := 0
+		for _, changes := range [][]WarehouseChange{warehouseAdditions, warehouseRemovals, warehouseIncreases, warehouseDecreases} {
+			if len(changes) > 0 {
+				changeTypesPresent++
 			}
 		}
+
+		// Determine if we have truly mixed changes (more than one type of change)
+		hasMixedChanges := changeTypesPresent > 1
+
+		// Report size increases
+		for _, change := range warehouseIncreases {
+			warehouseType := r.extractWarehouseType(change.FilePath)
+			details = append(details, formatSizeChangeDetail(warehouseType, change.FromSize, change.ToSize, hasMixedChanges, "increased"))
+		}
+
+		// Report size decreases
+		for _, change := range warehouseDecreases {
+			warehouseType := r.extractWarehouseType(change.FilePath)
+			details = append(details, formatSizeChangeDetail(warehouseType, change.FromSize, change.ToSize, hasMixedChanges, "decreased"))
+		}
+
 		// Sort details for consistent ordering in comments
 		sort.Strings(details)
+
+		// Use appropriate message format based on change type
+		if hasMixedChanges {
+			// Multiple types of changes - use generic message
+			return shared.ManualReview, fmt.Sprintf("Warehouse changes detected - manual review required: %s", strings.Join(details, ", "))
+		} else if len(warehouseRemovals) > 0 {
+			// Only removals
+			return shared.ManualReview, fmt.Sprintf("Warehouse removal detected: %s", strings.Join(details, ", "))
+		} else if len(warehouseDecreases) > 0 {
+			// Only decreases
+			return shared.ManualReview, fmt.Sprintf("Warehouse size decrease detected: %s", strings.Join(details, ", "))
+		}
+		// Only additions OR only increases - use "increase" message
 		return shared.ManualReview, fmt.Sprintf("Warehouse size increase detected: %s", strings.Join(details, ", "))
 	}
 
-	// If there are warehouse size decreases, approve them
-	if len(warehouseDecreases) > 0 {
-		details := []string{}
-		for _, change := range warehouseDecreases {
-			warehouseType := r.extractWarehouseType(change.FilePath)
-			details = append(details, fmt.Sprintf("%s warehouse: %s → %s", warehouseType, change.FromSize, change.ToSize))
-		}
-		// Sort details for consistent ordering in comments
-		sort.Strings(details)
-		return shared.Approve, fmt.Sprintf("Warehouse size decrease approved: %s", strings.Join(details, ", "))
-	}
-
-	// No warehouse size changes detected - approve (other rules will handle non-warehouse sections)
+	// No warehouse changes detected in this file - approve (using old format)
 	return shared.Approve, "No warehouse size changes detected - approved"
 }
 
@@ -167,4 +210,12 @@ func (r *Rule) extractWarehouseType(filePath string) string {
 		}
 	}
 	return "unknown"
+}
+
+// formatSizeChangeDetail formats the detail string for warehouse size changes
+func formatSizeChangeDetail(warehouseType, from, to string, hasMixedChanges bool, changeVerb string) string {
+	if hasMixedChanges {
+		return fmt.Sprintf("%s warehouse %s: %s → %s", warehouseType, changeVerb, from, to)
+	}
+	return fmt.Sprintf("%s warehouse: %s → %s", warehouseType, from, to)
 }

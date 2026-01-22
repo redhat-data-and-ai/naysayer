@@ -228,7 +228,14 @@ func TestAnalyzer_compareWarehouses(t *testing.T) {
 					{Type: "snowflake", Size: "MEDIUM"},
 				},
 			},
-			expected: []WarehouseChange{},
+			expected: []WarehouseChange{
+				{
+					FilePath:   "dataproducts/agg/test/product.yaml (type: redshift)",
+					FromSize:   "LARGE",
+					ToSize:     "",
+					IsDecrease: true,
+				},
+			},
 		},
 		{
 			name: "unknown warehouse size",
