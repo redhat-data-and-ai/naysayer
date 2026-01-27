@@ -2,17 +2,20 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
 // Config holds application configuration
 type Config struct {
-	GitLab   GitLabConfig
-	Server   ServerConfig
-	Webhook  WebhookConfig
-	Comments CommentsConfig
-	Rules    RulesConfig
-	Approval ApprovalConfig
+	GitLab     GitLabConfig
+	Server     ServerConfig
+	Webhook    WebhookConfig
+	Comments   CommentsConfig
+	Rules      RulesConfig
+	Approval   ApprovalConfig
+	AutoRebase AutoRebaseConfig
+	StaleMR    StaleMRConfig
 }
 
 // GitLabConfig holds GitLab API configuration
@@ -20,6 +23,7 @@ type GitLabConfig struct {
 	BaseURL                       string
 	Token                         string
 	GitlabFivetranRepositoryToken string // Optional: separate token for fivetran_terraform rebase
+	GitlabStaleMRToken            string // Optional: dedicated token for stale MR cleanup
 	InsecureTLS                   bool   // Skip TLS certificate verification
 	CACertPath                    string // Path to custom CA certificate file
 }
@@ -101,6 +105,18 @@ type ApprovalConfig struct {
 	PlatformGroupID        string // GitLab group ID for platform team
 }
 
+// AutoRebaseConfig holds auto-rebase configuration
+type AutoRebaseConfig struct {
+	Enabled               bool   // Enable/disable auto-rebase feature
+	CheckAtlantisComments bool   // Check atlantis comments for plan failures (default: false)
+	RepositoryToken       string // Optional: repository-specific token (for backward compat with Fivetran)
+}
+
+// StaleMRConfig holds stale MR cleanup configuration
+type StaleMRConfig struct {
+	ClosureDays int // Days before closure (default: 30)
+}
+
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
@@ -108,6 +124,7 @@ func Load() *Config {
 			BaseURL:                       getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
 			Token:                         getEnv("GITLAB_TOKEN", ""),
 			GitlabFivetranRepositoryToken: getEnv("GITLAB_TOKEN_FIVETRAN", ""), // Dedicated token for fivetran_terraform rebase
+			GitlabStaleMRToken:            getEnv("GITLAB_TOKEN_STALE_MR", ""), // Dedicated token for stale MR cleanup
 			InsecureTLS:                   getEnv("GITLAB_INSECURE_TLS", "false") == "true",
 			CACertPath:                    getEnv("GITLAB_CA_CERT_PATH", ""),
 		},
@@ -160,6 +177,15 @@ func Load() *Config {
 			TOCGroupID:             getEnv("TOC_GROUP_ID", ""),
 			PlatformGroupID:        getEnv("PLATFORM_GROUP_ID", ""),
 		},
+		AutoRebase: AutoRebaseConfig{
+			Enabled:               getEnv("AUTO_REBASE_ENABLED", "true") == "true",
+			CheckAtlantisComments: getEnv("AUTO_REBASE_CHECK_ATLANTIS_COMMENTS", "false") == "true",
+			// Support both new and old env var names for backward compatibility
+			RepositoryToken: getEnv("AUTO_REBASE_REPOSITORY_TOKEN", getEnv("GITLAB_TOKEN_FIVETRAN", "")),
+		},
+		StaleMR: StaleMRConfig{
+			ClosureDays: getEnvInt("STALE_MR_CLOSURE_DAYS", 30),
+		},
 	}
 }
 
@@ -192,6 +218,15 @@ func (c *Config) WebhookSecurityMode() string {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
 	}
 	return defaultValue
 }

@@ -10,6 +10,203 @@ NAYSAYER provides HTTP endpoints for webhook processing, health monitoring, and 
 
 ## 📡 **Webhook Endpoints**
 
+### **POST /auto-rebase**
+
+Generic webhook endpoint for auto-rebase feature (works across all repositories).
+
+**Description**: Automatically rebases eligible merge requests when code is pushed to the main branch. Only processes push events to `main` or `master` branches. Supports optional atlantis comment checking for repositories using Terraform/Atlantis.
+
+**Configuration**: Controlled via environment variables:
+- `AUTO_REBASE_ENABLED` - Enable/disable feature (default: `true`)
+- `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` - Check atlantis comments for plan failures (default: `false`)
+- `AUTO_REBASE_REPOSITORY_TOKEN` - Repository-specific token (optional)
+
+**Request Headers**:
+```http
+Content-Type: application/json
+```
+
+**Request Body**: GitLab push webhook payload (JSON)
+
+**Example Request**:
+```bash
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_kind": "push",
+    "ref": "refs/heads/main",
+    "project": {
+      "id": 456
+    },
+    "commits": [
+      {
+        "id": "abc123",
+        "message": "Update configuration"
+      }
+    ]
+  }'
+```
+
+**Response Codes**:
+- `200 OK` - Webhook processed successfully
+- `400 Bad Request` - Invalid request format or unsupported event type
+- `500 Internal Server Error` - Internal processing error
+
+**Success Response Example** (200):
+```json
+{
+  "webhook_response": "processed",
+  "status": "completed",
+  "project_id": 456,
+  "branch": "main",
+  "total_mrs": 5,
+  "eligible_mrs": 2,
+  "successful": 2,
+  "failed": 0,
+  "skipped": 3,
+  "skip_details": [
+    {
+      "mr_iid": 123,
+      "reason": "pipeline_running",
+      "pipeline_id": 45678
+    },
+    {
+      "mr_iid": 124,
+      "reason": "too_old",
+      "created_at": "2025-11-01T10:00:00Z"
+    },
+    {
+      "mr_iid": 125,
+      "reason": "pipeline_failed",
+      "pipeline_id": 45679
+    }
+  ]
+}
+```
+
+**Response with Failures** (200):
+```json
+{
+  "webhook_response": "processed",
+  "status": "completed",
+  "project_id": 456,
+  "branch": "main",
+  "total_mrs": 3,
+  "eligible_mrs": 3,
+  "successful": 2,
+  "failed": 1,
+  "skipped": 0,
+  "failures": [
+    {
+      "mr_iid": 456,
+      "error": "rebase failed: rebase already in progress or conflicts detected"
+    }
+  ]
+}
+```
+
+**Non-Main Branch Response** (200):
+```json
+{
+  "webhook_response": "processed",
+  "status": "skipped",
+  "reason": "Push to feature/update branch, only main/master triggers rebase",
+  "branch": "feature/update"
+}
+```
+
+**Response Fields**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `webhook_response` | string | Always `"processed"` |
+| `status` | string | `"completed"` or `"skipped"` |
+| `project_id` | number | GitLab project ID |
+| `branch` | string | Branch name (`main` or `master`) |
+| `total_mrs` | number | Total number of open MRs found |
+| `eligible_mrs` | number | Number of MRs eligible for rebase |
+| `successful` | number | Number of successfully rebased MRs |
+| `failed` | number | Number of failed rebase attempts |
+| `skipped` | number | Number of MRs skipped (not eligible) |
+| `skip_details` | array | Details about skipped MRs (if any) |
+| `failures` | array | Details about failed rebases (if any) |
+
+**Skip Details Object**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `mr_iid` | number | Merge request IID |
+| `reason` | string | Skip reason (`pipeline_running`, `pipeline_pending`, `pipeline_failed`, `pipeline_failed_atlantis_comment_not_found`, `pipeline_failed_atlantis_plan_failed`, `pipeline_jobs_failed`, `too_old`, `has_conflicts`, `already_up_to_date`, `rebase_in_progress`) |
+| `pipeline_id` | number | Pipeline ID (if skipped due to pipeline status) |
+| `created_at` | string | MR creation date (if skipped due to age) |
+
+**Failure Object**:
+| Field | Type | Description |
+|-------|------|-------------|
+| `mr_iid` | number | Merge request IID |
+| `error` | string | Error message describing the failure |
+
+**Eligibility Criteria**:
+- MR must be created within the last **7 days**
+- MR must not have merge conflicts (`merge_status` must not be `cannot_be_merged`)
+- MR must not already be up-to-date (`behind_commits_count > 0`)
+- MR must not have a rebase in progress (`rebase_in_progress = false`)
+- MR pipeline status:
+  - `success` → Rebase directly
+  - `failed` → Check all jobs succeeded, then optionally check atlantis comments (if `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`)
+  - `null` (no pipeline) → Rebase
+- MRs with `running` or `pending` pipelines are skipped
+- Only push events to `main` or `master` branches trigger rebase operations
+
+**Rebase Verification**:
+- After triggering a rebase, the system verifies that the rebase completed successfully:
+  - Polls the MR status until `rebase_in_progress = false` (max 60 seconds)
+  - Checks that no conflicts were introduced (`merge_status != cannot_be_merged`)
+  - Verifies that commits were actually added (`behind_commits_count` decreased or is 0)
+- Only posts success comment if rebase was actually performed
+- If conflicts are detected during or after rebase, the rebase is marked as failed
+
+**Conflict Detection**:
+- Pre-rebase: Checks `has_conflicts` and `merge_status` fields before attempting rebase
+- Post-rebase: Verifies no conflicts were introduced during the rebase operation
+- MRs with conflicts are skipped and reported in the `failures` array with error message: `"rebase skipped: MR has merge conflicts (merge_status: <status>)"`
+
+**Atlantis Comment Checking** (when `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`):
+- For failed pipelines with all jobs succeeded:
+  - Checks latest atlantis-bot comment
+  - If comment contains "Error: Error acquiring the state lock" → Allow rebase
+  - If comment contains other plan errors → Skip rebase
+  - If no atlantis comment found → Skip rebase (safe default)
+
+**Error Response Examples**:
+
+**400 - Unsupported Event Type**:
+```json
+{
+  "error": "Unsupported event type: merge_request. Only push events are supported."
+}
+```
+
+**400 - Invalid Content Type**:
+```json
+{
+  "error": "Content-Type must be application/json, got: text/plain"
+}
+```
+
+**400 - Missing Project Information**:
+```json
+{
+  "error": "Missing project information"
+}
+```
+
+**500 - Failed to List MRs**:
+```json
+{
+  "error": "Failed to list open MRs: GitLab API error 401: Unauthorized",
+  "project_id": 456
+}
+```
+
 ### **POST /dataverse-product-config-review**
 
 Main webhook endpoint for GitLab merge request events.
@@ -205,9 +402,22 @@ curl -s https://your-naysayer-domain.com/ready | jq '.'
 
 NAYSAYER is configured through environment variables and a `rules.yaml` file.
 
+**Required Environment Variables**:
+- `GITLAB_TOKEN` - GitLab personal access token with `api` scope
+- `GITLAB_BASE_URL` - GitLab instance URL (default: `https://gitlab.com`)
+
+**Optional Environment Variables**:
+- `AUTO_REBASE_ENABLED` - Enable/disable auto-rebase feature (default: `true`)
+- `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS` - Check atlantis comments for plan failures (default: `false`)
+- `AUTO_REBASE_REPOSITORY_TOKEN` - Repository-specific token (falls back to `GITLAB_TOKEN` if not set)
+- `GITLAB_TOKEN_FIVETRAN` - Legacy name for repository-specific token (backward compatibility, maps to `AUTO_REBASE_REPOSITORY_TOKEN`)
+- `WEBHOOK_SECRET` - Webhook secret token for additional security
+- `PORT` - Server port (default: `3000`)
+
 > **📋 Configuration Details**: For complete configuration options and examples, see:
 > - [Development Setup Guide](DEVELOPMENT_SETUP.md) - Environment variables and setup
 > - [Section-Based Architecture Guide](SECTION_BASED_ARCHITECTURE.md) - rules.yaml configuration
+> - [Auto-Rebase Rule Documentation](rules/AUTOREBASE_RULE_AND_SETUP.md) - Auto-rebase setup and configuration
 
 
 ## 🔍 **Error Handling**
@@ -259,7 +469,7 @@ NAYSAYER uses structured JSON logging with key fields: `mr_id`, `project_id`, `e
 curl -f https://your-naysayer-domain.com/health
 ```
 
-**Test Webhook**:
+**Test Data Product Config Review Webhook**:
 ```bash
 curl -X POST https://your-naysayer-domain.com/dataverse-product-config-review \
   -H "Content-Type: application/json" \
@@ -267,7 +477,20 @@ curl -X POST https://your-naysayer-domain.com/dataverse-product-config-review \
   -d '{"object_kind": "merge_request", "object_attributes": {"id": 123, "iid": 456}}'
 ```
 
-> **🧪 Development & Testing**: For comprehensive testing strategies and examples, see [Development Setup Guide](DEVELOPMENT_SETUP.md)
+**Test Auto-Rebase Webhook** (Generic Endpoint):
+```bash
+curl -X POST https://your-naysayer-domain.com/auto-rebase \
+  -H "Content-Type: application/json" \
+  -d '{
+    "object_kind": "push",
+    "ref": "refs/heads/main",
+    "project": {"id": 456}
+  }'
+```
+
+
+> **🧪 Development & Testing**: For comprehensive testing strategies and examples, see:
+> - [Development Setup Guide](DEVELOPMENT_SETUP.md) - General testing guide
 
 ## 🔐 **Security**
 

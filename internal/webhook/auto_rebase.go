@@ -192,9 +192,28 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 	failures := make([]map[string]interface{}, 0)
 
 	for _, mr := range eligibleMRs {
-		logging.Info("Attempting to rebase MR", zap.Int("mr_iid", mr.IID))
+		logging.Info("Attempting to rebase MR", zap.Int("mr_iid", mr.IID), zap.Int("behind_commits", mr.BehindCommitsCount))
 
-		err := h.gitlabClient.RebaseMR(projectID, mr.IID)
+		// Pre-check: Skip if already up-to-date
+		if mr.BehindCommitsCount == 0 {
+			logging.Info("MR is already up-to-date, skipping rebase", zap.Int("mr_iid", mr.IID))
+			continue
+		}
+
+		// Pre-check: Skip if has conflicts
+		if mr.HasConflicts || mr.MergeStatus == "cannot_be_merged" {
+			logging.Warn("MR has conflicts, skipping rebase",
+				zap.Int("mr_iid", mr.IID),
+				zap.String("merge_status", mr.MergeStatus))
+			failureCount++
+			failures = append(failures, map[string]interface{}{
+				"mr_iid": mr.IID,
+				"error":  fmt.Sprintf("rebase skipped: MR has merge conflicts (merge_status: %s)", mr.MergeStatus),
+			})
+			continue
+		}
+
+		success, actuallyRebased, err := h.gitlabClient.RebaseMR(projectID, mr.IID)
 		if err != nil {
 			logging.Warn("Failed to rebase MR", zap.Int("mr_iid", mr.IID), zap.Error(err))
 			failureCount++
@@ -202,16 +221,19 @@ func (h *FivetranTerraformRebaseHandler) handlePushToMain(c *fiber.Ctx, payload 
 				"mr_iid": mr.IID,
 				"error":  err.Error(),
 			})
-		} else {
-			logging.Info("Successfully triggered rebase for MR", zap.Int("mr_iid", mr.IID))
+		} else if success && actuallyRebased {
+			logging.Info("Successfully rebased MR", zap.Int("mr_iid", mr.IID))
 			successCount++
 
-			// Add comment to MR informing users about the automated rebase
+			// Only add comment if rebase was actually performed
 			commentBody := "🤖 **Automated Rebase**\n\nThis merge request has been automatically rebased with the latest changes from the target branch.\n\n_This is an automated action triggered by a push to the main branch._"
 			if commentErr := h.gitlabClient.AddMRComment(projectID, mr.IID, commentBody); commentErr != nil {
 				logging.Warn("Failed to add rebase comment to MR", zap.Int("mr_iid", mr.IID), zap.Error(commentErr))
-				// Don't fail the rebase if comment fails
 			}
+		} else if success && !actuallyRebased {
+			// Rebase API succeeded but no rebase was needed (already up-to-date)
+			logging.Info("Rebase not needed for MR (already up-to-date)", zap.Int("mr_iid", mr.IID))
+			// Don't count as success or failure, just skip
 		}
 	}
 

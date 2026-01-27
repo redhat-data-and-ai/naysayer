@@ -305,10 +305,10 @@ func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bo
 }
 
 // RebaseMR is a no-op for mock client (rebase functionality is not tested in e2e)
-func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) (bool, bool, error) {
 	// In e2e tests, we don't need to test rebase functionality
 	// Just return success
-	return nil
+	return true, true, nil
 }
 
 // ListOpenMRs is a stub for mock client
@@ -337,4 +337,61 @@ func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDet
 	}
 
 	return details, nil
+}
+
+// ListAllOpenMRsWithDetails lists all open merge requests (mock implementation)
+// Returns ALL open MRs without date filter (unlike ListOpenMRsWithDetails which filters to last 7 days)
+func (m *MockGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
+	// For this e2e mock, we return the same data since ListOpenMRs returns empty anyway.
+	// In a real scenario, this would return MRs older than 7 days as well.
+	return m.ListOpenMRsWithDetails(projectID)
+}
+
+// CloseMR closes a merge request (mock implementation)
+func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error {
+	// Mock implementation - just log the action
+	return nil
+}
+
+// FindCommentByPattern checks if a comment with the pattern exists (mock implementation)
+func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	// Mock implementation - check captured comments
+	for _, comment := range m.CapturedComments {
+		if comment.ProjectID == projectID && comment.MRIID == mrIID {
+			if strings.Contains(comment.Comment, pattern) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// GetPipelineJobs is a stub for mock client
+func (m *MockGitLabClient) GetPipelineJobs(projectID, pipelineID int) ([]gitlab.PipelineJob, error) {
+	// Return empty jobs for e2e tests
+	return []gitlab.PipelineJob{}, nil
+}
+
+// GetJobTrace is a stub for mock client
+func (m *MockGitLabClient) GetJobTrace(projectID, jobID int) (string, error) {
+	// Return empty trace for e2e tests
+	return "", nil
+}
+
+// FindLatestAtlantisComment is a stub for mock client
+func (m *MockGitLabClient) FindLatestAtlantisComment(projectID, mrIID int) (*gitlab.MRComment, error) {
+	// Return nil for e2e tests (no atlantis comments)
+	return nil, nil
+}
+
+// AreAllPipelineJobsSucceeded is a stub for mock client
+func (m *MockGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	// Return true for e2e tests (all jobs succeeded)
+	return true, nil
+}
+
+// CheckAtlantisCommentForPlanFailures is a stub for mock client
+func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	// Return false for e2e tests (no plan failures, allow rebase)
+	return false, ""
 }

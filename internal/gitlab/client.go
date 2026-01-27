@@ -336,6 +336,39 @@ func (c *Client) ResetNaysayerApproval(projectID, mrIID int) error {
 	}
 }
 
+// parseNextLink extracts the "next" page URL from GitLab's Link header
+// GitLab follows RFC 5988 format: <URL>; rel="next", <URL>; rel="prev"
+// Returns empty string if no next link exists
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
+	}
+
+	// Split by comma to handle multiple links
+	links := strings.Split(linkHeader, ",")
+
+	for _, link := range links {
+		link = strings.TrimSpace(link)
+
+		// Check if this is a "next" rel
+		if !strings.Contains(link, `rel="next"`) {
+			continue
+		}
+
+		// Extract URL from angle brackets
+		startIdx := strings.Index(link, "<")
+		endIdx := strings.Index(link, ">")
+
+		if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
+			continue
+		}
+
+		return link[startIdx+1 : endIdx]
+	}
+
+	return ""
+}
+
 // MRComment represents a GitLab merge request comment
 type MRComment struct {
 	ID        int                    `json:"id"`
@@ -345,40 +378,85 @@ type MRComment struct {
 	Author    map[string]interface{} `json:"author"`
 }
 
-// ListMRComments retrieves all comments for a merge request
+// ListMRComments retrieves all comments for a merge request with pagination support
 func (c *Client) ListMRComments(projectID, mrIID int) ([]MRComment, error) {
-	// Use a larger page size to get more comments (GitLab API supports up to 100 per page)
-	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
+	const maxPages = 20 // Safety limit to prevent infinite loops (20 pages = 2000 comments)
+
+	allComments := make([]MRComment, 0, 200) // Pre-allocate for typical case
+
+	// Initial URL with pagination params
+	nextURL := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/notes?sort=desc&order_by=created_at&per_page=100",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create list comments request: %w", err)
-	}
+	pageCount := 0
 
-	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	for nextURL != "" && pageCount < maxPages {
+		pageCount++
 
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list comments: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	switch resp.StatusCode {
-	case 200:
-		var comments []MRComment
-		if err := json.NewDecoder(resp.Body).Decode(&comments); err != nil {
-			return nil, fmt.Errorf("failed to decode comments response: %w", err)
+		// Create request
+		req, err := http.NewRequest("GET", nextURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create list comments request (page %d): %w", pageCount, err)
 		}
-		return comments, nil
-	case 401:
-		return nil, fmt.Errorf("list comments failed: insufficient permissions")
-	case 404:
-		return nil, fmt.Errorf("list comments failed: MR not found")
-	default:
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
+
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+
+		// Execute request
+		resp, err := c.http.Do(req)
+		if err != nil {
+			// First page failure is fatal
+			if pageCount == 1 {
+				return nil, fmt.Errorf("failed to list comments: %w", err)
+			}
+			// Subsequent page failures - log and return what we have
+			logging.Warn("Failed to fetch comment page %d for MR %d, returning %d comments", pageCount, mrIID, len(allComments))
+			return allComments, nil
+		}
+
+		// Handle HTTP status
+		switch resp.StatusCode {
+		case 200:
+			var pageComments []MRComment
+			err = json.NewDecoder(resp.Body).Decode(&pageComments)
+			_ = resp.Body.Close()
+			if err != nil {
+				if pageCount == 1 {
+					return nil, fmt.Errorf("failed to decode comments response: %w", err)
+				}
+				logging.Warn("Failed to decode comment page %d for MR %d, returning %d comments", pageCount, mrIID, len(allComments))
+				return allComments, nil
+			}
+
+			allComments = append(allComments, pageComments...)
+
+			// Extract next page URL from Link header
+			nextURL = parseNextLink(resp.Header.Get("Link"))
+
+		case 401:
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list comments failed: insufficient permissions")
+		case 404:
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list comments failed: MR not found")
+		default:
+			// For first page, return error. For subsequent pages, gracefully degrade
+			if pageCount == 1 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				return nil, fmt.Errorf("list comments failed with status %d: %s", resp.StatusCode, string(body))
+			}
+			_ = resp.Body.Close()
+			logging.Warn("Comment page %d failed with status %d for MR %d, returning %d comments", pageCount, resp.StatusCode, mrIID, len(allComments))
+			return allComments, nil
+		}
 	}
+
+	// Check if we hit the page limit
+	if pageCount >= maxPages && nextURL != "" {
+		logging.Warn("Reached max page limit (%d) for MR %d, returning %d comments", maxPages, mrIID, len(allComments))
+	}
+
+	return allComments, nil
 }
 
 // UpdateMRComment updates an existing comment on a merge request
@@ -546,14 +624,39 @@ func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, comment
 	return c.AddMRComment(projectID, mrIID, commentBody)
 }
 
-// RebaseMR triggers a rebase for a merge request
-func (c *Client) RebaseMR(projectID, mrIID int) error {
+// RebaseMR triggers a rebase for a merge request and verifies it completed successfully
+// Returns (success bool, actuallyRebased bool, error)
+// actuallyRebased indicates if the rebase was actually performed (false if already up-to-date or conflicts)
+func (c *Client) RebaseMR(projectID, mrIID int) (bool, bool, error) {
+	// Step 1: Check MR status before rebase to detect conflicts early
+	mrDetails, err := c.GetMRDetails(projectID, mrIID)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to get MR details before rebase: %w", err)
+	}
+
+	// Check if rebase is already in progress
+	if mrDetails.RebaseInProgress {
+		return false, false, fmt.Errorf("rebase already in progress for MR %d", mrIID)
+	}
+
+	// Check if MR has conflicts
+	if mrDetails.HasConflicts || mrDetails.MergeStatus == "cannot_be_merged" {
+		return false, false, fmt.Errorf("rebase failed: MR has merge conflicts (merge_status: %s)", mrDetails.MergeStatus)
+	}
+
+	// Check if rebase is needed
+	if mrDetails.BehindCommitsCount == 0 {
+		// Already up-to-date, no rebase needed
+		return true, false, nil
+	}
+
+	// Step 2: Trigger rebase
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/rebase",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte("{}")))
 	if err != nil {
-		return fmt.Errorf("failed to create rebase request: %w", err)
+		return false, false, fmt.Errorf("failed to create rebase request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.config.Token)
@@ -561,25 +664,82 @@ func (c *Client) RebaseMR(projectID, mrIID int) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to rebase MR: %w", err)
+		return false, false, fmt.Errorf("failed to rebase MR: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+
 	switch resp.StatusCode {
 	case 202:
-		return nil // Success - rebase accepted
+		// Rebase queued - now verify it completes successfully
+		// Wait for rebase to complete (with timeout)
+		actuallyRebased, verifyErr := c.verifyRebaseCompleted(projectID, mrIID)
+		if verifyErr != nil {
+			return false, false, fmt.Errorf("rebase verification failed: %w", verifyErr)
+		}
+		if !actuallyRebased {
+			return false, false, fmt.Errorf("rebase failed: conflicts detected or rebase could not complete")
+		}
+		return true, true, nil
 	case 403:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed: insufficient permissions or rebase not allowed: %s", string(body))
+		return false, false, fmt.Errorf("rebase failed: insufficient permissions or rebase not allowed: %s", bodyStr)
 	case 404:
-		return fmt.Errorf("rebase failed: MR not found")
+		return false, false, fmt.Errorf("rebase failed: MR not found")
 	case 409:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed: rebase already in progress or conflicts detected: %s", string(body))
+		// Conflicts detected synchronously
+		return false, false, fmt.Errorf("rebase failed: rebase already in progress or conflicts detected: %s", bodyStr)
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, string(body))
+		return false, false, fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, bodyStr)
 	}
+}
+
+// verifyRebaseCompleted polls the MR to verify rebase completed successfully
+// Returns (actuallyRebased bool, error)
+func (c *Client) verifyRebaseCompleted(projectID, mrIID int) (bool, error) {
+	maxAttempts := 30        // 30 attempts
+	delay := 2 * time.Second // 2 seconds between attempts = max 60 seconds wait
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		time.Sleep(delay)
+
+		mrDetails, err := c.GetMRDetails(projectID, mrIID)
+		if err != nil {
+			// If we can't fetch details, continue polling
+			logging.Warn("Failed to get MR details during rebase verification, retrying... MR: %d, Attempt: %d, Error: %v", mrIID, attempt+1, err)
+			continue
+		}
+
+		// Check if rebase is still in progress
+		if mrDetails.RebaseInProgress {
+			// Still rebasing, continue waiting
+			logging.Info("Rebase still in progress, waiting... MR: %d, Attempt: %d", mrIID, attempt+1)
+			continue
+		}
+
+		// Rebase completed - check if it was successful
+		// If behind_commits_count is now 0, rebase succeeded
+		// If conflicts were introduced, merge_status will be "cannot_be_merged"
+		if mrDetails.HasConflicts || mrDetails.MergeStatus == "cannot_be_merged" {
+			return false, fmt.Errorf("rebase completed but conflicts were introduced (merge_status: %s)", mrDetails.MergeStatus)
+		}
+
+		// Check if rebase actually happened (commits were added)
+		// If behind_commits_count decreased or is now 0, rebase succeeded
+		if mrDetails.BehindCommitsCount == 0 {
+			// Successfully rebased and up-to-date
+			return true, nil
+		}
+
+		// If we've waited long enough and rebase is not in progress but behind_commits_count
+		// hasn't changed, something went wrong
+		if attempt >= maxAttempts-1 {
+			return false, fmt.Errorf("rebase verification timeout: rebase completed but MR still behind (behind_commits_count: %d)", mrDetails.BehindCommitsCount)
+		}
+	}
+
+	return false, fmt.Errorf("rebase verification timeout: rebase still in progress after %d attempts", maxAttempts)
 }
 
 // ListOpenMRs returns a list of open MR IIDs for a project
@@ -657,4 +817,328 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 	}
 
 	return detailedMRs, nil
+}
+
+// ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
+// This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
+func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
+	var allMRs []MRDetails
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests?state=opened&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID)
+
+	for url != "" {
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create list MRs request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list MRs: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("list MRs failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var mrs []MRDetails
+		err = json.NewDecoder(resp.Body).Decode(&mrs)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode MRs response: %w", err)
+		}
+
+		allMRs = append(allMRs, mrs...)
+
+		// Get next page URL from Link header using parseNextLink helper
+		url = parseNextLink(resp.Header.Get("Link"))
+	}
+
+	return allMRs, nil
+}
+
+// CloseMR closes a merge request
+func (c *Client) CloseMR(projectID, mrIID int) error {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	payload := map[string]string{
+		"state_event": "close",
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal close MR payload: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create close MR request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to close MR: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("close MR failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	logging.Info("Successfully closed MR !%d in project %d", mrIID, projectID)
+	return nil
+}
+
+// GetPipelineJobs retrieves all jobs for a pipeline
+func (c *Client) GetPipelineJobs(projectID, pipelineID int) ([]PipelineJob, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/pipelines/%d/jobs",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, pipelineID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipeline jobs request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pipeline jobs: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get pipeline jobs failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var jobs []PipelineJob
+	if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+		return nil, fmt.Errorf("failed to decode pipeline jobs response: %w", err)
+	}
+
+	return jobs, nil
+}
+
+// JobTrace represents the trace content from a GitLab job
+type JobTrace struct {
+	Content string `json:"content"`
+}
+
+// GetJobTrace retrieves the trace/logs for a specific job
+func (c *Client) GetJobTrace(projectID, jobID int) (string, error) {
+	url := fmt.Sprintf("%s/api/v4/projects/%d/jobs/%d/trace",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, jobID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create job trace request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get job trace: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get job trace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var trace JobTrace
+	if err := json.NewDecoder(resp.Body).Decode(&trace); err != nil {
+		return "", fmt.Errorf("failed to decode job trace response: %w", err)
+	}
+
+	return trace.Content, nil
+}
+
+// FindLatestAtlantisComment finds the latest comment from atlantis-bot
+func (c *Client) FindLatestAtlantisComment(projectID, mrIID int) (*MRComment, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	// Log all comments for debugging
+	logging.Info("Found %d comments for MR %d", len(comments), mrIID)
+	for i, comment := range comments {
+		if i < 5 { // Log first 5 comments for debugging
+			authorUsername := "unknown"
+			authorName := "unknown"
+			if username, ok := comment.Author["username"].(string); ok {
+				authorUsername = username
+			}
+			if name, ok := comment.Author["name"].(string); ok {
+				authorName = name
+			}
+			isAtlantis := c.isAtlantisBotComment(comment.Author)
+			bodyPreview := truncateString(comment.Body, 100)
+			logging.Info("Comment %d: author=%s/%s, is_atlantis=%v, preview=%s (MR %d)",
+				i, authorUsername, authorName, isAtlantis, bodyPreview, mrIID)
+		}
+	}
+
+	// Find the latest atlantis comment
+	// Comments are already sorted by created_at desc from ListMRComments
+	for _, comment := range comments {
+		// Check if comment is from atlantis-bot
+		if c.isAtlantisBotComment(comment.Author) {
+			logging.Info("Found atlantis comment for MR %d", mrIID)
+			return &comment, nil
+		}
+	}
+
+	logging.Info("No atlantis comment found in %d comments for MR %d", len(comments), mrIID)
+	return nil, nil // No atlantis comment found
+}
+
+// truncateString truncates a string to maxLen characters
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// isAtlantisBotComment checks if a comment is from atlantis-bot
+func (c *Client) isAtlantisBotComment(author map[string]interface{}) bool {
+	// Common atlantis bot username patterns
+	atlantisPatterns := []string{
+		"atlantis",
+		"atlatnis", // Common typo
+		"atlantis-bot",
+		"atlantisbot",
+		"atlatnisbot",
+	}
+
+	// Check username field (primary check)
+	if username, ok := author["username"].(string); ok {
+		usernameLower := strings.ToLower(username)
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(usernameLower, pattern) {
+				return true
+			}
+		}
+	}
+
+	// Check name field as fallback
+	if name, ok := author["name"].(string); ok {
+		nameLower := strings.ToLower(name)
+		for _, pattern := range atlantisPatterns {
+			if strings.Contains(nameLower, pattern) {
+				return true
+			}
+		}
+	}
+
+	// Check if author is a bot (some GitLab instances mark bots differently)
+	if bot, ok := author["bot"].(bool); ok && bot {
+		// If it's marked as a bot, check if username/name contains atlantis
+		if username, ok := author["username"].(string); ok {
+			usernameLower := strings.ToLower(username)
+			for _, pattern := range atlantisPatterns {
+				if strings.Contains(usernameLower, pattern) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// AreAllPipelineJobsSucceeded checks if all non-allow-failure jobs in a pipeline succeeded
+func (c *Client) AreAllPipelineJobsSucceeded(projectID, pipelineID int) (bool, error) {
+	jobs, err := c.GetPipelineJobs(projectID, pipelineID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get pipeline jobs: %w", err)
+	}
+
+	if len(jobs) == 0 {
+		// No jobs found, consider it as succeeded
+		return true, nil
+	}
+
+	// Check if all non-allow-failure jobs succeeded
+	for _, job := range jobs {
+		// Skip jobs that are allowed to fail
+		if job.AllowFailure {
+			continue
+		}
+
+		// Check job status
+		status := strings.ToLower(job.Status)
+		if status != "success" && status != "skipped" {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// CheckAtlantisCommentForPlanFailures checks the latest atlantis comment for plan failures
+// Returns (shouldSkip, reason) where:
+// - shouldSkip=true means rebase should be skipped
+// - reason explains why (e.g., "atlantis_plan_failed", "atlantis_plan_locked")
+// - If shouldSkip=false, reason will be empty or "atlantis_plan_locked"
+func (c *Client) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
+	atlantisComment, err := c.FindLatestAtlantisComment(projectID, mrIID)
+	if err != nil {
+		// If we can't find the comment, don't skip (safer to allow rebase)
+		return false, ""
+	}
+
+	if atlantisComment == nil {
+		// No atlantis comment found - if pipeline is failed, skip rebase to be safe
+		// (We can't determine if it's a state lock or real error without the comment)
+		return true, "atlantis_comment_not_found"
+	}
+
+	commentBody := strings.ToLower(atlantisComment.Body)
+
+	// Check if failure is due to state lock (which we can ignore)
+	// Only check for the specific Terraform state lock error message
+	// If it's state lock, allow rebase; otherwise, skip rebase
+	hasStateLock := strings.Contains(commentBody, "error acquiring the state lock")
+
+	if hasStateLock {
+		// State lock detected - this is temporary, allow rebase
+		return false, "atlantis_plan_locked"
+	}
+
+	// Not a state lock error - skip rebase
+	return true, "atlantis_plan_failed"
+}
+
+// FindCommentByPattern checks if a comment containing the specified pattern exists on an MR
+func (c *Client) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
+	comments, err := c.ListMRComments(projectID, mrIID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list comments: %w", err)
+	}
+
+	// Search through comments for the pattern
+	for _, comment := range comments {
+		if strings.Contains(comment.Body, pattern) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

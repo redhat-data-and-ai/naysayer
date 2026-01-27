@@ -28,7 +28,7 @@ type GitLabClient interface {
 	IsNaysayerBotAuthor(author map[string]interface{}) bool
 
 	// Rebase operations
-	RebaseMR(projectID, mrIID int) error
+	RebaseMR(projectID, mrIID int) (bool, bool, error) // Returns (success, actuallyRebased, error)
 	ListOpenMRs(projectID int) ([]int, error)
 	ListOpenMRsWithDetails(projectID int) ([]MRDetails, error)
 }
