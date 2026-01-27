@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,12 +30,16 @@ type MockRebaseGitLabClient struct {
 	}
 }
 
-func (m *MockRebaseGitLabClient) RebaseMR(projectID, mrIID int) error {
+func (m *MockRebaseGitLabClient) RebaseMR(projectID, mrIID int) (bool, bool, error) {
 	m.capturedRebaseMRs = append(m.capturedRebaseMRs, struct {
 		projectID int
 		mrIID     int
 	}{projectID, mrIID})
-	return m.rebaseError
+	if m.rebaseError != nil {
+		return false, false, m.rebaseError
+	}
+	// Default: assume rebase was needed and succeeded
+	return true, true, nil
 }
 
 func (m *MockRebaseGitLabClient) AddMRComment(projectID, mrIID int, comment string) error {
@@ -55,9 +60,13 @@ func (m *MockRebaseGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRD
 	// Return basic MR details for the mock
 	// This is called by ListOpenMRsWithDetails now
 	return &gitlab.MRDetails{
-		IID:       mrIID,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // 1 day ago
-		Pipeline:  &gitlab.MRPipeline{Status: "success"},
+		IID:                mrIID,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // 1 day ago
+		Pipeline:           &gitlab.MRPipeline{Status: "success"},
+		BehindCommitsCount: 1, // Default: 1 commit behind to allow rebase
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}, nil
 }
 
@@ -135,9 +144,13 @@ func (m *MockRebaseGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab
 		details = make([]gitlab.MRDetails, len(m.openMRs))
 		for i, mrIID := range m.openMRs {
 			details[i] = gitlab.MRDetails{
-				IID:       mrIID,
-				CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Created 1 day ago
-				Pipeline:  &gitlab.MRPipeline{Status: "success"},
+				IID:                mrIID,
+				CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Created 1 day ago
+				Pipeline:           &gitlab.MRPipeline{Status: "success"},
+				BehindCommitsCount: 1,
+				MergeStatus:        "can_be_merged",
+				RebaseInProgress:   false,
+				HasConflicts:       false,
 			}
 		}
 	}
@@ -194,20 +207,6 @@ func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, 
 	// Return true, "atlantis_comment_not_found" by default (no atlantis comment found, skip rebase)
 	// This matches the actual implementation behavior
 	return true, "atlantis_comment_not_found"
-}
-
-func (m *MockRebaseGitLabClient) ListAllOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
-	// Returns ALL open MRs without date filter (mocked as empty)
-	// This is used by stale MR cleanup to find MRs older than 27-30 days
-	return []gitlab.MRDetails{}, nil
-}
-
-func (m *MockRebaseGitLabClient) CloseMR(projectID, mrIID int) error {
-	return nil
-}
-
-func (m *MockRebaseGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
-	return false, nil
 }
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
@@ -586,33 +585,53 @@ func TestFivetranTerraformRebaseHandler_FilterEligibleMRs(t *testing.T) {
 	// Note: We only test with MRs created within 7 days, since older MRs
 	// are filtered at the GitLab API level via created_after parameter
 	recentMR := gitlab.MRDetails{
-		IID:       123,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // 1 day old
-		Pipeline:  &gitlab.MRPipeline{Status: "success"},
+		IID:                123,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // 1 day old
+		Pipeline:           &gitlab.MRPipeline{Status: "success"},
+		BehindCommitsCount: 1,
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}
 
 	runningPipelineMR := gitlab.MRDetails{
-		IID:       789,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		Pipeline:  &gitlab.MRPipeline{Status: "running"},
+		IID:                789,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+		Pipeline:           &gitlab.MRPipeline{Status: "running"},
+		BehindCommitsCount: 1,
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}
 
 	failedPipelineMR := gitlab.MRDetails{
-		IID:       101,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		Pipeline:  &gitlab.MRPipeline{Status: "failed"},
+		IID:                101,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+		Pipeline:           &gitlab.MRPipeline{Status: "failed"},
+		BehindCommitsCount: 1,
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}
 
 	pendingPipelineMR := gitlab.MRDetails{
-		IID:       102,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		Pipeline:  &gitlab.MRPipeline{Status: "pending"},
+		IID:                102,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+		Pipeline:           &gitlab.MRPipeline{Status: "pending"},
+		BehindCommitsCount: 1,
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}
 
 	noPipelineMR := gitlab.MRDetails{
-		IID:       103,
-		CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		Pipeline:  nil, // No pipeline
+		IID:                103,
+		CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+		Pipeline:           nil, // No pipeline
+		BehindCommitsCount: 1,
+		MergeStatus:        "can_be_merged",
+		RebaseInProgress:   false,
+		HasConflicts:       false,
 	}
 
 	tests := []struct {
@@ -685,9 +704,13 @@ func TestFivetranTerraformRebaseHandler_HandleWebhook_WithFilteredMRs(t *testing
 	mockClient := &MockRebaseGitLabClient{
 		openMRDetails: []gitlab.MRDetails{
 			{
-				IID:       123,
-				CreatedAt: time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Eligible
-				Pipeline:  &gitlab.MRPipeline{Status: "success"},
+				IID:                123,
+				CreatedAt:          time.Now().Add(-24 * time.Hour).Format(time.RFC3339), // Eligible
+				Pipeline:           &gitlab.MRPipeline{Status: "success"},
+				BehindCommitsCount: 1,
+				MergeStatus:        "can_be_merged",
+				RebaseInProgress:   false,
+				HasConflicts:       false,
 			},
 			{
 				IID:       789,

@@ -624,14 +624,39 @@ func (c *Client) AddOrUpdateMRComment(projectID, mrIID int, commentBody, comment
 	return c.AddMRComment(projectID, mrIID, commentBody)
 }
 
-// RebaseMR triggers a rebase for a merge request
-func (c *Client) RebaseMR(projectID, mrIID int) error {
+// RebaseMR triggers a rebase for a merge request and verifies it completed successfully
+// Returns (success bool, actuallyRebased bool, error)
+// actuallyRebased indicates if the rebase was actually performed (false if already up-to-date or conflicts)
+func (c *Client) RebaseMR(projectID, mrIID int) (bool, bool, error) {
+	// Step 1: Check MR status before rebase to detect conflicts early
+	mrDetails, err := c.GetMRDetails(projectID, mrIID)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to get MR details before rebase: %w", err)
+	}
+
+	// Check if rebase is already in progress
+	if mrDetails.RebaseInProgress {
+		return false, false, fmt.Errorf("rebase already in progress for MR %d", mrIID)
+	}
+
+	// Check if MR has conflicts
+	if mrDetails.HasConflicts || mrDetails.MergeStatus == "cannot_be_merged" {
+		return false, false, fmt.Errorf("rebase failed: MR has merge conflicts (merge_status: %s)", mrDetails.MergeStatus)
+	}
+
+	// Check if rebase is needed
+	if mrDetails.BehindCommitsCount == 0 {
+		// Already up-to-date, no rebase needed
+		return true, false, nil
+	}
+
+	// Step 2: Trigger rebase
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/rebase",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte("{}")))
 	if err != nil {
-		return fmt.Errorf("failed to create rebase request: %w", err)
+		return false, false, fmt.Errorf("failed to create rebase request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.config.Token)
@@ -639,25 +664,82 @@ func (c *Client) RebaseMR(projectID, mrIID int) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to rebase MR: %w", err)
+		return false, false, fmt.Errorf("failed to rebase MR: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+
 	switch resp.StatusCode {
 	case 202:
-		return nil // Success - rebase accepted
+		// Rebase queued - now verify it completes successfully
+		// Wait for rebase to complete (with timeout)
+		actuallyRebased, verifyErr := c.verifyRebaseCompleted(projectID, mrIID)
+		if verifyErr != nil {
+			return false, false, fmt.Errorf("rebase verification failed: %w", verifyErr)
+		}
+		if !actuallyRebased {
+			return false, false, fmt.Errorf("rebase failed: conflicts detected or rebase could not complete")
+		}
+		return true, true, nil
 	case 403:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed: insufficient permissions or rebase not allowed: %s", string(body))
+		return false, false, fmt.Errorf("rebase failed: insufficient permissions or rebase not allowed: %s", bodyStr)
 	case 404:
-		return fmt.Errorf("rebase failed: MR not found")
+		return false, false, fmt.Errorf("rebase failed: MR not found")
 	case 409:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed: rebase already in progress or conflicts detected: %s", string(body))
+		// Conflicts detected synchronously
+		return false, false, fmt.Errorf("rebase failed: rebase already in progress or conflicts detected: %s", bodyStr)
 	default:
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, string(body))
+		return false, false, fmt.Errorf("rebase failed with status %d: %s", resp.StatusCode, bodyStr)
 	}
+}
+
+// verifyRebaseCompleted polls the MR to verify rebase completed successfully
+// Returns (actuallyRebased bool, error)
+func (c *Client) verifyRebaseCompleted(projectID, mrIID int) (bool, error) {
+	maxAttempts := 30        // 30 attempts
+	delay := 2 * time.Second // 2 seconds between attempts = max 60 seconds wait
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		time.Sleep(delay)
+
+		mrDetails, err := c.GetMRDetails(projectID, mrIID)
+		if err != nil {
+			// If we can't fetch details, continue polling
+			logging.Warn("Failed to get MR details during rebase verification, retrying... MR: %d, Attempt: %d, Error: %v", mrIID, attempt+1, err)
+			continue
+		}
+
+		// Check if rebase is still in progress
+		if mrDetails.RebaseInProgress {
+			// Still rebasing, continue waiting
+			logging.Info("Rebase still in progress, waiting... MR: %d, Attempt: %d", mrIID, attempt+1)
+			continue
+		}
+
+		// Rebase completed - check if it was successful
+		// If behind_commits_count is now 0, rebase succeeded
+		// If conflicts were introduced, merge_status will be "cannot_be_merged"
+		if mrDetails.HasConflicts || mrDetails.MergeStatus == "cannot_be_merged" {
+			return false, fmt.Errorf("rebase completed but conflicts were introduced (merge_status: %s)", mrDetails.MergeStatus)
+		}
+
+		// Check if rebase actually happened (commits were added)
+		// If behind_commits_count decreased or is now 0, rebase succeeded
+		if mrDetails.BehindCommitsCount == 0 {
+			// Successfully rebased and up-to-date
+			return true, nil
+		}
+
+		// If we've waited long enough and rebase is not in progress but behind_commits_count
+		// hasn't changed, something went wrong
+		if attempt >= maxAttempts-1 {
+			return false, fmt.Errorf("rebase verification timeout: rebase completed but MR still behind (behind_commits_count: %d)", mrDetails.BehindCommitsCount)
+		}
+	}
+
+	return false, fmt.Errorf("rebase verification timeout: rebase still in progress after %d attempts", maxAttempts)
 }
 
 // ListOpenMRs returns a list of open MR IIDs for a project
@@ -736,6 +818,7 @@ func (c *Client) ListOpenMRsWithDetails(projectID int) ([]MRDetails, error) {
 
 	return detailedMRs, nil
 }
+
 // ListAllOpenMRsWithDetails lists all open merge requests for a project (no date filter)
 // This is used by the stale MR cleanup feature to find MRs that are 27-30+ days old
 func (c *Client) ListAllOpenMRsWithDetails(projectID int) ([]MRDetails, error) {

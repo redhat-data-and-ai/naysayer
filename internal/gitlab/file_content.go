@@ -110,15 +110,20 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 
 // MRDetails represents merge request details
 type MRDetails struct {
-	TargetBranch    string      `json:"target_branch"`
-	SourceBranch    string      `json:"source_branch"`
-	IID             int         `json:"iid"`
-	ProjectID       int         `json:"project_id"`        // Target project ID
-	SourceProjectID int         `json:"source_project_id"` // Source project ID (for cross-fork MRs)
-	TargetProjectID int         `json:"target_project_id"` // Target project ID (same as ProjectID)
-	CreatedAt       string      `json:"created_at"`        // ISO 8601 format timestamp
-	UpdatedAt       string      `json:"updated_at"`        // ISO 8601 format timestamp of last activity
-	Pipeline        *MRPipeline `json:"pipeline"`          // Pipeline info (can be nil if no pipeline)
+	TargetBranch         string      `json:"target_branch"`
+	SourceBranch         string      `json:"source_branch"`
+	IID                  int         `json:"iid"`
+	ProjectID            int         `json:"project_id"`             // Target project ID
+	SourceProjectID      int         `json:"source_project_id"`      // Source project ID (for cross-fork MRs)
+	TargetProjectID      int         `json:"target_project_id"`      // Target project ID (same as ProjectID)
+	CreatedAt            string      `json:"created_at"`             // ISO 8601 format timestamp
+	UpdatedAt            string      `json:"updated_at"`             // ISO 8601 format timestamp of last activity
+	Pipeline             *MRPipeline `json:"pipeline"`               // Pipeline info (can be nil if no pipeline)
+	BehindCommitsCount   int         `json:"behind_commits_count"`   // Number of commits behind target branch
+	DivergedCommitsCount int         `json:"diverged_commits_count"` // Number of diverged commits
+	MergeStatus          string      `json:"merge_status"`           // "can_be_merged", "cannot_be_merged", "checking", "unchecked"
+	RebaseInProgress     bool        `json:"rebase_in_progress"`     // True if rebase is currently in progress
+	HasConflicts         bool        `json:"has_conflicts"`          // True if MR has merge conflicts
 }
 
 // MRPipeline represents pipeline information for an MR

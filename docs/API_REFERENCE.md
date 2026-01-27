@@ -134,7 +134,7 @@ curl -X POST https://your-naysayer-domain.com/auto-rebase \
 | Field | Type | Description |
 |-------|------|-------------|
 | `mr_iid` | number | Merge request IID |
-| `reason` | string | Skip reason (`pipeline_running`, `pipeline_pending`, `pipeline_failed`, `pipeline_failed_atlantis_comment_not_found`, `pipeline_failed_atlantis_plan_failed`, `pipeline_jobs_failed`, `too_old`) |
+| `reason` | string | Skip reason (`pipeline_running`, `pipeline_pending`, `pipeline_failed`, `pipeline_failed_atlantis_comment_not_found`, `pipeline_failed_atlantis_plan_failed`, `pipeline_jobs_failed`, `too_old`, `has_conflicts`, `already_up_to_date`, `rebase_in_progress`) |
 | `pipeline_id` | number | Pipeline ID (if skipped due to pipeline status) |
 | `created_at` | string | MR creation date (if skipped due to age) |
 
@@ -146,12 +146,28 @@ curl -X POST https://your-naysayer-domain.com/auto-rebase \
 
 **Eligibility Criteria**:
 - MR must be created within the last **7 days**
+- MR must not have merge conflicts (`merge_status` must not be `cannot_be_merged`)
+- MR must not already be up-to-date (`behind_commits_count > 0`)
+- MR must not have a rebase in progress (`rebase_in_progress = false`)
 - MR pipeline status:
   - `success` → Rebase directly
   - `failed` → Check all jobs succeeded, then optionally check atlantis comments (if `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`)
   - `null` (no pipeline) → Rebase
 - MRs with `running` or `pending` pipelines are skipped
 - Only push events to `main` or `master` branches trigger rebase operations
+
+**Rebase Verification**:
+- After triggering a rebase, the system verifies that the rebase completed successfully:
+  - Polls the MR status until `rebase_in_progress = false` (max 60 seconds)
+  - Checks that no conflicts were introduced (`merge_status != cannot_be_merged`)
+  - Verifies that commits were actually added (`behind_commits_count` decreased or is 0)
+- Only posts success comment if rebase was actually performed
+- If conflicts are detected during or after rebase, the rebase is marked as failed
+
+**Conflict Detection**:
+- Pre-rebase: Checks `has_conflicts` and `merge_status` fields before attempting rebase
+- Post-rebase: Verifies no conflicts were introduced during the rebase operation
+- MRs with conflicts are skipped and reported in the `failures` array with error message: `"rebase skipped: MR has merge conflicts (merge_status: <status>)"`
 
 **Atlantis Comment Checking** (when `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`):
 - For failed pipelines with all jobs succeeded:

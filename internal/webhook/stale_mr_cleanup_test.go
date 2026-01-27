@@ -92,7 +92,9 @@ func (m *MockStaleMRClient) GetCurrentBotUsername() (string, error)           { 
 func (m *MockStaleMRClient) IsNaysayerBotAuthor(author map[string]interface{}) bool {
 	return false
 }
-func (m *MockStaleMRClient) RebaseMR(projectID, mrIID int) error { return nil }
+func (m *MockStaleMRClient) RebaseMR(projectID, mrIID int) (bool, bool, error) {
+	return true, true, nil
+}
 func (m *MockStaleMRClient) ListOpenMRs(projectID int) ([]int, error) {
 	return nil, nil
 }

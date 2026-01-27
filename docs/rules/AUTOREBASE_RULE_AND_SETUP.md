@@ -190,19 +190,25 @@ kubectl logs -f deployment/naysayer | grep -i "auto-rebase\|rebase"
 An MR is eligible for auto-rebase if **ALL** of the following are true:
 
 1. ✅ **Age**: Created within the last **7 days**
-2. ✅ **Pipeline Status**: 
+2. ✅ **No Conflicts**: MR does not have merge conflicts (`merge_status != cannot_be_merged`, `has_conflicts = false`)
+3. ✅ **Not Up-to-Date**: MR is behind target branch (`behind_commits_count > 0`)
+4. ✅ **No Rebase in Progress**: MR is not currently being rebased (`rebase_in_progress = false`)
+5. ✅ **Pipeline Status**: 
    - Pipeline is `success` → Rebase directly
    - Pipeline is `failed` → Check jobs and optionally atlantis comments (see below)
    - Pipeline is `null` (no pipeline) → Rebase
-3. ✅ **State**: MR is in `opened` state
+6. ✅ **State**: MR is in `opened` state
 
 ### Skip Conditions
 
 An MR is **skipped** (not rebased) if **ANY** of the following are true:
 
 1. ❌ **Too Old**: Created more than 7 days ago
-2. ❌ **Active Pipeline**: Pipeline status is `running` or `pending`
-3. ❌ **Failed Pipeline**: 
+2. ❌ **Has Conflicts**: MR has merge conflicts (`has_conflicts = true` or `merge_status = cannot_be_merged`)
+3. ❌ **Already Up-to-Date**: MR is already up-to-date with target branch (`behind_commits_count = 0`)
+4. ❌ **Rebase in Progress**: MR is currently being rebased (`rebase_in_progress = true`)
+5. ❌ **Active Pipeline**: Pipeline status is `running` or `pending`
+6. ❌ **Failed Pipeline**: 
    - If `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=false`: Skip all failed pipelines
    - If `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`: 
      - Skip if jobs failed
@@ -221,12 +227,20 @@ When `AUTO_REBASE_CHECK_ATLANTIS_COMMENTS=true`:
 
 1. **Webhook Trigger**: Push to `main`/`master` branch triggers webhook
 2. **MR Discovery**: System fetches all open MRs created in last 7 days
-3. **Filtering**: MRs are filtered based on:
+3. **Pre-Rebase Checks**: For each MR:
+   - Check if already up-to-date (`behind_commits_count = 0`) → Skip
+   - Check for conflicts (`has_conflicts` or `merge_status = cannot_be_merged`) → Skip
+   - Check if rebase in progress (`rebase_in_progress = true`) → Skip
+4. **Filtering**: MRs are filtered based on:
    - Pipeline status (success → rebase, failed → check jobs)
    - Job status (all jobs must succeed for failed pipelines)
    - Atlantis comments (if enabled, check for state lock vs plan errors)
-4. **Rebase**: Eligible MRs are rebased sequentially
-5. **Notification**: Successfully rebased MRs receive an automated comment
+5. **Rebase**: Eligible MRs are rebased sequentially
+6. **Rebase Verification**: After triggering rebase:
+   - Polls MR status until `rebase_in_progress = false` (max 60 seconds)
+   - Verifies no conflicts were introduced
+   - Confirms commits were actually added (`behind_commits_count` decreased or is 0)
+7. **Notification**: Only successfully rebased MRs (where commits were actually added) receive an automated comment
 
 ## 📋 Example Scenarios
 
@@ -382,6 +396,12 @@ curl -H "Authorization: Bearer $AUTO_REBASE_REPOSITORY_TOKEN" \
 
 **Solutions**:
 1. **Check MR mergeability**: Ensure MR can be rebased (no conflicts, not locked)
+   - The system now automatically checks for conflicts before attempting rebase
+   - MRs with conflicts are skipped and reported in the `failures` array
+2. **Check rebase verification**: If rebase is triggered but fails during verification:
+   - System polls for up to 60 seconds to verify rebase completed
+   - If conflicts are introduced during rebase, it's marked as failed
+   - Check logs for "rebase verification failed" messages
 2. **Verify branch permissions**: Ensure token has write access to repository
 3. **Check GitLab rate limits**: Verify you're not hitting API rate limits
 4. **Review error details**: Check `failures` array in webhook response

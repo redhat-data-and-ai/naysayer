@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
-	"github.com/stretchr/testify/assert"
 )
 
 // MockRuleManager for testing
@@ -502,8 +503,8 @@ func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bo
 	return false
 }
 
-func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error {
-	return nil
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) (bool, bool, error) {
+	return true, true, nil
 }
 
 func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) {
