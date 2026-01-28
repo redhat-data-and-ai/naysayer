@@ -233,6 +233,21 @@ func (a *Analyzer) compareWarehouses(filePath string, oldDP, newDP *DataProduct)
 		}
 	}
 
+	// Check for removed warehouses
+	for whType, oldSize := range oldWarehouses {
+		if _, exists := newWarehouses[whType]; !exists {
+			// Warehouse was removed - treat as a decrease (requires manual review)
+			if _, oldExists := WarehouseSizes[oldSize]; oldExists {
+				changes = append(changes, WarehouseChange{
+					FilePath:   fmt.Sprintf("%s (type: %s)", filePath, whType),
+					FromSize:   oldSize,
+					ToSize:     "", // Empty for removed warehouses
+					IsDecrease: true, // Removal is considered a decrease
+				})
+			}
+		}
+	}
+
 	return changes
 }
 

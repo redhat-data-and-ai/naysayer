@@ -9,7 +9,7 @@ expected:
   comment_contains:
     - "⚠️ **Manual review required**"
     - "TOC approval"
-    - "Warehouse configuration validated"
+    - "Warehouse size increase detected"
 
 mr_metadata:
   title: "Deploy new sales product with optimized warehouse configuration"

@@ -15,7 +15,7 @@ expected:
   comment_contains:
     - "⚠️ **Manual review required**"
     - "Warehouse size increase detected"
-    - "Warehouse configuration validated"
+    - "user warehouse"
 
 mr_metadata:
   title: "Scale up warehouse for increased load"

@@ -1,0 +1,23 @@
+---
+name: marketing
+kind: aggregated
+rover_group: dataverse-aggregate-marketing
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+- type: user
+  size: LARGE
+- type: service_account
+  size: LARGE
+service_account:
+  dbt: true
+tags:
+  data_product: marketing
+data_product_db:
+- database: marketing_db
+  presentation_schemas:
+  - name: marts
+    consumers: []
+

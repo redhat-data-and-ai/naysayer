@@ -8,7 +8,7 @@ expected:
 
   comment_contains:
     - "⚠️ **Manual review required**"
-    - "Warehouse size increase detected"
+    - "Warehouse size decrease detected"
 
 mr_metadata:
   title: "Rebalance warehouses - scale up analytics, scale down marketing"

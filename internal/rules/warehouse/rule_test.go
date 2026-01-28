@@ -27,9 +27,9 @@ func TestWarehouseRule_Name(t *testing.T) {
 func TestWarehouseRule_Description(t *testing.T) {
 	rule := NewRule(nil)
 	description := rule.Description()
-	assert.Contains(t, description, "warehouse size changes")
+	assert.Contains(t, description, "warehouse")
 	assert.Contains(t, description, "product.yaml")
-	assert.Contains(t, description, "Other sections handled by respective rules")
+	assert.Contains(t, description, "manual review")
 }
 
 func TestWarehouseRule_isWarehouseFile(t *testing.T) {
@@ -98,7 +98,8 @@ func TestWarehouseRule_ValidateLines_NoContext(t *testing.T) {
 		expectedResult shared.DecisionType
 		expectedReason string
 	}{
-		{"warehouse file without context", "dataproducts/analytics/product.yaml", shared.Approve, "simplified validation"},
+		// Without analyzer/context, warehouse files require manual review for safety
+		{"warehouse file without context", "dataproducts/analytics/product.yaml", shared.ManualReview, "Warehouse changes require manual review"},
 		{"non-warehouse file", "README.md", shared.Approve, "Not a warehouse file"},
 	}
 
@@ -140,14 +141,15 @@ func TestWarehouseRule_ValidateLines_WithContext(t *testing.T) {
 			expectedReasonPart: "Warehouse size increase detected",
 		},
 		{
-			name:     "warehouse size decrease - auto approve",
+			// All warehouse changes now require manual review (including decreases)
+			name:     "warehouse size decrease - requires manual review",
 			filePath: "dataproducts/analytics/product.yaml",
 			mockChanges: []WarehouseChange{
 				{FilePath: "dataproducts/analytics/product.yaml (type: user)", FromSize: "SMALL", ToSize: "XSMALL", IsDecrease: true},
 			},
 			mockError:          nil,
-			expectedResult:     shared.Approve,
-			expectedReasonPart: "Warehouse size decrease approved",
+			expectedResult:     shared.ManualReview,
+			expectedReasonPart: "Warehouse size decrease detected",
 		},
 		{
 			name:     "non-warehouse changes ignored",
@@ -168,6 +170,17 @@ func TestWarehouseRule_ValidateLines_WithContext(t *testing.T) {
 			mockError:          nil,
 			expectedResult:     shared.ManualReview,
 			expectedReasonPart: "New user warehouse: SMALL",
+		},
+		{
+			name:     "mixed warehouse changes - increase and decrease",
+			filePath: "dataproducts/analytics/product.yaml",
+			mockChanges: []WarehouseChange{
+				{FilePath: "dataproducts/analytics/product.yaml (type: user)", FromSize: "SMALL", ToSize: "MEDIUM", IsDecrease: false},
+				{FilePath: "dataproducts/analytics/product.yaml (type: loader)", FromSize: "LARGE", ToSize: "MEDIUM", IsDecrease: true},
+			},
+			mockError:          nil,
+			expectedResult:     shared.ManualReview,
+			expectedReasonPart: "Warehouse changes detected - manual review required",
 		},
 		{
 			name:               "analyzer error",
@@ -272,15 +285,16 @@ func TestWarehouseRule_SectionBasedScenarios(t *testing.T) {
 			expectedReasonPart: "No warehouse size changes detected",
 		},
 		{
-			name:        "warehouse size decrease - should be approved",
+			// All warehouse changes now require manual review (including decreases)
+			name:        "warehouse size decrease - requires manual review",
 			filePath:    "dataproducts/analytics/product.yaml",
 			fileContent: "name: analytics\nwarehouses:\n- type: user\n  size: SMALL\n",
 			mockChanges: []WarehouseChange{
 				{FilePath: "dataproducts/analytics/product.yaml (type: user)", FromSize: "MEDIUM", ToSize: "SMALL", IsDecrease: true},
 			},
 			expectCoverage:     true,
-			expectedDecision:   shared.Approve,
-			expectedReasonPart: "Warehouse size decrease approved",
+			expectedDecision:   shared.ManualReview,
+			expectedReasonPart: "Warehouse size decrease detected",
 		},
 		{
 			name:        "warehouse size increase - should require manual review",

@@ -10,6 +10,6 @@ One or more files require manual review
 **What was checked:**
 • ✅ Auto-approved: Product metadata changes are safe
 • ✅ Existing product.yaml file or not in critical environment - no TOC approval required
-• 🚫 Warehouse size increase detected: user warehouse: MEDIUM → LARGE
+• 🚫 Warehouse changes detected - manual review required: service_account warehouse decreased: SMALL → XSMALL, user warehouse increased: MEDIUM → LARGE
 
 </details>

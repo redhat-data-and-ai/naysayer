@@ -1,0 +1,15 @@
+name: "Warehouse addition with new entries"
+description: "Adding new warehouse entries (LARGE) to existing product should require manual review - analyzer detects as size increase due to map-based comparison"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Warehouse size increase detected"
+
+mr_metadata:
+  title: "Add LARGE warehouses to marketing"
+  author: "testuser"
+  source_branch: "feature/add-large-warehouses"
+  target_branch: "main"
