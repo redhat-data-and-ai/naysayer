@@ -1,11 +1,16 @@
-# String Masking Policy - Updated
+# Invalid masking policy - HASH_SHA1 before UNMASKED
 kind: MaskingPolicy
 name: analytics_pii_string_policy
 data_product: analytics
 datatype: string
 mask: "==MASKED=="
 cases:
-  - strategy: UNMASKED
+  - strategy: HASH_SHA1
     consumers:
       - kind: consumer_group
         name: dataverse-aggregate-analytics
+  - strategy: UNMASKED
+    consumers:
+      - kind: consumer_group
+        name: dataverse-source-analytics
+

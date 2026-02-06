@@ -1,4 +1,4 @@
-# String Masking Policy - Updated
+# Masking policy that will be deleted
 kind: MaskingPolicy
 name: analytics_pii_string_policy
 data_product: analytics
@@ -8,4 +8,5 @@ cases:
   - strategy: UNMASKED
     consumers:
       - kind: consumer_group
-        name: dataverse-aggregate-analytics
+        name: dataverse-source-analytics
+

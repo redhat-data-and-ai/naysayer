@@ -1,0 +1,18 @@
+name: "Invalid masking policy - HASH_SHA1 with float"
+description: "HASH_SHA1 strategy is only valid for string datatype, not float"
+
+expected:
+  decision: ManualReview
+  reason: "One or more files require manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "Masking policy validation failed"
+
+mr_metadata:
+  title: "Add masking policy with invalid strategy for float"
+  author: "testuser"
+  source_branch: "feature/add-hashsha1-float-masking"
+  target_branch: "main"
+

@@ -1,6 +1,6 @@
-# String Masking Policy - Updated
+# Invalid masking policy - uses hyphens instead of underscores
 kind: MaskingPolicy
-name: analytics_pii_string_policy
+name: analytics-pii-string-policy
 data_product: analytics
 datatype: string
 mask: "==MASKED=="
@@ -8,4 +8,5 @@ cases:
   - strategy: UNMASKED
     consumers:
       - kind: consumer_group
-        name: dataverse-aggregate-analytics
+        name: dataverse-source-analytics
+
