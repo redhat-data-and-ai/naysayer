@@ -56,8 +56,8 @@ var (
 	// Number/Integer mask format: valid integer (e.g., "8888", "-9", "0")
 	NumberMaskRegex = regexp.MustCompile(`^-?\d+$`)
 
-	// Consumer group naming: dataverse-(source|aggregate|consumer)-<dataproduct>(-<suffix>)?
-	ConsumerGroupRegex = regexp.MustCompile(`^dataverse-(source|aggregate|consumer)-[a-z0-9]{3,30}(-[a-z0-9]{3,50})?$`)
+	// Consumer group naming: dataverse-(source|aggregate|consumer|platform)-<dataproduct>(-<suffix>)?
+	ConsumerGroupRegex = regexp.MustCompile(`^dataverse-(source|aggregate|consumer|platform)-[a-z0-9]{3,30}(-[a-z0-9]{3,50})?$`)
 
 	// Service account naming: <dataproduct>_<tool>_<env>_appuser
 	ServiceAccountRegex = regexp.MustCompile(`^[a-z0-9]{3,30}_[a-z0-9]+_(sandbox|dev|preprod|prod|platformtest)_appuser$`)

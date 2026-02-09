@@ -230,7 +230,7 @@ func (v *Validator) validateConsumers(policy *MaskingPolicy, environment string,
 			switch kind {
 			case ConsumerKindGroup:
 				if !ConsumerGroupRegex.MatchString(name) {
-					result.AddError(fmt.Sprintf("cases[%d].consumers[%d].name", i, j), fmt.Sprintf("consumer_group name must follow pattern 'dataverse-(source|aggregate|consumer)-<dataproduct>(-<suffix>)?', found: %s", consumer.Name))
+					result.AddError(fmt.Sprintf("cases[%d].consumers[%d].name", i, j), fmt.Sprintf("consumer_group name must follow pattern 'dataverse-(source|aggregate|consumer|platform)-<dataproduct>(-<suffix>)?', found: %s", consumer.Name))
 				}
 			case ConsumerKindServiceAccount:
 				if !ServiceAccountRegex.MatchString(name) {

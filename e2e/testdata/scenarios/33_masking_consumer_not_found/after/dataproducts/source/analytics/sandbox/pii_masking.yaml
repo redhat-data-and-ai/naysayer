@@ -1,0 +1,12 @@
+# Masking policy with consumer group that does NOT exist in repository
+kind: MaskingPolicy
+name: analytics_pii_string_policy
+data_product: analytics
+datatype: string
+mask: "==MASKED=="
+cases:
+  - strategy: UNMASKED
+    consumers:
+      - kind: consumer_group
+        name: dataverse-source-nonexistent
+

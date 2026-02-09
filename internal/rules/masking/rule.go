@@ -9,10 +9,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// DefaultTargetBranch is the default branch to check for consumer existence
+const DefaultTargetBranch = "main"
+
 // Rule implements masking policy validation for *masking.yaml files
 type Rule struct {
 	client    gitlab.GitLabClient
 	validator *Validator
+	mrCtx     *shared.MRContext // Store MR context for consumer existence checks
 }
 
 // NewRule creates a new masking policy validation rule
@@ -21,6 +25,11 @@ func NewRule(client gitlab.GitLabClient) *Rule {
 		client:    client,
 		validator: NewValidator(),
 	}
+}
+
+// SetMRContext implements ContextAwareRule interface
+func (r *Rule) SetMRContext(mrCtx *shared.MRContext) {
+	r.mrCtx = mrCtx
 }
 
 // Name returns the rule identifier
@@ -69,7 +78,7 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 
 	// Parse the YAML content
 	policy, err := r.parseMaskingPolicy(fileContent)
-	if err != nil {
+	if err != nil || policy == nil {
 		return shared.ManualReview, fmt.Sprintf("Failed to parse masking policy YAML: %v", err)
 	}
 
@@ -79,8 +88,7 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 	}
 
 	// Extract data product and environment from file path
-	dataProductFromPath := r.extractDataProductFromPath(filePath)
-	environment := r.extractEnvironmentFromPath(filePath)
+	dataProductFromPath, environment := r.extractPathInfo(filePath)
 
 	// Validate the masking policy
 	validationResult := r.validator.Validate(policy, dataProductFromPath, environment)
@@ -88,6 +96,22 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 	if !validationResult.IsValid {
 		errorMessages := validationResult.GetErrorMessages()
 		return shared.ManualReview, fmt.Sprintf("Masking policy validation failed: %s", strings.Join(errorMessages, "; "))
+	}
+
+	// Check if all consumers exist in the repository
+	if r.client != nil && r.mrCtx != nil {
+		var missingConsumers []string
+		for _, c := range policy.Cases {
+			for _, consumer := range c.Consumers {
+				exists, reason := r.checkConsumerExists(consumer, environment)
+				if !exists {
+					missingConsumers = append(missingConsumers, reason)
+				}
+			}
+		}
+		if len(missingConsumers) > 0 {
+			return shared.ManualReview, fmt.Sprintf("Missing consumers: %s", strings.Join(missingConsumers, "; "))
+		}
 	}
 
 	return shared.Approve, "Masking policy validation passed - auto-approved"
@@ -124,11 +148,11 @@ func (r *Rule) parseMaskingPolicy(content string) (*MaskingPolicy, error) {
 	return &policy, nil
 }
 
-// extractDataProductFromPath extracts the data product name from the file path
+// extractPathInfo extracts data product and environment from the file path.
 // Path format: dataproducts/<type>/<dataproduct>/<env>/<filename>
 // Where type is: source, aggregate, or platform
-// Example: dataproducts/source/hellosource/sandbox/pii_masking.yaml -> "hellosource"
-func (r *Rule) extractDataProductFromPath(filePath string) string {
+// Example: dataproducts/source/hellosource/sandbox/pii_masking.yaml -> "hellosource", "sandbox"
+func (r *Rule) extractPathInfo(filePath string) (dataProduct, environment string) {
 	parts := strings.Split(filePath, "/")
 
 	// Look for "dataproducts" in the path
@@ -139,35 +163,111 @@ func (r *Rule) extractDataProductFromPath(filePath string) string {
 				// Verify parts[i+1] is a known type (source, aggregate, platform)
 				typeDir := strings.ToLower(parts[i+1])
 				if typeDir == "source" || typeDir == "aggregate" || typeDir == "platform" {
-					return strings.ToLower(parts[i+2])
+					return strings.ToLower(parts[i+2]), strings.ToLower(parts[i+3])
 				}
 			}
 		}
 	}
 
+	return "", ""
+}
+
+// checkConsumerExists checks if a consumer (group or service account) exists in the repository
+func (r *Rule) checkConsumerExists(consumer Consumer, environment string) (bool, string) {
+	kind := strings.ToLower(consumer.Kind)
+	name := strings.ToLower(consumer.Name)
+
+	switch kind {
+	case ConsumerKindGroup:
+		return r.checkGroupExists(name)
+	case ConsumerKindServiceAccount:
+		return r.checkServiceAccountExists(name, environment)
+	default:
+		// Unknown kind - let naming validation handle it
+		return true, ""
+	}
+}
+
+// checkGroupExists checks if a consumer group file exists in the repository
+// Group naming patterns:
+//   - Pattern 1: dataverse-(source|aggregate|platform)-<dataproduct>
+//     Example: dataverse-source-analytics, dataverse-aggregate-marketing
+//   - Pattern 2: dataverse-consumer-<dataproduct>-<suffix>
+//     Example: dataverse-consumer-analytics-marts, dataverse-consumer-sales-reports
+//
+// In both patterns, dataproduct is at position [2] when split by "-"
+// File location: dataproducts/<type>/<dataproduct>/groups/<group_name>.yaml
+func (r *Rule) checkGroupExists(groupName string) (bool, string) {
+	// Extract dataproduct from group name
+	dataProduct := r.extractDataProductFromGroupName(groupName)
+	if dataProduct == "" {
+		return false, fmt.Sprintf("Consumer group '%s' has invalid naming - cannot extract data product", groupName)
+	}
+
+	// Check all possible type directories (source, aggregate, platform)
+	// because we don't know which type the referenced dataproduct is
+	types := []string{"source", "aggregate", "platform"}
+
+	for _, dpType := range types {
+		filePath := fmt.Sprintf("dataproducts/%s/%s/groups/%s.yaml", dpType, dataProduct, groupName)
+		if r.fileExistsInRepo(filePath) {
+			return true, ""
+		}
+	}
+
+	return false, fmt.Sprintf("Consumer group '%s' not found in repository - expected at dataproducts/<type>/%s/groups/%s.yaml", groupName, dataProduct, groupName)
+}
+
+// checkServiceAccountExists checks if a service account file exists in the repository
+// File location: serviceaccounts/<env>/<sa_name>.yaml
+func (r *Rule) checkServiceAccountExists(saName, environment string) (bool, string) {
+	if environment == "" {
+		return false, fmt.Sprintf("Cannot verify service account '%s' - environment not detected from file path", saName)
+	}
+
+	filePath := fmt.Sprintf("serviceaccounts/%s/%s.yaml", environment, saName)
+	if r.fileExistsInRepo(filePath) {
+		return true, ""
+	}
+
+	return false, fmt.Sprintf("Service account '%s' not found in repository - expected at serviceaccounts/%s/%s.yaml", saName, environment, saName)
+}
+
+// extractDataProductFromGroupName extracts the data product name from a consumer group name
+// Pattern 1: dataverse-<source|aggregate|platform>-<dataproduct>
+// Pattern 2: dataverse-consumer-<dataproduct>-<martname>
+// In both patterns, dataproduct is at position [2] (3rd part)
+func (r *Rule) extractDataProductFromGroupName(groupName string) string {
+	parts := strings.Split(groupName, "-")
+	if len(parts) >= 3 {
+		return parts[2] // Always the 3rd part (index 2)
+	}
 	return ""
 }
 
-// extractEnvironmentFromPath extracts the environment from the file path
-// Path format: dataproducts/<type>/<dataproduct>/<env>/<filename>
-// Where type is: source, aggregate, or platform
-// Example: dataproducts/source/hellosource/sandbox/pii_masking.yaml -> "sandbox"
-func (r *Rule) extractEnvironmentFromPath(filePath string) string {
-	parts := strings.Split(filePath, "/")
-
-	// Look for "dataproducts" in the path
-	for i, part := range parts {
-		if strings.ToLower(part) == "dataproducts" {
-			// Need at least 4 parts after "dataproducts": <type>/<dataproduct>/<env>/<file>
-			if len(parts)-i-1 >= 4 {
-				// Verify parts[i+1] is a known type (source, aggregate, platform)
-				typeDir := strings.ToLower(parts[i+1])
-				if typeDir == "source" || typeDir == "aggregate" || typeDir == "platform" {
-					return strings.ToLower(parts[i+3])
-				}
-			}
-		}
+// fileExistsInRepo checks if a file exists in the repository using GitLab API
+func (r *Rule) fileExistsInRepo(filePath string) bool {
+	if r.client == nil || r.mrCtx == nil {
+		return true // If no client/context, skip existence check (validation only)
 	}
 
-	return ""
+	// Get target branch from MR info
+	targetBranch := DefaultTargetBranch
+	if r.mrCtx.MRInfo != nil && r.mrCtx.MRInfo.TargetBranch != "" {
+		targetBranch = r.mrCtx.MRInfo.TargetBranch
+	}
+
+	// Try to fetch the file from the repository
+	_, err := r.client.FetchFileContent(r.mrCtx.ProjectID, filePath, targetBranch)
+	if err != nil {
+		// Check if file exists in the current MR changes (being added in same MR)
+		for _, change := range r.mrCtx.Changes {
+			if strings.EqualFold(change.NewPath, filePath) && !change.DeletedFile {
+				return true // File is being added in this MR
+			}
+		}
+		return false
+	}
+
+	return true
 }
