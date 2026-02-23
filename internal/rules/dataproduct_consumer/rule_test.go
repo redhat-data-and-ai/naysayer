@@ -372,7 +372,9 @@ data_product_db:
 		t.Run(tt.name, func(t *testing.T) {
 			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
 
-			result := rule.fileContainsConsumersSection(tt.fileContent)
+			// Pre-parse the YAML content to match the new function signature
+			parsedContent := rule.parseYAMLContent(tt.fileContent)
+			result := rule.fileContainsConsumersSection(parsedContent)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -554,7 +556,9 @@ data_product_db:
 		t.Run(tt.name, func(t *testing.T) {
 			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
 
-			isSelfConsumer, name := rule.detectSelfConsumer(tt.filePath, tt.fileContent)
+			// Pre-parse the YAML content to match the new function signature
+			parsedContent := rule.parseYAMLContent(tt.fileContent)
+			isSelfConsumer, name := rule.detectSelfConsumer(tt.filePath, parsedContent)
 
 			assert.Equal(t, tt.expectedSelfConsumer, isSelfConsumer)
 			assert.Equal(t, tt.expectedName, name)
