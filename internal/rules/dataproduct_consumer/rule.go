@@ -43,6 +43,11 @@ func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent str
 	// Analyze the context for this file
 	context := r.analyzeFile(filePath, fileContent, lineRanges)
 
+	// Check for self-consumer configuration - this requires manual review
+	if context.IsSelfConsumer {
+		return shared.ManualReview, "Self-consumer detected: data product '" + context.SelfConsumerName + "' cannot be added as a consumer of itself - manual review required"
+	}
+
 	// Auto-approve consumer-only changes across all environments
 	// Data product owner approval is sufficient, no TOC approval required
 	if context.HasConsumers && context.IsConsumerOnly {
@@ -82,13 +87,21 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 // analyzeFile analyzes a file to determine if consumer rule applies
 func (r *DataProductConsumerRule) analyzeFile(filePath string, fileContent string, lineRanges []shared.LineRange) *ConsumerContext {
 	context := &ConsumerContext{
-		FilePath:       filePath,
-		Environment:    r.extractEnvironmentFromPath(filePath),
-		HasConsumers:   false,
-		IsConsumerOnly: false,
+		FilePath:         filePath,
+		Environment:      r.extractEnvironmentFromPath(filePath),
+		HasConsumers:     false,
+		IsConsumerOnly:   false,
+		IsSelfConsumer:   false,
+		SelfConsumerName: "",
 	}
 
-	// Check if file contains consumers section
+	// Check for self-consumer configuration FIRST (independent of HasConsumers)
+	// This uses extractConsumersFromContent which handles both full file and section content
+	isSelfConsumer, selfConsumerName := r.detectSelfConsumer(filePath, fileContent)
+	context.IsSelfConsumer = isSelfConsumer
+	context.SelfConsumerName = selfConsumerName
+
+	// Check if file contains consumers section (for consumer-only change detection)
 	context.HasConsumers = r.fileContainsConsumersSection(fileContent)
 	if !context.HasConsumers {
 		return context
@@ -126,6 +139,128 @@ func (r *DataProductConsumerRule) fileContainsConsumersSection(fileContent strin
 	}
 
 	return false
+}
+
+// detectSelfConsumer checks if the product is added as a consumer of itself
+// Returns (isSelfConsumer, productName) - only checks consumers with kind: data_product
+func (r *DataProductConsumerRule) detectSelfConsumer(filePath string, fileContent string) (bool, string) {
+	// Try to get product name from YAML 'name' field first (full file content)
+	var yamlContent map[string]interface{}
+	productName := ""
+	if err := yaml.Unmarshal([]byte(fileContent), &yamlContent); err == nil {
+		if name, ok := yamlContent["name"].(string); ok {
+			productName = name
+		}
+	}
+
+	// Fall back to extracting product name from file path
+	if productName == "" {
+		productName = r.extractProductNameFromPath(filePath)
+		if productName == "" {
+			return false, ""
+		}
+	}
+
+	// Check consumers for self-reference - handle both full file and section-only content
+	consumers := r.extractConsumersFromContent(fileContent)
+	for _, consumer := range consumers {
+		if consumerMap, ok := consumer.(map[string]interface{}); ok {
+			consumerName, _ := consumerMap["name"].(string)
+			consumerKind, _ := consumerMap["kind"].(string)
+			// Only flag as self-consumer if kind is data_product
+			if consumerName == productName && consumerKind == "data_product" {
+				return true, consumerName
+			}
+		}
+	}
+
+	return false, ""
+}
+
+// extractProductNameFromPath extracts the product name from the file path
+// Path format: dataproducts/<type>/<productname>/<env>/product.yaml
+func (r *DataProductConsumerRule) extractProductNameFromPath(filePath string) string {
+	// Normalize path separators
+	normalizedPath := strings.ReplaceAll(filePath, "\\", "/")
+	parts := strings.Split(normalizedPath, "/")
+
+	// Find "dataproducts" in the path and get the product name
+	// Format: dataproducts/<type>/<productname>/<env>/product.yaml
+	for i, part := range parts {
+		if part == "dataproducts" && i+3 < len(parts) {
+			// parts[i+1] = type (source, aggregate, platform)
+			// parts[i+2] = product name
+			return parts[i+2]
+		}
+	}
+
+	return ""
+}
+
+// extractConsumersFromContent extracts consumers from YAML content string
+// Handles both full file content and section-only content (data_product_db section)
+func (r *DataProductConsumerRule) extractConsumersFromContent(fileContent string) []interface{} {
+	var allConsumers []interface{}
+
+	// First, try to parse as a map (full file content or map-style data_product_db)
+	var yamlMap map[string]interface{}
+	if err := yaml.Unmarshal([]byte(fileContent), &yamlMap); err == nil {
+		// Check if data_product_db is an array (common format)
+		if dataProductDB, ok := yamlMap["data_product_db"].([]interface{}); ok {
+			allConsumers = r.extractConsumersFromDBArray(dataProductDB)
+		}
+		// Check if data_product_db is a map (alternative format)
+		if len(allConsumers) == 0 {
+			if dataProductDB, ok := yamlMap["data_product_db"].(map[string]interface{}); ok {
+				allConsumers = r.extractConsumersFromDBMap(dataProductDB)
+			}
+		}
+		// Check if this is section content that is a map with presentation_schemas directly
+		if len(allConsumers) == 0 {
+			allConsumers = r.extractConsumersFromDBMap(yamlMap)
+		}
+	}
+
+	// If no consumers found, try parsing as a direct array (section content)
+	// Section content format: [{ database: x, presentation_schemas: [{ consumers: [...] }] }]
+	if len(allConsumers) == 0 {
+		var yamlArray []interface{}
+		if err := yaml.Unmarshal([]byte(fileContent), &yamlArray); err == nil {
+			allConsumers = r.extractConsumersFromDBArray(yamlArray)
+		}
+	}
+
+	return allConsumers
+}
+
+// extractConsumersFromDBArray extracts consumers from the data_product_db array structure
+func (r *DataProductConsumerRule) extractConsumersFromDBArray(dbArray []interface{}) []interface{} {
+	var allConsumers []interface{}
+
+	for _, db := range dbArray {
+		if dbMap, ok := db.(map[string]interface{}); ok {
+			allConsumers = append(allConsumers, r.extractConsumersFromDBMap(dbMap)...)
+		}
+	}
+
+	return allConsumers
+}
+
+// extractConsumersFromDBMap extracts consumers from a data_product_db map structure
+func (r *DataProductConsumerRule) extractConsumersFromDBMap(dbMap map[string]interface{}) []interface{} {
+	var allConsumers []interface{}
+
+	if schemas, ok := dbMap["presentation_schemas"].([]interface{}); ok {
+		for _, schema := range schemas {
+			if schemaMap, ok := schema.(map[string]interface{}); ok {
+				if consumers, ok := schemaMap["consumers"].([]interface{}); ok {
+					allConsumers = append(allConsumers, consumers...)
+				}
+			}
+		}
+	}
+
+	return allConsumers
 }
 
 // areChangesConsumerOnly checks if only consumer-related lines are being modified

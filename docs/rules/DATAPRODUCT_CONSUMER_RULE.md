@@ -49,9 +49,54 @@ data_product_db:
 
 | **Condition** | **Decision** | **Reason** |
 |---------------|--------------|------------|
+| Self-consumer detected (product as consumer of itself) | ⚠️ **Manual Review** | Data product cannot consume itself |
 | Consumer-only changes in any environment | ✅ **Auto-approve** | Data product owner approval sufficient, no TOC needed |
 | Consumer + other field changes | 🔄 **Other Rules Apply** | Let other rules handle non-consumer changes |
 | Non-product files | ✅ **Auto-approve** | Rule doesn't apply |
+
+## 🚫 Self-Consumer Detection
+
+The rule automatically detects and blocks auto-approval when a data product is added as a consumer of itself.
+
+### What is a Self-Consumer?
+A self-consumer occurs when the product name matches a consumer name with `kind: data_product`:
+
+```yaml
+# ❌ BLOCKED: Self-consumer configuration
+name: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: analytics        # Same as product name!
+      kind: data_product       # With kind: data_product
+```
+
+### Why is Self-Consumer Blocked?
+1. **Logical Error**: A data product already has access to its own data
+2. **Circular Dependency**: Creates a self-referential loop in the data lineage
+3. **Configuration Mistake**: Usually indicates a copy-paste error or typo
+
+### What's NOT Blocked?
+The following are **NOT** considered self-consumers and will be auto-approved:
+- `kind: consumer_group` with same name (different semantic meaning)
+- `kind: service_account` with same name (service accounts have different naming)
+- Different product name as consumer (normal use case)
+
+```yaml
+# ✅ ALLOWED: consumer_group with similar name
+name: analytics
+consumers:
+  - name: dataverse-consumer-analytics-marts
+    kind: consumer_group
+
+# ✅ ALLOWED: Different data product as consumer  
+name: analytics
+consumers:
+  - name: journey
+    kind: data_product
+```
 
 ## ✅ Auto-Approval Scenarios
 
@@ -195,6 +240,23 @@ data_product_db:
 ```
 **Result**: ⚠️ Manual review required - Warehouse size increase triggers warehouse_rule
 
+### Scenario 6: Self-Consumer (Blocked)
+```yaml
+# File: dataproducts/aggregate/analytics/prod/product.yaml
+# Change: Adding analytics as consumer of itself
+name: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: dataverse-consumer-analytics-marts
+      kind: consumer_group
+    - name: analytics  # ❌ SELF-CONSUMER!
+      kind: data_product
+```
+**Result**: ⚠️ Manual review required - Self-consumer detected: data product 'analytics' cannot be added as a consumer of itself
+
 ## 📋 Governance & Compliance
 
 ### Why No TOC Approval?
@@ -315,6 +377,7 @@ consumers:
 | **Change Type** | **Rule** | **Approval** |
 |-----------------|----------|--------------|
 | Add consumer | Consumer Rule | ✅ Auto (DP Owner) |
+| Self-consumer (product as own consumer) | Consumer Rule | ⚠️ Manual (Blocked) |
 | New product in prod | TOC Rule | ⚠️ Manual (TOC) |
 | Warehouse increase | Warehouse Rule | ⚠️ Manual |
 | Documentation | Metadata Rule | ✅ Auto |
