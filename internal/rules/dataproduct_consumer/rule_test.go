@@ -707,3 +707,242 @@ data_product_db:
 		})
 	}
 }
+
+func TestDataProductConsumerRule_parseYAMLContent_EdgeCases(t *testing.T) {
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+
+	tests := []struct {
+		name      string
+		content   string
+		expectNil bool
+	}{
+		{
+			name:      "invalid YAML should return nil",
+			content:   "{{invalid yaml content",
+			expectNil: true,
+		},
+		{
+			name:      "empty string should return nil",
+			content:   "",
+			expectNil: true,
+		},
+		{
+			name:      "valid YAML should not return nil",
+			content:   "name: test",
+			expectNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := rule.parseYAMLContent(tt.content)
+			if tt.expectNil {
+				assert.Nil(t, result)
+			} else {
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+func TestDataProductConsumerRule_fileContainsConsumersSection_EdgeCases(t *testing.T) {
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		{
+			name:     "nil content should return false",
+			content:  "{{invalid",
+			expected: false,
+		},
+		{
+			name:     "array content (non-map) should return false",
+			content:  "- item1\n- item2",
+			expected: false,
+		},
+		{
+			name:     "map without data_product_db should return false",
+			content:  "name: test\nkind: aggregated",
+			expected: false,
+		},
+		{
+			name: "data_product_db with non-map entries should handle gracefully",
+			content: `data_product_db:
+- "string_entry"
+- 123`,
+			expected: false,
+		},
+		{
+			name: "presentation_schemas with non-map entries should handle gracefully",
+			content: `data_product_db:
+- database: test_db
+  presentation_schemas:
+  - "string_schema"`,
+			expected: false,
+		},
+		{
+			name: "schema without consumers key should return false",
+			content: `data_product_db:
+- database: test_db
+  presentation_schemas:
+  - name: marts
+    other_field: value`,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsedContent := rule.parseYAMLContent(tt.content)
+			result := rule.fileContainsConsumersSection(parsedContent)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDataProductConsumerRule_detectSelfConsumer_EdgeCases(t *testing.T) {
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+
+	tests := []struct {
+		name                 string
+		filePath             string
+		content              string
+		expectedSelfConsumer bool
+		expectedName         string
+	}{
+		{
+			name:     "consumers with non-map entries should be skipped",
+			filePath: "dataproducts/aggregate/analytics/prod/product.yaml",
+			content: `name: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - "string_consumer"
+    - 123`,
+			expectedSelfConsumer: false,
+			expectedName:         "",
+		},
+		{
+			name:     "consumer missing name field should not match",
+			filePath: "dataproducts/aggregate/analytics/prod/product.yaml",
+			content: `name: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - kind: data_product`,
+			expectedSelfConsumer: false,
+			expectedName:         "",
+		},
+		{
+			name:     "consumer missing kind field should not match",
+			filePath: "dataproducts/aggregate/analytics/prod/product.yaml",
+			content: `name: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: analytics`,
+			expectedSelfConsumer: false,
+			expectedName:         "",
+		},
+		{
+			name:                 "nil parsed content should return false",
+			filePath:             "dataproducts/aggregate/analytics/prod/product.yaml",
+			content:              "{{invalid yaml",
+			expectedSelfConsumer: false,
+			expectedName:         "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsedContent := rule.parseYAMLContent(tt.content)
+			isSelfConsumer, name := rule.detectSelfConsumer(tt.filePath, parsedContent)
+			assert.Equal(t, tt.expectedSelfConsumer, isSelfConsumer)
+			assert.Equal(t, tt.expectedName, name)
+		})
+	}
+}
+
+func TestDataProductConsumerRule_extractConsumersFromContent_EdgeCases(t *testing.T) {
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+
+	t.Run("nil content should return nil", func(t *testing.T) {
+		result := rule.extractConsumersFromContent(nil)
+		assert.Nil(t, result)
+	})
+
+	t.Run("non-map non-array content should return nil", func(t *testing.T) {
+		result := rule.extractConsumersFromContent("string content")
+		assert.Nil(t, result)
+	})
+
+	t.Run("integer content should return nil", func(t *testing.T) {
+		result := rule.extractConsumersFromContent(123)
+		assert.Nil(t, result)
+	})
+
+	t.Run("array content should be processed as DBArray", func(t *testing.T) {
+		content := `- database: test_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: consumer1
+      kind: data_product`
+		parsedContent := rule.parseYAMLContent(content)
+		result := rule.extractConsumersFromContent(parsedContent)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 1)
+	})
+}
+
+func TestDataProductConsumerRule_extractConsumersFromMap_EdgeCases(t *testing.T) {
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+
+	t.Run("data_product_db as map should be processed", func(t *testing.T) {
+		content := `data_product_db:
+  database: test_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: consumer1
+      kind: data_product`
+		parsedContent := rule.parseYAMLContent(content)
+		result := rule.extractConsumersFromContent(parsedContent)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 1)
+	})
+
+	t.Run("data_product_db with unexpected type should fallback to direct extraction", func(t *testing.T) {
+		content := `data_product_db: "string_value"
+presentation_schemas:
+- name: marts
+  consumers:
+  - name: consumer1
+    kind: data_product`
+		parsedContent := rule.parseYAMLContent(content)
+		result := rule.extractConsumersFromContent(parsedContent)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 1)
+	})
+
+	t.Run("map without data_product_db should check presentation_schemas directly", func(t *testing.T) {
+		content := `presentation_schemas:
+- name: marts
+  consumers:
+  - name: consumer1
+    kind: data_product`
+		parsedContent := rule.parseYAMLContent(content)
+		result := rule.extractConsumersFromContent(parsedContent)
+		assert.NotNil(t, result)
+		assert.Len(t, result, 1)
+	})
+}
