@@ -7,6 +7,8 @@ type GitLabClient interface {
 	FetchFileContent(projectID int, filePath, ref string) (*FileContent, error)
 	GetMRTargetBranch(projectID, mrIID int) (string, error)
 	GetMRDetails(projectID, mrIID int) (*MRDetails, error)
+	// ListDirectoryFiles lists files in a directory using GitLab Repository Tree API
+	ListDirectoryFiles(projectID int, dirPath, ref string) ([]RepositoryFile, error)
 
 	// MR changes
 	FetchMRChanges(projectID, mrIID int) ([]FileChange, error)

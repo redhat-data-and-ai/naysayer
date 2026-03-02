@@ -1,0 +1,8 @@
+kind: Tag
+name: analytics_pii
+description: String and Float tag for pii data masking
+data_product: analytics
+masking_policies:
+  - name: analytics_pii_string_policy
+allowed_values:
+  - default
