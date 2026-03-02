@@ -25,10 +25,3 @@ var (
 	// Examples: analytics_pii_string_policy, hellosource_restricted_float_policy
 	MaskingPolicyNameRegex = regexp.MustCompile(`^[a-z0-9]+(_[a-z0-9]+)*_(string|float|number)_policy$`)
 )
-
-// Regex pattern strings for error messages
-const (
-	TagNameRegexString           = `^[a-z0-9]{3,30}_[a-z0-9]+$`
-	DataProductRegexString       = `^[a-z0-9]{3,30}$`
-	MaskingPolicyNameRegexString = `^[a-z0-9]+(_[a-z0-9]+)*_(string|float|number)_policy$`
-)

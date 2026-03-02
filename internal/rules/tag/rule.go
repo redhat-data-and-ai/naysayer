@@ -216,6 +216,9 @@ func (r *Rule) checkMaskingPolicyExists(policyName, dpType, dataProduct, environ
 		}
 
 		// Check each masking file for the policy
+		// Note: This iterates through files and fetches content individually (N+1 pattern).
+		// GitLab API doesn't support batch content retrieval. In practice, data product
+		// directories typically contain few masking policy files, so this is acceptable.
 		for _, file := range files {
 			if file.Type != "blob" {
 				continue
