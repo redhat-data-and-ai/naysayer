@@ -8,11 +8,11 @@ One or more files require manual review
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
+• 🚫 Missing masking policies: Masking policy 'analytics_pii_string_policy' not found in repository; Masking policy 'analytics_pii_number_policy' not found in repository
 
 **Files without validation rules:**
 
 *No validation rules configured for this file type:*
 • `dataproducts/analytics/prod/pii_string_data_masking.yaml`
-• `dataproducts/analytics/prod/tag_pii_data_masking.yaml`
 
 </details>

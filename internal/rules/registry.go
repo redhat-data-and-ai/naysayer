@@ -9,6 +9,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/tag"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
 )
@@ -108,6 +109,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "consumer_access",
+	})
+
+	// Tag CR rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "tag_rule",
+		Description: "Auto-approves valid Tag CRs, requires manual review for invalid configurations or deletions",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return tag.NewRule(client)
+		},
+		Enabled:  true,
+		Category: "tag",
 	})
 
 }

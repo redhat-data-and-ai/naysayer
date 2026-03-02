@@ -447,3 +447,36 @@ func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID 
 	// Return false for e2e tests (no plan failures, allow rebase)
 	return false, ""
 }
+
+// ListDirectoryFiles lists files in a directory from the mock filesystem
+func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	// Determine which directory to read from based on branch
+	var baseDir string
+	if ref == m.targetBranch {
+		baseDir = m.beforeDir
+	} else {
+		baseDir = m.afterDir
+	}
+
+	fullPath := filepath.Join(baseDir, dirPath)
+	entries, err := os.ReadDir(fullPath)
+	if err != nil {
+		// Directory doesn't exist, return empty list
+		return []gitlab.RepositoryFile{}, nil
+	}
+
+	var files []gitlab.RepositoryFile
+	for _, entry := range entries {
+		fileType := "blob"
+		if entry.IsDir() {
+			fileType = "tree"
+		}
+		files = append(files, gitlab.RepositoryFile{
+			Name: entry.Name(),
+			Path: filepath.Join(dirPath, entry.Name()),
+			Type: fileType,
+		})
+	}
+
+	return files, nil
+}

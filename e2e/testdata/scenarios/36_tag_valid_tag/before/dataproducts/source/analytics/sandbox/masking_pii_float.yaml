@@ -1,0 +1,4 @@
+kind: MaskingPolicy
+name: analytics_pii_float_policy
+description: PII float masking for analytics
+data_product: analytics
