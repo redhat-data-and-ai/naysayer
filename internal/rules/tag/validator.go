@@ -88,7 +88,7 @@ func (v *Validator) validateKind(tag *Tag, result *ValidationResult) {
 // validateTagName checks the tag name follows the regex pattern
 func (v *Validator) validateTagName(tag *Tag, result *ValidationResult) {
 	if !TagNameRegex.MatchString(tag.Name) {
-		result.AddError("name", fmt.Sprintf("must follow pattern '%s' (e.g., 'analytics_pii'), found: %s", TagNameRegexString, tag.Name))
+		result.AddError("name", fmt.Sprintf("must follow pattern '%s' (e.g., 'analytics_pii'), found: %s", TagNameRegex.String(), tag.Name))
 	}
 }
 
@@ -106,7 +106,7 @@ func (v *Validator) validateTagNamePrefix(tag *Tag, result *ValidationResult) {
 // validateDataProductName checks the data product name follows the regex pattern
 func (v *Validator) validateDataProductName(tag *Tag, result *ValidationResult) {
 	if !DataProductRegex.MatchString(tag.DataProduct) {
-		result.AddError("data_product", fmt.Sprintf("must follow pattern '%s' (3-30 lowercase alphanumeric), found: %s", DataProductRegexString, tag.DataProduct))
+		result.AddError("data_product", fmt.Sprintf("must follow pattern '%s' (3-30 lowercase alphanumeric), found: %s", DataProductRegex.String(), tag.DataProduct))
 	}
 }
 
@@ -132,7 +132,7 @@ func (v *Validator) validateMaskingPolicies(tag *Tag, result *ValidationResult) 
 
 		// Validate name pattern
 		if !MaskingPolicyNameRegex.MatchString(policy.Name) {
-			result.AddError(fieldName, fmt.Sprintf("must follow pattern '<dataproduct>_<classification>_(string|float|number)_policy', found: %s", policy.Name))
+			result.AddError(fieldName, fmt.Sprintf("must follow pattern '%s', found: %s", MaskingPolicyNameRegex.String(), policy.Name))
 			continue
 		}
 

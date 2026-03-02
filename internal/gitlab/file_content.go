@@ -184,39 +184,58 @@ func (c *Client) GetMRDetails(projectID, mrIID int) (*MRDetails, error) {
 // ListDirectoryFiles lists files in a directory using GitLab Repository Tree API
 // GET /projects/:id/repository/tree?path=:path&ref=:ref
 func (c *Client) ListDirectoryFiles(projectID int, dirPath, ref string) ([]RepositoryFile, error) {
-	apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/tree?path=%s&ref=%s&per_page=100",
-		strings.TrimRight(c.config.BaseURL, "/"),
-		projectID,
-		url.QueryEscape(dirPath),
-		url.QueryEscape(ref))
+	var allFiles []RepositoryFile
+	page := 1
 
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create list directory request: %w", err)
+	for {
+		apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/tree?path=%s&ref=%s&per_page=100&page=%d",
+			strings.TrimRight(c.config.BaseURL, "/"),
+			projectID,
+			url.QueryEscape(dirPath),
+			url.QueryEscape(ref),
+			page)
+
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create list directory request: %w", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list directory: %w", err)
+		}
+
+		if resp.StatusCode == 404 {
+			_ = resp.Body.Close()
+			if page == 1 {
+				return []RepositoryFile{}, nil // Directory doesn't exist, return empty list
+			}
+			break // No more pages
+		}
+
+		if resp.StatusCode != 200 {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
+		}
+
+		var files []RepositoryFile
+		if err := json.NewDecoder(resp.Body).Decode(&files); err != nil {
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode directory listing: %w", err)
+		}
+		_ = resp.Body.Close()
+
+		allFiles = append(allFiles, files...)
+
+		if resp.Header.Get("X-Next-Page") == "" {
+			break
+		}
+		page++
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.config.Token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list directory: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == 404 {
-		return []RepositoryFile{}, nil // Directory doesn't exist, return empty list
-	}
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
-	}
-
-	var files []RepositoryFile
-	if err := json.NewDecoder(resp.Body).Decode(&files); err != nil {
-		return nil, fmt.Errorf("failed to decode directory listing: %w", err)
-	}
-
-	return files, nil
+	return allFiles, nil
 }
