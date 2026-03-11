@@ -245,17 +245,12 @@ func (r *DataProductConsumerRule) extractConsumersFromContent(parsedContent inte
 	}
 }
 
-// extractConsumersFromMap extracts consumers from a map structure
-// Handles both full file content with data_product_db key and direct section content
+// extractConsumersFromMap extracts consumers from a map structure (full file content)
+// All product.yaml files use array format for data_product_db
 func (r *DataProductConsumerRule) extractConsumersFromMap(yamlMap map[string]interface{}) []interface{} {
-	// Check if data_product_db exists - use type switch for clean handling
-	if dataProductDB, ok := yamlMap["data_product_db"]; ok {
-		switch db := dataProductDB.(type) {
-		case []interface{}:
-			return r.extractConsumersFromDBArray(db)
-		case map[string]interface{}:
-			return r.extractConsumersFromDBMap(db)
-		}
+	// Check if data_product_db exists and is an array (standard format)
+	if dataProductDB, ok := yamlMap["data_product_db"].([]interface{}); ok {
+		return r.extractConsumersFromDBArray(dataProductDB)
 	}
 
 	// No data_product_db key - check if this is section content with presentation_schemas directly

@@ -79,10 +79,10 @@ data_product_db:
 3. **Configuration Mistake**: Usually indicates a copy-paste error or typo
 
 ### What's NOT Blocked?
-The following are **NOT** considered self-consumers and will be auto-approved:
-- `kind: consumer_group` with same name (different semantic meaning)
-- `kind: service_account` with same name (service accounts have different naming)
-- Different product name as consumer (normal use case)
+The following are **NOT** considered self-consumers:
+- `kind: consumer_group` — consumer groups are allowed
+- `kind: service_account` — service accounts are allowed
+- Different data product name as consumer — normal cross data product access
 
 ```yaml
 # ✅ ALLOWED: consumer_group with similar name

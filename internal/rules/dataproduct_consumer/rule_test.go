@@ -907,9 +907,9 @@ func TestDataProductConsumerRule_extractConsumersFromContent_EdgeCases(t *testin
 func TestDataProductConsumerRule_extractConsumersFromMap_EdgeCases(t *testing.T) {
 	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
 
-	t.Run("data_product_db as map should be processed", func(t *testing.T) {
+	t.Run("data_product_db as array should be processed", func(t *testing.T) {
 		content := `data_product_db:
-  database: test_db
+- database: test_db
   presentation_schemas:
   - name: marts
     consumers:
