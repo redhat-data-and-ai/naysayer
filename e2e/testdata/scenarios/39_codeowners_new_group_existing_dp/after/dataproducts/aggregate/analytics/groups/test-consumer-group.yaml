@@ -1,0 +1,4 @@
+group_name: test-consumer-group
+approvers:
+  - approver1
+  - approver2

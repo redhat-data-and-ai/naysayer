@@ -1,0 +1,15 @@
+name: "CODEOWNERS changed without YAML changes"
+description: "Manual review required when CODEOWNERS is modified without corresponding YAML file changes"
+
+expected:
+  decision: ManualReview
+  reason: "manual review"
+  approved: false
+  comment_contains:
+    - "Manual review required"
+
+mr_metadata:
+  title: "Update CODEOWNERS directly"
+  author: "testuser"
+  source_branch: "feature/direct-codeowners-edit"
+  target_branch: "main"
