@@ -6,6 +6,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
@@ -108,6 +109,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "consumer_access",
+	})
+
+	// CODEOWNERS sync rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "codeowners_sync_rule",
+		Description: "Auto-approves CODEOWNERS changes that match developers.yaml or groups/*.yaml changes in the same MR",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return codeowners.NewCODEOWNERSSyncRule(client)
+		},
+		Enabled:  true,
+		Category: "codeowners",
 	})
 
 }

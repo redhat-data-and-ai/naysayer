@@ -1,0 +1,15 @@
+name: "CODEOWNERS sync - new data product"
+description: "Manual review required when new data product is created"
+
+expected:
+  decision: ManualReview
+  reason: "manual review"
+  approved: false
+  comment_contains:
+    - "Manual review required"
+
+mr_metadata:
+  title: "Create new data product"
+  author: "testuser"
+  source_branch: "feature/new-dp"
+  target_branch: "main"

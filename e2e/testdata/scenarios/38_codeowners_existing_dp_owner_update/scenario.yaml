@@ -1,0 +1,15 @@
+name: "CODEOWNERS sync - existing DP owner update"
+description: "Auto-approve CODEOWNERS when developers.yaml owners are updated for existing data product"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add new owner to analytics data product"
+  author: "testuser"
+  source_branch: "feature/add-owner"
+  target_branch: "main"
