@@ -125,17 +125,17 @@ files:
             enabled: true
         auto_approve: true
 
-  # Masking files - Low risk, can auto-approve
+  # Masking files - Validated with masking_policy_rule
   - name: "masking_files"
     path: "dataproducts/**/"
     filename: "*masking.{yaml,yml}"
     parser_type: yaml
-    enabled: false
+    enabled: true
     sections:
       - name: full_file
         yaml_path: .
         rule_configs:
-          - name: metadata_rule
+          - name: masking_policy_rule
             enabled: true
         auto_approve: true
 
