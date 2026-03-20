@@ -18,8 +18,10 @@ func DefaultDataProductConsumerConfig() *DataProductConsumerConfig {
 
 // ConsumerContext holds analysis context for consumer changes
 type ConsumerContext struct {
-	FilePath       string
-	Environment    string
-	HasConsumers   bool
-	IsConsumerOnly bool // Only consumer fields are being modified
+	FilePath         string
+	Environment      string
+	HasConsumers     bool
+	IsConsumerOnly   bool   // Only consumer fields are being modified
+	IsSelfConsumer   bool   // Product is added as consumer of itself
+	SelfConsumerName string // Name of the self-consumer (for error message)
 }
