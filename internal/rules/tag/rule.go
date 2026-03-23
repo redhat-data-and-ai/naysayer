@@ -128,7 +128,7 @@ func (r *Rule) isTagFile(filePath string, fileContent string) bool {
 	}
 
 	// Must be in dataproducts directory
-	if !strings.Contains(lowerPath, "dataproducts/") {
+	if !strings.Contains(lowerPath, DirDataProducts+"/") {
 		return false
 	}
 
@@ -165,14 +165,14 @@ func (r *Rule) parseTag(content string) (*Tag, error) {
 func (r *Rule) extractPathInfo(filePath string) (dpType, dataProduct, environment string) {
 	parts := strings.Split(filePath, "/")
 
-	// Look for "dataproducts" in the path
+	// Look for dataproducts directory in the path
 	for i, part := range parts {
-		if strings.ToLower(part) == "dataproducts" {
-			// Need at least 4 parts after "dataproducts": <type>/<dataproduct>/<env>/<file>
+		if strings.EqualFold(part, DirDataProducts) {
+			// Need at least 4 parts after dataproducts: <type>/<dataproduct>/<env>/<file>
 			if len(parts)-i-1 >= 4 {
-				// Verify parts[i+1] is a known type (source, aggregate, platform)
+				// Verify parts[i+1] is a known type
 				typeDir := strings.ToLower(parts[i+1])
-				if typeDir == "source" || typeDir == "aggregate" || typeDir == "platform" {
+				if isValidDataProductType(typeDir) {
 					return typeDir, strings.ToLower(parts[i+2]), strings.ToLower(parts[i+3])
 				}
 			}
@@ -180,6 +180,16 @@ func (r *Rule) extractPathInfo(filePath string) (dpType, dataProduct, environmen
 	}
 
 	return "", "", ""
+}
+
+// isValidDataProductType checks if the type is a valid data product type
+func isValidDataProductType(t string) bool {
+	return t == TypeSource || t == TypeAggregate || t == TypePlatform
+}
+
+// getAllDataProductTypes returns all valid data product types
+func getAllDataProductTypes() []string {
+	return []string{TypeSource, TypeAggregate, TypePlatform}
 }
 
 // checkMaskingPolicyExists checks if a masking policy exists in the repository
@@ -203,11 +213,11 @@ func (r *Rule) checkMaskingPolicyExists(policyName, dpType, dataProduct, environ
 	// If dpType is empty, try all types
 	typesToCheck := []string{dpType}
 	if dpType == "" {
-		typesToCheck = []string{"source", "aggregate", "platform"}
+		typesToCheck = getAllDataProductTypes()
 	}
 
 	for _, checkType := range typesToCheck {
-		dirPath := fmt.Sprintf("dataproducts/%s/%s/%s", checkType, dataProduct, environment)
+		dirPath := fmt.Sprintf("%s/%s/%s/%s", DirDataProducts, checkType, dataProduct, environment)
 
 		// List files in the directory
 		files, err := r.client.ListDirectoryFiles(r.mrCtx.ProjectID, dirPath, targetBranch)
@@ -265,13 +275,30 @@ func (r *Rule) policyExistsInMRChanges(policyName, dataProduct string) bool {
 		if !strings.Contains(lowerPath, dataProduct) {
 			continue
 		}
-		// Check diff for policy name and kind
-		if strings.Contains(change.Diff, "kind: MaskingPolicy") &&
-			strings.Contains(change.Diff, "name: "+policyName) {
+		// Parse diff lines to find actual YAML key-value pairs
+		// This avoids false positives from comments or descriptions
+		if r.diffContainsMaskingPolicy(change.Diff, policyName) {
 			return true
 		}
 	}
 	return false
+}
+
+// diffContainsMaskingPolicy checks if diff contains a MaskingPolicy with specific name.
+// Checks YAML keys at line start to avoid false positives from comments/descriptions.
+func (r *Rule) diffContainsMaskingPolicy(diff, policyName string) bool {
+	hasKind := false
+	hasName := false
+	for _, line := range strings.Split(diff, "\n") {
+		trimmed := strings.TrimLeft(line, "+- \t")
+		if strings.HasPrefix(trimmed, "kind:") && strings.Contains(trimmed, MaskingPolicyKind) {
+			hasKind = true
+		}
+		if strings.HasPrefix(trimmed, "name:") && strings.Contains(trimmed, policyName) {
+			hasName = true
+		}
+	}
+	return hasKind && hasName
 }
 
 // fileContainsPolicy checks if a file content contains a specific masking policy name
@@ -283,65 +310,5 @@ func (r *Rule) fileContainsPolicy(content, policyName string) bool {
 	if err := yaml.Unmarshal([]byte(content), &parsed); err != nil {
 		return false
 	}
-	return parsed.Kind == "MaskingPolicy" && parsed.Name == policyName
-}
-
-// CheckDuplicateTagNames checks for duplicate tag names in the MR changes
-// Returns a list of duplicate tag names found
-func (r *Rule) CheckDuplicateTagNames() []string {
-	if r.mrCtx == nil {
-		return nil
-	}
-
-	tagNames := make(map[string]int)
-	var duplicates []string
-
-	for _, change := range r.mrCtx.Changes {
-		if change.DeletedFile {
-			continue
-		}
-		// Check if file looks like a tag file
-		lowerPath := strings.ToLower(change.NewPath)
-		if !strings.Contains(lowerPath, "dataproducts/") {
-			continue
-		}
-		if !strings.HasSuffix(lowerPath, ".yaml") && !strings.HasSuffix(lowerPath, ".yml") {
-			continue
-		}
-
-		// Try to extract tag name from diff
-		if strings.Contains(change.Diff, "kind: Tag") {
-			// Extract name from diff
-			name := r.extractTagNameFromDiff(change.Diff)
-			if name != "" {
-				tagNames[name]++
-			}
-		}
-	}
-
-	// Find duplicates
-	for name, count := range tagNames {
-		if count > 1 {
-			duplicates = append(duplicates, name)
-		}
-	}
-
-	return duplicates
-}
-
-// extractTagNameFromDiff extracts the tag name from a diff
-func (r *Rule) extractTagNameFromDiff(diff string) string {
-	lines := strings.Split(diff, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "+name:") || strings.HasPrefix(line, "name:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				name := strings.TrimSpace(parts[1])
-				name = strings.TrimPrefix(name, "+")
-				return strings.TrimSpace(name)
-			}
-		}
-	}
-	return ""
+	return parsed.Kind == MaskingPolicyKind && parsed.Name == policyName
 }
