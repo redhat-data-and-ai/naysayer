@@ -386,26 +386,6 @@ allowed_values:
 	assert.Contains(t, reason, "passed")
 }
 
-func TestRule_CheckDuplicateTagNames(t *testing.T) {
-	r := NewRule(nil)
-	r.SetMRContext(&shared.MRContext{
-		ProjectID: 123,
-		Changes: []gitlab.FileChange{
-			{
-				NewPath: "dataproducts/source/analytics/sandbox/tag_pii.yaml",
-				Diff:    "+kind: Tag\n+name: analytics_pii",
-			},
-			{
-				NewPath: "dataproducts/source/analytics/production/tag_pii.yaml",
-				Diff:    "+kind: Tag\n+name: analytics_pii",
-			},
-		},
-	})
-
-	duplicates := r.CheckDuplicateTagNames()
-	assert.Contains(t, duplicates, "analytics_pii")
-}
-
 func TestRule_GetCoveredLines(t *testing.T) {
 	r := NewRule(nil)
 

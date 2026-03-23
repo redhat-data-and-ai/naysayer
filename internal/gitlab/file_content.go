@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 )
 
 // FileContent represents a file's content from GitLab API
@@ -32,7 +34,7 @@ func (c *Client) FetchFileContent(projectID int, filePath, ref string) (*FileCon
 	url := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s?ref=%s",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, encodedPath, ref)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,13 +48,13 @@ func (c *Client) FetchFileContent(projectID int, filePath, ref string) (*FileCon
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("file not found: %s", filePath)
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("gitlab API error %d: %s", resp.StatusCode, string(body))
 	}
 
 	var fileContent FileContent
@@ -77,7 +79,7 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -91,9 +93,9 @@ func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("gitlab API error %d: %s", resp.StatusCode, string(body))
 	}
 
 	var mr struct {
@@ -154,7 +156,7 @@ func (c *Client) GetMRDetails(projectID, mrIID int) (*MRDetails, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -168,9 +170,9 @@ func (c *Client) GetMRDetails(projectID, mrIID int) (*MRDetails, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("gitlab API error %d: %s", resp.StatusCode, string(body))
 	}
 
 	var mrDetails MRDetails
@@ -186,16 +188,16 @@ func (c *Client) GetMRDetails(projectID, mrIID int) (*MRDetails, error) {
 func (c *Client) ListDirectoryFiles(projectID int, dirPath, ref string) ([]RepositoryFile, error) {
 	var allFiles []RepositoryFile
 	page := 1
+	baseURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/tree?path=%s&ref=%s&per_page=100",
+		strings.TrimRight(c.config.BaseURL, "/"),
+		projectID,
+		url.QueryEscape(dirPath),
+		url.QueryEscape(ref))
 
 	for {
-		apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/tree?path=%s&ref=%s&per_page=100&page=%d",
-			strings.TrimRight(c.config.BaseURL, "/"),
-			projectID,
-			url.QueryEscape(dirPath),
-			url.QueryEscape(ref),
-			page)
+		apiURL := fmt.Sprintf("%s&page=%d", baseURL, page)
 
-		req, err := http.NewRequest("GET", apiURL, nil)
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create list directory request: %w", err)
 		}
@@ -208,18 +210,19 @@ func (c *Client) ListDirectoryFiles(projectID int, dirPath, ref string) ([]Repos
 			return nil, fmt.Errorf("failed to list directory: %w", err)
 		}
 
-		if resp.StatusCode == 404 {
+		if resp.StatusCode == http.StatusNotFound {
 			_ = resp.Body.Close()
 			if page == 1 {
 				return []RepositoryFile{}, nil // Directory doesn't exist, return empty list
 			}
+			logging.Info("ListDirectoryFiles pagination ended with 404 at page %d for path: %s", page, dirPath)
 			break // No more pages
 		}
 
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
-			return nil, fmt.Errorf("GitLab API error %d: %s", resp.StatusCode, string(body))
+			return nil, fmt.Errorf("gitlab API error %d: %s", resp.StatusCode, string(body))
 		}
 
 		var files []RepositoryFile

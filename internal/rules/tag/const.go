@@ -5,10 +5,25 @@ import "regexp"
 // Kind constant
 const TagKind = "Tag"
 
+// MaskingPolicy kind constant
+const MaskingPolicyKind = "MaskingPolicy"
+
 // Allowed values constraints
 const (
 	MinAllowedValues = 1
 	MaxAllowedValues = 20
+)
+
+// Directory constants
+const (
+	DirDataProducts = "dataproducts"
+)
+
+// Data product type constants
+const (
+	TypeSource    = "source"
+	TypeAggregate = "aggregate"
+	TypePlatform  = "platform"
 )
 
 // Regex patterns for validation
