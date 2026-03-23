@@ -560,6 +560,10 @@ func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID 
 	return false, ""
 }
 
+func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	return []gitlab.RepositoryFile{}, nil
+}
+
 // Test empty MR detection
 func TestEvaluateRules_EmptyMR(t *testing.T) {
 	setupTestRulesFile(t)

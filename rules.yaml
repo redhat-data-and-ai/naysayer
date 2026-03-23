@@ -139,6 +139,20 @@ files:
             enabled: true
         auto_approve: true
 
+  # Tag CR files - Validates tag configurations
+  - name: "tag_files"
+    path: "dataproducts/**/"
+    filename: "*tag*.{yaml,yml}"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: tag_rule
+            enabled: true
+        auto_approve: true
+
 # STRICT POLICY ENFORCEMENT:
 # Any file type not explicitly configured above will require manual review by default.
 # This includes:
