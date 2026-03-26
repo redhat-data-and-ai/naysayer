@@ -136,9 +136,17 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	// Get unique file paths from changes
 	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
 
+	// Source branch files for fork MRs live on the fork project, not the target (same as warehouse analyzer).
+	sourceProjectID := srm.sourceProjectIDForMR(mrCtx)
+
 	for _, filePath := range filePaths {
 		// Get file content from source branch
-		fileContent := srm.getFileContent(filePath, mrCtx)
+		fileContent, fetchErr := srm.getFileContent(filePath, mrCtx, sourceProjectID)
+		if fetchErr != nil {
+			logging.Warn("Cannot load source-branch file for validation (requiring manual review): %s: %v", filePath, fetchErr)
+			fileValidations[filePath] = srm.createManualReviewValidation(filePath, 0, fmt.Sprintf("Could not load file from source branch: %v", fetchErr))
+			continue
+		}
 		totalLines := shared.CountLines(fileContent)
 
 		// Extract changed lines from the diff for delta validation
@@ -415,32 +423,43 @@ func (srm *SectionRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) [
 	return filePaths
 }
 
-func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
-	// Fetch full file content from source branch using GitLab client
+// sourceProjectIDForMR returns the GitLab project ID where the MR source branch exists.
+// For same-repository MRs this is mrCtx.ProjectID; for fork MRs it is the fork's project ID.
+func (srm *SectionRuleManager) sourceProjectIDForMR(mrCtx *shared.MRContext) int {
+	projectID := mrCtx.ProjectID
+	if srm.gitlabClient == nil {
+		return projectID
+	}
+	mrDetails, err := srm.gitlabClient.GetMRDetails(projectID, mrCtx.MRIID)
+	if err != nil {
+		logging.Warn("Failed to get MR details for source project resolution (MR %d): %v", mrCtx.MRIID, err)
+		return projectID
+	}
+	if mrDetails != nil && mrDetails.SourceProjectID != 0 && mrDetails.SourceProjectID != projectID {
+		logging.Info("Fork MR: source-branch file fetches use project %d (target project %d)", mrDetails.SourceProjectID, projectID)
+		return mrDetails.SourceProjectID
+	}
+	return projectID
+}
+
+func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext, sourceProjectID int) (string, error) {
 	if srm.gitlabClient == nil {
 		logging.Warn("GitLab client not available, cannot fetch file content for: %s", filePath)
-		return ""
+		return "", nil
 	}
-
-	// Get the source branch from MR context
+	if mrCtx.MRInfo == nil || mrCtx.MRInfo.SourceBranch == "" {
+		return "", fmt.Errorf("source branch not available in MR context")
+	}
 	sourceBranch := mrCtx.MRInfo.SourceBranch
-	if sourceBranch == "" {
-		logging.Warn("Source branch not available in MR context for file: %s", filePath)
-		return ""
-	}
-
-	// Fetch full file content from source branch
-	fileContent, err := srm.gitlabClient.FetchFileContent(mrCtx.ProjectID, filePath, sourceBranch)
+	fileContent, err := srm.gitlabClient.FetchFileContent(sourceProjectID, filePath, sourceBranch)
 	if err != nil {
-		logging.Warn("Failed to fetch file content for %s from branch %s: %v", filePath, sourceBranch, err)
-		return ""
+		logging.Warn("Failed to fetch file content for %s from project %d branch %s: %v", filePath, sourceProjectID, sourceBranch, err)
+		return "", err
 	}
-
 	if fileContent == nil {
-		return ""
+		return "", fmt.Errorf("empty response when fetching %s", filePath)
 	}
-
-	return fileContent.Content
+	return fileContent.Content, nil
 }
 
 // extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff
