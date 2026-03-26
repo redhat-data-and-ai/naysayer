@@ -109,6 +109,7 @@ func TestStrictPolicy_MixedFiles(t *testing.T) {
 	assert.Equal(t, shared.ManualReview, result.FinalDecision.Type)
 	assert.Contains(t, result.FinalDecision.Details, "V1__create.sql")
 	assert.Equal(t, 2, result.TotalFiles)
-	assert.Equal(t, 1, result.ApprovedFiles) // product.yaml should be approved
-	assert.Equal(t, 1, result.ReviewFiles)   // SQL file requires review
+	// Without a GitLab client, source-branch content cannot be loaded; every changed file requires manual review.
+	assert.Equal(t, 0, result.ApprovedFiles)
+	assert.Equal(t, 2, result.ReviewFiles)
 }
