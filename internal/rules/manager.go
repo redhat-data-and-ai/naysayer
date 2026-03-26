@@ -445,7 +445,7 @@ func (srm *SectionRuleManager) sourceProjectIDForMR(mrCtx *shared.MRContext) int
 func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext, sourceProjectID int) (string, error) {
 	if srm.gitlabClient == nil {
 		logging.Warn("GitLab client not available, cannot fetch file content for: %s", filePath)
-		return "", nil
+		return "", fmt.Errorf("GitLab client not available")
 	}
 	if mrCtx.MRInfo == nil || mrCtx.MRInfo.SourceBranch == "" {
 		return "", fmt.Errorf("source branch not available in MR context")
