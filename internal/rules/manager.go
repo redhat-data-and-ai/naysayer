@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -151,13 +152,14 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 
 		// Extract changed lines from the diff for delta validation
 		changedLines := srm.getChangedLinesForFile(filePath, mrCtx)
+		diffText := srm.getDiffForFile(filePath, mrCtx)
 
 		// Check if this file has section-based validation
 		parser := srm.getParserForFile(filePath)
 		if parser != nil {
 			logging.Info("Using section-based validation for file: %s", filePath)
 			// Use section-based validation with delta approach
-			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines)
+			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines, diffText)
 			fileValidations[filePath] = fileValidation
 		} else {
 			logging.Info("No parser found for file: %s - requiring manual review", filePath)
@@ -187,8 +189,17 @@ func (srm *SectionRuleManager) getChangedLinesForFile(filePath string, mrCtx *sh
 	return []shared.LineRange{}
 }
 
+func (srm *SectionRuleManager) getDiffForFile(filePath string, mrCtx *shared.MRContext) string {
+	for _, change := range mrCtx.Changes {
+		if change.NewPath == filePath {
+			return change.Diff
+		}
+	}
+	return ""
+}
+
 // validateFileWithSections validates a file using section-based approach with delta validation
-func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange) *shared.FileValidationSummary {
+func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange, diffText string) *shared.FileValidationSummary {
 	// Parse file into sections
 	sections, err := parser.ParseSections(filePath, fileContent)
 	if err != nil {
@@ -212,6 +223,20 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
 	}
 
+	if len(affectedSections) > 0 {
+		var names []string
+		for name := range affectedSections {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		logging.Info("Delta validation for %s affected sections: %s", filePath, strings.Join(names, ", "))
+	}
+
+	if !affectedSections["warehouses"] && diffMentionsWarehouses(diffText) {
+		affectedSections["warehouses"] = true
+		logging.Info("Delta validation for %s: warehouses section flagged as affected (diff heuristic)", filePath)
+	}
+
 	// Validate all sections (not just affected ones) to show complete rule evaluation
 	for _, section := range sections {
 		// Get enabled rules for this section
@@ -225,6 +250,43 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		for _, ruleResult := range sectionResult.RuleResults {
 			ruleResults = append(ruleResults, ruleResult)
 			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+		}
+	}
+
+	// Defense-in-depth: any changes touching the warehouses section must require manual review.
+	if affectedSections["warehouses"] {
+		var sawWarehouseRule bool
+		var sawWarehouseManual bool
+		for i := range ruleResults {
+			if ruleResults[i].RuleName != "warehouse_rule" {
+				continue
+			}
+			sawWarehouseRule = true
+			if ruleResults[i].Decision == shared.ManualReview {
+				sawWarehouseManual = true
+				break
+			}
+		}
+
+		if !sawWarehouseManual {
+			reason := "Warehouses section changed - manual review required"
+			if sawWarehouseRule {
+				for i := range ruleResults {
+					if ruleResults[i].RuleName == "warehouse_rule" {
+						ruleResults[i].Decision = shared.ManualReview
+						ruleResults[i].Reason = reason
+						ruleResults[i].WasEvaluated = true
+					}
+				}
+			} else {
+				ruleResults = append(ruleResults, shared.LineValidationResult{
+					RuleName:     "warehouse_rule",
+					LineRanges:   changedLines,
+					Decision:     shared.ManualReview,
+					Reason:       reason,
+					WasEvaluated: true,
+				})
+			}
 		}
 	}
 
@@ -243,6 +305,20 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		RuleResults:    ruleResults,
 		FileDecision:   fileDecision,
 	}
+}
+
+func diffMentionsWarehouses(diffText string) bool {
+	if diffText == "" {
+		return false
+	}
+
+	if strings.Contains(diffText, "\nwarehouses:") || strings.HasPrefix(diffText, "warehouses:") {
+		return true
+	}
+	if strings.Contains(diffText, "+warehouses:") || strings.Contains(diffText, "-warehouses:") {
+		return true
+	}
+	return false
 }
 
 // createManualReviewValidation creates a validation summary that requires manual review
@@ -560,6 +636,8 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 
 	var manualReviewFiles []string
 	var approvedFiles []string
+	var warehouseManualReasons []string
+	var hasUncoveredLines bool
 
 	// Collect file results
 	for _, fileValidation := range fileValidations {
@@ -567,6 +645,18 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			manualReviewFiles = append(manualReviewFiles, fileValidation.FilePath)
 		} else {
 			approvedFiles = append(approvedFiles, fileValidation.FilePath)
+		}
+
+		if fileValidation != nil && len(fileValidation.UncoveredLines) > 0 {
+			hasUncoveredLines = true
+		}
+
+		if fileValidation != nil {
+			for _, rr := range fileValidation.RuleResults {
+				if rr.RuleName == "warehouse_rule" && rr.Decision == shared.ManualReview {
+					warehouseManualReasons = append(warehouseManualReasons, rr.Reason)
+				}
+			}
 		}
 	}
 
@@ -577,12 +667,31 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			details += fmt.Sprintf(". Files auto-approved: %s", strings.Join(approvedFiles, ", "))
 		}
 
-		logging.Info("MR requires manual review due to %d uncovered files: %v",
-			len(manualReviewFiles), manualReviewFiles)
+		reason := "One or more files require manual review"
+		if len(warehouseManualReasons) > 0 {
+			reason = "Warehouse changes require manual review"
+			seen := make(map[string]bool)
+			var uniq []string
+			for _, r := range warehouseManualReasons {
+				if r == "" || seen[r] {
+					continue
+				}
+				seen[r] = true
+				uniq = append(uniq, r)
+			}
+			if len(uniq) > 0 {
+				details += fmt.Sprintf(". Warehouse: %s", strings.Join(uniq, " | "))
+			}
+		} else if hasUncoveredLines {
+			reason = "Uncovered changes require manual review"
+		}
+
+		logging.Info("MR requires manual review (files=%d, warehouse=%t, uncovered_lines=%t): %v",
+			len(manualReviewFiles), len(warehouseManualReasons) > 0, hasUncoveredLines, manualReviewFiles)
 
 		return shared.Decision{
 			Type:    shared.ManualReview,
-			Reason:  "One or more files require manual review",
+			Reason:  reason,
 			Summary: "⚠️ Manual review required",
 			Details: details,
 		}

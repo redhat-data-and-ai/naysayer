@@ -464,6 +464,13 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 
 	// Enhanced decision with WHY explanation
 	hasUncovered := mb.hasUncoveredFiles(result)
+	hasUncoveredLines := false
+	for _, fv := range result.FileValidations {
+		if fv != nil && len(fv.UncoveredLines) > 0 {
+			hasUncoveredLines = true
+			break
+		}
+	}
 
 	if hasUncovered {
 		summary.WriteString("**Why manual review is needed:**\n")
@@ -486,6 +493,33 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 	// Always show what was checked (rule results)
 	summary.WriteString("**What was checked:**\n")
 	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
+
+	if hasUncoveredLines {
+		summary.WriteString("\n**Uncovered changed lines (require manual review):**\n")
+
+		var filePaths []string
+		for filePath := range result.FileValidations {
+			filePaths = append(filePaths, filePath)
+		}
+		sort.Strings(filePaths)
+
+		for _, filePath := range filePaths {
+			fv := result.FileValidations[filePath]
+			if fv == nil || len(fv.UncoveredLines) == 0 {
+				continue
+			}
+
+			var ranges []string
+			for _, lr := range fv.UncoveredLines {
+				if lr.StartLine == lr.EndLine {
+					ranges = append(ranges, fmt.Sprintf("%d", lr.StartLine))
+				} else {
+					ranges = append(ranges, fmt.Sprintf("%d-%d", lr.StartLine, lr.EndLine))
+				}
+			}
+			summary.WriteString(fmt.Sprintf("• `%s`: %s\n", filePath, strings.Join(ranges, ", ")))
+		}
+	}
 
 	// If there are uncovered files, show them in a separate section
 	if hasUncovered {
