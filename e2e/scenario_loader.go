@@ -40,10 +40,11 @@ type ExpectedRule struct {
 
 // MRMetadata contains MR-specific metadata
 type MRMetadata struct {
-	Title        string
-	Author       string
-	SourceBranch string
-	TargetBranch string
+	Title               string
+	Author              string
+	SourceBranch        string
+	TargetBranch        string
+	ForkSourceProjectID int // When non-zero, simulates fork MR (source branch only on this GitLab project ID)
 }
 
 // ScenarioYAML represents the YAML format for scenario.yaml
@@ -63,10 +64,11 @@ type ScenarioYAML struct {
 		CommentContains []string `yaml:"comment_contains"`
 	} `yaml:"expected"`
 	MRMetadata struct {
-		Title        string `yaml:"title"`
-		Author       string `yaml:"author"`
-		SourceBranch string `yaml:"source_branch"`
-		TargetBranch string `yaml:"target_branch"`
+		Title               string `yaml:"title"`
+		Author              string `yaml:"author"`
+		SourceBranch        string `yaml:"source_branch"`
+		TargetBranch        string `yaml:"target_branch"`
+		ForkSourceProjectID int    `yaml:"fork_source_project_id"`
 	} `yaml:"mr_metadata"`
 }
 
@@ -129,10 +131,11 @@ func LoadScenario(scenarioDir string) (*ScenarioConfig, error) {
 			CommentFile:     filepath.Join(scenarioDir, "expected_comment.txt"),
 		},
 		MRMetadata: MRMetadata{
-			Title:        scenarioYAML.MRMetadata.Title,
-			Author:       scenarioYAML.MRMetadata.Author,
-			SourceBranch: scenarioYAML.MRMetadata.SourceBranch,
-			TargetBranch: scenarioYAML.MRMetadata.TargetBranch,
+			Title:               scenarioYAML.MRMetadata.Title,
+			Author:              scenarioYAML.MRMetadata.Author,
+			SourceBranch:        scenarioYAML.MRMetadata.SourceBranch,
+			TargetBranch:        scenarioYAML.MRMetadata.TargetBranch,
+			ForkSourceProjectID: scenarioYAML.MRMetadata.ForkSourceProjectID,
 		},
 	}
 
