@@ -300,6 +300,66 @@ func TestCODEOWNERSSyncRule_ValidateLines_NewGroupInNewDP(t *testing.T) {
 	assert.Contains(t, reason, "New group in new data product")
 }
 
+func TestCODEOWNERSSyncRule_ValidateLines_ExtraUnexpectedEntry(t *testing.T) {
+	mock := NewMockGitLabClient()
+	mock.SetFileContent("feature", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners:\n    - alice\n    - bob")
+	mock.SetFileContent("main", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners: [old]")
+
+	rule := NewCODEOWNERSSyncRule(mock)
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID: 1, MRIID: 1,
+		Changes: []gitlab.FileChange{
+			{NewPath: "CODEOWNERS", Diff: "+/dataproducts/aggregate/dp/ @alice @bob\n+* @mallory"},
+			{NewPath: "dataproducts/aggregate/dp/developers.yaml", NewFile: false},
+		},
+		MRInfo: &gitlab.MRInfo{SourceBranch: "feature", TargetBranch: "main"},
+	})
+
+	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
+	assert.Equal(t, shared.ManualReview, decision)
+	assert.Contains(t, reason, "Unexpected CODEOWNERS entry")
+}
+
+func TestCODEOWNERSSyncRule_ValidateLines_OrphanDeletion(t *testing.T) {
+	mock := NewMockGitLabClient()
+	mock.SetFileContent("feature", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners:\n    - alice\n    - bob")
+	mock.SetFileContent("main", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners: [old]")
+
+	rule := NewCODEOWNERSSyncRule(mock)
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID: 1, MRIID: 1,
+		Changes: []gitlab.FileChange{
+			{NewPath: "CODEOWNERS", Diff: "+/dataproducts/aggregate/dp/ @alice @bob\n-/serviceaccounts/ @platformadmin"},
+			{NewPath: "dataproducts/aggregate/dp/developers.yaml", NewFile: false},
+		},
+		MRInfo: &gitlab.MRInfo{SourceBranch: "feature", TargetBranch: "main"},
+	})
+
+	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
+	assert.Equal(t, shared.ManualReview, decision)
+	assert.Contains(t, reason, "Unrelated CODEOWNERS deletion")
+}
+
+func TestCODEOWNERSSyncRule_ValidateLines_ValidModification(t *testing.T) {
+	mock := NewMockGitLabClient()
+	mock.SetFileContent("feature", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners:\n    - bob")
+	mock.SetFileContent("main", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners: [alice, bob]")
+
+	rule := NewCODEOWNERSSyncRule(mock)
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID: 1, MRIID: 1,
+		Changes: []gitlab.FileChange{
+			{NewPath: "CODEOWNERS", Diff: "-/dataproducts/aggregate/dp/ @alice @bob\n+/dataproducts/aggregate/dp/ @bob"},
+			{NewPath: "dataproducts/aggregate/dp/developers.yaml", NewFile: false},
+		},
+		MRInfo: &gitlab.MRInfo{SourceBranch: "feature", TargetBranch: "main"},
+	})
+
+	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
+	assert.Equal(t, shared.Approve, decision)
+	assert.Contains(t, reason, "Auto-approved")
+}
+
 func TestCODEOWNERSSyncRule_GetCoveredLines(t *testing.T) {
 	rule := NewCODEOWNERSSyncRule(nil)
 

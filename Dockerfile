@@ -8,8 +8,8 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
 RUN microdnf install -y tar gzip ca-certificates
 
 # Install Go
-RUN curl -OL https://go.dev/dl/go1.25.8.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.25.8.linux-amd64.tar.gz
+RUN curl -OL https://go.dev/dl/go1.25.9.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.25.9.linux-amd64.tar.gz
 
 WORKDIR /app
 

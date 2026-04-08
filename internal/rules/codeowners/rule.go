@@ -65,6 +65,11 @@ func (r *CODEOWNERSSyncRule) ValidateLines(filePath string, fileContent string, 
 		return r.CreateManualReviewResult(reason)
 	}
 
+	// Check for orphan deletions (deletions without corresponding additions)
+	if reason := r.checkOrphanDeletions(mrCtx, filePath); reason != "" {
+		return r.CreateManualReviewResult(reason)
+	}
+
 	return r.CreateApprovalResult("Auto-approved: CODEOWNERS changes match YAML changes")
 }
 
@@ -126,8 +131,8 @@ func (r *CODEOWNERSSyncRule) parseDevelopersYAML(mrCtx *shared.MRContext, change
 
 // parseGroupYAML parses a groups/*.yaml change
 func (r *CODEOWNERSSyncRule) parseGroupYAML(mrCtx *shared.MRContext, change gitlab.FileChange) *YAMLChangeInfo {
-	if !strings.Contains(change.NewPath, "/groups/") ||
-		!strings.HasPrefix(change.NewPath, "dataproducts/") ||
+	if !strings.HasPrefix(change.NewPath, "dataproducts/") ||
+		!strings.Contains(change.NewPath, "/groups/") ||
 		(!strings.HasSuffix(change.NewPath, ".yaml") && !strings.HasSuffix(change.NewPath, ".yml")) {
 		return nil
 	}
@@ -241,6 +246,42 @@ func (r *CODEOWNERSSyncRule) parseAddedCODEOWNERSEntries(mrCtx *shared.MRContext
 	return entries
 }
 
+// checkOrphanDeletions checks for CODEOWNERS deletions that don't have corresponding additions
+func (r *CODEOWNERSSyncRule) checkOrphanDeletions(mrCtx *shared.MRContext, filePath string) string {
+	addedPaths := make(map[string]bool)
+	var deletedPaths []string
+
+	for _, change := range mrCtx.Changes {
+		if change.NewPath != filePath {
+			continue
+		}
+
+		for _, line := range strings.Split(change.Diff, "\n") {
+			// Track added paths
+			if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+				if entry := r.parseCODEOWNERSLine(strings.TrimPrefix(line, "+")); entry != nil {
+					addedPaths[entry.Path] = true
+				}
+			}
+			// Track deleted paths
+			if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "--") {
+				if entry := r.parseCODEOWNERSLine(strings.TrimPrefix(line, "-")); entry != nil {
+					deletedPaths = append(deletedPaths, entry.Path)
+				}
+			}
+		}
+		break
+	}
+
+	// Check for orphan deletions (deleted paths without corresponding additions)
+	for _, deletedPath := range deletedPaths {
+		if !addedPaths[deletedPath] {
+			return "Unrelated CODEOWNERS deletion requires manual review: " + deletedPath
+		}
+	}
+	return ""
+}
+
 // parseCODEOWNERSLine parses a single CODEOWNERS line
 func (r *CODEOWNERSSyncRule) parseCODEOWNERSLine(line string) *CODEOWNERSEntry {
 	line = strings.TrimSpace(line)
@@ -318,9 +359,9 @@ func (r *CODEOWNERSSyncRule) validateEntriesMatch(expected, added []CODEOWNERSEn
 		}
 	}
 
-	// Check for extra data product entries
+	// Check for any extra unmatched entries
 	for i, add := range added {
-		if !matched[i] && strings.HasPrefix(add.Path, "/dataproducts/") {
+		if !matched[i] {
 			return "Unexpected CODEOWNERS entry: " + add.Path
 		}
 	}
