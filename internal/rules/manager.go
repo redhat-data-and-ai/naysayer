@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -136,20 +137,29 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	// Get unique file paths from changes
 	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
 
+	// Source branch files for fork MRs live on the fork project, not the target (same as warehouse analyzer).
+	sourceProjectID := srm.sourceProjectIDForMR(mrCtx)
+
 	for _, filePath := range filePaths {
 		// Get file content from source branch
-		fileContent := srm.getFileContent(filePath, mrCtx)
+		fileContent, fetchErr := srm.getFileContent(filePath, mrCtx, sourceProjectID)
+		if fetchErr != nil {
+			logging.Warn("Cannot load source-branch file for validation (requiring manual review): %s: %v", filePath, fetchErr)
+			fileValidations[filePath] = srm.createManualReviewValidation(filePath, 0, fmt.Sprintf("Could not load file from source branch: %v", fetchErr))
+			continue
+		}
 		totalLines := shared.CountLines(fileContent)
 
 		// Extract changed lines from the diff for delta validation
 		changedLines := srm.getChangedLinesForFile(filePath, mrCtx)
+		diffText := srm.getDiffForFile(filePath, mrCtx)
 
 		// Check if this file has section-based validation
 		parser := srm.getParserForFile(filePath)
 		if parser != nil {
 			logging.Info("Using section-based validation for file: %s", filePath)
 			// Use section-based validation with delta approach
-			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines)
+			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines, diffText)
 			fileValidations[filePath] = fileValidation
 		} else {
 			logging.Info("No parser found for file: %s - requiring manual review", filePath)
@@ -179,8 +189,17 @@ func (srm *SectionRuleManager) getChangedLinesForFile(filePath string, mrCtx *sh
 	return []shared.LineRange{}
 }
 
+func (srm *SectionRuleManager) getDiffForFile(filePath string, mrCtx *shared.MRContext) string {
+	for _, change := range mrCtx.Changes {
+		if change.NewPath == filePath {
+			return change.Diff
+		}
+	}
+	return ""
+}
+
 // validateFileWithSections validates a file using section-based approach with delta validation
-func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange) *shared.FileValidationSummary {
+func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange, diffText string) *shared.FileValidationSummary {
 	// Parse file into sections
 	sections, err := parser.ParseSections(filePath, fileContent)
 	if err != nil {
@@ -204,6 +223,20 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
 	}
 
+	if len(affectedSections) > 0 {
+		var names []string
+		for name := range affectedSections {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		logging.Info("Delta validation for %s affected sections: %s", filePath, strings.Join(names, ", "))
+	}
+
+	if !affectedSections["warehouses"] && diffMentionsWarehouses(diffText) {
+		affectedSections["warehouses"] = true
+		logging.Info("Delta validation for %s: warehouses section flagged as affected (diff heuristic)", filePath)
+	}
+
 	// Validate all sections (not just affected ones) to show complete rule evaluation
 	for _, section := range sections {
 		// Get enabled rules for this section
@@ -217,6 +250,43 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		for _, ruleResult := range sectionResult.RuleResults {
 			ruleResults = append(ruleResults, ruleResult)
 			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+		}
+	}
+
+	// Defense-in-depth: any changes touching the warehouses section must require manual review.
+	if affectedSections["warehouses"] {
+		var sawWarehouseRule bool
+		var sawWarehouseManual bool
+		for i := range ruleResults {
+			if ruleResults[i].RuleName != "warehouse_rule" {
+				continue
+			}
+			sawWarehouseRule = true
+			if ruleResults[i].Decision == shared.ManualReview {
+				sawWarehouseManual = true
+				break
+			}
+		}
+
+		if !sawWarehouseManual {
+			reason := "Warehouses section changed - manual review required"
+			if sawWarehouseRule {
+				for i := range ruleResults {
+					if ruleResults[i].RuleName == "warehouse_rule" {
+						ruleResults[i].Decision = shared.ManualReview
+						ruleResults[i].Reason = reason
+						ruleResults[i].WasEvaluated = true
+					}
+				}
+			} else {
+				ruleResults = append(ruleResults, shared.LineValidationResult{
+					RuleName:     "warehouse_rule",
+					LineRanges:   changedLines,
+					Decision:     shared.ManualReview,
+					Reason:       reason,
+					WasEvaluated: true,
+				})
+			}
 		}
 	}
 
@@ -235,6 +305,20 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		RuleResults:    ruleResults,
 		FileDecision:   fileDecision,
 	}
+}
+
+func diffMentionsWarehouses(diffText string) bool {
+	if diffText == "" {
+		return false
+	}
+
+	if strings.Contains(diffText, "\nwarehouses:") || strings.HasPrefix(diffText, "warehouses:") {
+		return true
+	}
+	if strings.Contains(diffText, "+warehouses:") || strings.Contains(diffText, "-warehouses:") {
+		return true
+	}
+	return false
 }
 
 // createManualReviewValidation creates a validation summary that requires manual review
@@ -415,32 +499,43 @@ func (srm *SectionRuleManager) getUniqueFilePaths(changes []gitlab.FileChange) [
 	return filePaths
 }
 
-func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext) string {
-	// Fetch full file content from source branch using GitLab client
+// sourceProjectIDForMR returns the GitLab project ID where the MR source branch exists.
+// For same-repository MRs this is mrCtx.ProjectID; for fork MRs it is the fork's project ID.
+func (srm *SectionRuleManager) sourceProjectIDForMR(mrCtx *shared.MRContext) int {
+	projectID := mrCtx.ProjectID
+	if srm.gitlabClient == nil {
+		return projectID
+	}
+	mrDetails, err := srm.gitlabClient.GetMRDetails(projectID, mrCtx.MRIID)
+	if err != nil {
+		logging.Warn("Failed to get MR details for source project resolution (MR %d): %v", mrCtx.MRIID, err)
+		return projectID
+	}
+	if mrDetails != nil && mrDetails.SourceProjectID != 0 && mrDetails.SourceProjectID != projectID {
+		logging.Info("Fork MR: source-branch file fetches use project %d (target project %d)", mrDetails.SourceProjectID, projectID)
+		return mrDetails.SourceProjectID
+	}
+	return projectID
+}
+
+func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext, sourceProjectID int) (string, error) {
 	if srm.gitlabClient == nil {
 		logging.Warn("GitLab client not available, cannot fetch file content for: %s", filePath)
-		return ""
+		return "", fmt.Errorf("GitLab client not available")
 	}
-
-	// Get the source branch from MR context
+	if mrCtx.MRInfo == nil || mrCtx.MRInfo.SourceBranch == "" {
+		return "", fmt.Errorf("source branch not available in MR context")
+	}
 	sourceBranch := mrCtx.MRInfo.SourceBranch
-	if sourceBranch == "" {
-		logging.Warn("Source branch not available in MR context for file: %s", filePath)
-		return ""
-	}
-
-	// Fetch full file content from source branch
-	fileContent, err := srm.gitlabClient.FetchFileContent(mrCtx.ProjectID, filePath, sourceBranch)
+	fileContent, err := srm.gitlabClient.FetchFileContent(sourceProjectID, filePath, sourceBranch)
 	if err != nil {
-		logging.Warn("Failed to fetch file content for %s from branch %s: %v", filePath, sourceBranch, err)
-		return ""
+		logging.Warn("Failed to fetch file content for %s from project %d branch %s: %v", filePath, sourceProjectID, sourceBranch, err)
+		return "", err
 	}
-
 	if fileContent == nil {
-		return ""
+		return "", fmt.Errorf("empty response when fetching %s", filePath)
 	}
-
-	return fileContent.Content
+	return fileContent.Content, nil
 }
 
 // extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff
@@ -541,6 +636,8 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 
 	var manualReviewFiles []string
 	var approvedFiles []string
+	var warehouseManualReasons []string
+	var hasUncoveredLines bool
 
 	// Collect file results
 	for _, fileValidation := range fileValidations {
@@ -548,6 +645,18 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			manualReviewFiles = append(manualReviewFiles, fileValidation.FilePath)
 		} else {
 			approvedFiles = append(approvedFiles, fileValidation.FilePath)
+		}
+
+		if fileValidation != nil && len(fileValidation.UncoveredLines) > 0 {
+			hasUncoveredLines = true
+		}
+
+		if fileValidation != nil {
+			for _, rr := range fileValidation.RuleResults {
+				if rr.RuleName == "warehouse_rule" && rr.Decision == shared.ManualReview {
+					warehouseManualReasons = append(warehouseManualReasons, rr.Reason)
+				}
+			}
 		}
 	}
 
@@ -558,12 +667,31 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			details += fmt.Sprintf(". Files auto-approved: %s", strings.Join(approvedFiles, ", "))
 		}
 
-		logging.Info("MR requires manual review due to %d uncovered files: %v",
-			len(manualReviewFiles), manualReviewFiles)
+		reason := "One or more files require manual review"
+		if len(warehouseManualReasons) > 0 {
+			reason = "Warehouse changes require manual review"
+			seen := make(map[string]bool)
+			var uniq []string
+			for _, r := range warehouseManualReasons {
+				if r == "" || seen[r] {
+					continue
+				}
+				seen[r] = true
+				uniq = append(uniq, r)
+			}
+			if len(uniq) > 0 {
+				details += fmt.Sprintf(". Warehouse: %s", strings.Join(uniq, " | "))
+			}
+		} else if hasUncoveredLines {
+			reason = "Uncovered changes require manual review"
+		}
+
+		logging.Info("MR requires manual review (files=%d, warehouse=%t, uncovered_lines=%t): %v",
+			len(manualReviewFiles), len(warehouseManualReasons) > 0, hasUncoveredLines, manualReviewFiles)
 
 		return shared.Decision{
 			Type:    shared.ManualReview,
-			Reason:  "One or more files require manual review",
+			Reason:  reason,
 			Summary: "⚠️ Manual review required",
 			Details: details,
 		}

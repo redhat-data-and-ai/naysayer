@@ -15,7 +15,18 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/webhook"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// TestE2E_ForkMR_WarehouseIncrease exercises fork MR handling: source branch exists only on
+// ForkSourceProjectID (regression for section validation fetching from target project only).
+func TestE2E_ForkMR_WarehouseIncrease(t *testing.T) {
+	scenarioDir := filepath.Join("testdata", "scenarios", "27_fork_mr_warehouse_increase")
+	scenario, err := LoadScenario(scenarioDir)
+	require.NoError(t, err)
+	assert.Equal(t, 9999, scenario.MRMetadata.ForkSourceProjectID)
+	runScenario(t, *scenario)
+}
 
 // TestE2E_Scenarios runs all E2E test scenarios
 func TestE2E_Scenarios(t *testing.T) {
@@ -69,6 +80,9 @@ func runScenario(t *testing.T, scenario ScenarioConfig) {
 	mockGitLab := NewMockGitLabClient(scenario.BeforeDir, scenario.AfterDir)
 	mockGitLab.SetMRBranches(scenario.MRMetadata.SourceBranch, scenario.MRMetadata.TargetBranch)
 	mockGitLab.SetFileChanges(changes)
+	if scenario.MRMetadata.ForkSourceProjectID != 0 {
+		mockGitLab.ForkSourceProjectID = scenario.MRMetadata.ForkSourceProjectID
+	}
 
 	// 3. Create test configuration
 	testConfig := createTestConfig(t)

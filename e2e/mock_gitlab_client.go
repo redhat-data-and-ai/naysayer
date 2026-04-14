@@ -35,6 +35,10 @@ type MockGitLabClient struct {
 	OpenMRsForAutoRebase []int
 	// Optional: for auto-rebase E2E. When >= 0, CompareBranches returns this many commits (behind). When < 0, returns 0 (up-to-date).
 	AutoRebaseBehindCount int
+
+	// ForkSourceProjectID simulates a fork MR: when non-zero, GetMRDetails sets source_project_id to this value and
+	// GetFileContent returns "file not found" when fetching the source branch from any other project ID (matches GitLab).
+	ForkSourceProjectID int
 }
 
 // CapturedComment represents a comment that would be posted to GitLab
@@ -82,6 +86,11 @@ func (m *MockGitLabClient) SetFileChanges(changes []gitlab.FileChange) {
 func (m *MockGitLabClient) GetFileContent(projectID int, filePath, ref string) (string, error) {
 	// Track which files were fetched
 	m.FetchedFiles = append(m.FetchedFiles, filePath)
+
+	// Fork MR: source branch exists only on ForkSourceProjectID (GitLab returns 404 for target project + source ref).
+	if m.ForkSourceProjectID != 0 && ref == m.sourceBranch && projectID != m.ForkSourceProjectID {
+		return "", fmt.Errorf("file not found: %s (ref: %s)", filePath, ref)
+	}
 
 	// Determine which directory to read from based on branch
 	// target branch = before/ directory
@@ -253,7 +262,7 @@ func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, erro
 // For autorebase eligibility, returns recent CreatedAt and success Pipeline when used with OpenMRsForAutoRebase.
 func (m *MockGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails, error) {
 	createdAt := time.Now().Add(-24 * time.Hour).Format(time.RFC3339) // 1 day ago
-	return &gitlab.MRDetails{
+	details := &gitlab.MRDetails{
 		IID:                  mrIID,
 		SourceBranch:         m.sourceBranch,
 		TargetBranch:         m.targetBranch,
@@ -265,7 +274,11 @@ func (m *MockGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails
 		MergeStatus:          "can_be_merged",
 		BehindCommitsCount:   0,
 		DivergedCommitsCount: 0,
-	}, nil
+	}
+	if m.ForkSourceProjectID != 0 {
+		details.SourceProjectID = m.ForkSourceProjectID
+	}
+	return details, nil
 }
 
 // ListMRComments returns captured comments as MRComment structs
