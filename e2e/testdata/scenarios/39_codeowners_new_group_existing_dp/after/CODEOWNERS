@@ -1,0 +1,5 @@
+# Data Product Owners
+[Aggregate Data Products]
+/dataproducts/aggregate/analytics/ @alice @bob
+/dataproducts/aggregate/analytics/groups/test-consumer-group.yaml @approver1 @approver2
+/dataproducts/aggregate/analytics/access-requests/groups/test-consumer-group/ @approver1 @approver2

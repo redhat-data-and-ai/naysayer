@@ -1,0 +1,15 @@
+name: "CODEOWNERS sync - new group in existing DP"
+description: "Auto-approve CODEOWNERS when new group is added to existing data product"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add consumer group to analytics data product"
+  author: "testuser"
+  source_branch: "feature/add-consumer-group"
+  target_branch: "main"
