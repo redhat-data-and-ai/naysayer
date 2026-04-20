@@ -1,0 +1,22 @@
+---
+name: analytics
+kind: aggregated
+rover_group: dataverse-aggregate-analytics
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+tags:
+  data_product: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: dataverse-consumer-analytics-marts
+      kind: consumer_group
+    - name: inorbit
+      kind: data_product
