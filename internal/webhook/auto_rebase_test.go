@@ -240,6 +240,12 @@ func (m *MockRebaseGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, 
 	// This matches the actual implementation behavior
 	return true, "atlantis_comment_not_found"
 }
+func (m *MockRebaseGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
+	return false, nil
+}
+func (m *MockRebaseGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
+	return nil, nil
+}
 
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()

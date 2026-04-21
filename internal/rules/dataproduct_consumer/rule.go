@@ -1,8 +1,12 @@
 package dataproduct_consumer
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
@@ -16,10 +20,11 @@ type DataProductConsumerRule struct {
 	*common.FileTypeMatcher
 	*common.ValidationHelper
 	config *DataProductConsumerConfig
+	client gitlab.GitLabClient
 }
 
 // NewDataProductConsumerRule creates a new data product consumer rule instance
-func NewDataProductConsumerRule(allowedEnvs []string) *DataProductConsumerRule {
+func NewDataProductConsumerRule(allowedEnvs []string, client gitlab.GitLabClient) *DataProductConsumerRule {
 	config := DefaultDataProductConsumerConfig()
 	if allowedEnvs != nil {
 		config.AllowedEnvironments = allowedEnvs
@@ -30,21 +35,38 @@ func NewDataProductConsumerRule(allowedEnvs []string) *DataProductConsumerRule {
 		FileTypeMatcher:  common.NewFileTypeMatcher(),
 		ValidationHelper: common.NewValidationHelper(),
 		config:           config,
+		client:           client,
 	}
 }
 
 // ValidateLines validates lines for consumer access changes
 func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
-	// Only apply to product.yaml files
 	if !r.IsProductFile(filePath) {
 		return r.CreateApprovalResult("Not a product.yaml file - consumer rule does not apply")
 	}
 
-	// Analyze the context for this file
-	context := r.analyzeFile(filePath, fileContent, lineRanges)
+	yamlContent, err := readYaml(fileContent)
+	if err != nil {
+		return shared.ManualReview, fmt.Sprintf("Failed to parse YAML content: %v", err)
+	}
 
-	// Auto-approve consumer-only changes across all environments
-	// Data product owner approval is sufficient, no TOC approval required
+	context := r.analyzeFile(filePath, yamlContent, fileContent, lineRanges)
+
+	// Validate consumer_group files exist regardless of consumer-only status.
+	// Missing groups files should block approval even when mixed with other changes.
+	if context.HasConsumers {
+		groupNames := r.extractConsumerGroupNames(yamlContent)
+		if len(groupNames) > 0 {
+			allExist, missingGroups := r.validateConsumerGroupFiles(filePath, groupNames)
+			if !allExist {
+				return shared.ManualReview, fmt.Sprintf(
+					"Consumer group file(s) not found in repository: %s",
+					strings.Join(missingGroups, ", "),
+				)
+			}
+		}
+	}
+
 	if context.HasConsumers && context.IsConsumerOnly {
 		if context.Environment != "" {
 			return r.CreateApprovalResult("Consumer access changes in " + context.Environment + " environment - data product owner approval sufficient (no TOC approval required)")
@@ -52,7 +74,6 @@ func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent str
 		return r.CreateApprovalResult("Consumer access changes - data product owner approval sufficient (no TOC approval required)")
 	}
 
-	// Not a consumer-only change, let other rules handle it
 	return r.CreateApprovalResult("No consumer-only changes detected")
 }
 
@@ -79,8 +100,9 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 	}
 }
 
-// analyzeFile analyzes a file to determine if consumer rule applies
-func (r *DataProductConsumerRule) analyzeFile(filePath string, fileContent string, lineRanges []shared.LineRange) *ConsumerContext {
+// analyzeFile analyzes a file to determine if consumer rule applies.
+// yamlContent is the pre-parsed YAML; fileContent is the raw text needed for line-based checks.
+func (r *DataProductConsumerRule) analyzeFile(filePath string, yamlContent interface{}, fileContent string, lineRanges []shared.LineRange) *ConsumerContext {
 	context := &ConsumerContext{
 		FilePath:       filePath,
 		Environment:    r.extractEnvironmentFromPath(filePath),
@@ -88,72 +110,65 @@ func (r *DataProductConsumerRule) analyzeFile(filePath string, fileContent strin
 		IsConsumerOnly: false,
 	}
 
-	// Check if file contains consumers section
-	context.HasConsumers = r.fileContainsConsumersSection(fileContent)
+	context.HasConsumers = r.containsConsumersKey(yamlContent)
 	if !context.HasConsumers {
 		return context
 	}
 
-	// Check if ONLY consumer fields are being modified
 	context.IsConsumerOnly = r.areChangesConsumerOnly(lineRanges, fileContent)
 
 	return context
 }
 
-// fileContainsConsumersSection checks if the file has a consumers section
-func (r *DataProductConsumerRule) fileContainsConsumersSection(fileContent string) bool {
-	// Parse YAML to check for consumers field
-	var yamlContent map[string]interface{}
-	if err := yaml.Unmarshal([]byte(fileContent), &yamlContent); err != nil {
-		return false
-	}
-
-	// Check for consumers in data_product_db.presentation_schemas
-	if dataProductDB, ok := yamlContent["data_product_db"].([]interface{}); ok {
-		for _, db := range dataProductDB {
-			if dbMap, ok := db.(map[string]interface{}); ok {
-				if schemas, ok := dbMap["presentation_schemas"].([]interface{}); ok {
-					for _, schema := range schemas {
-						if schemaMap, ok := schema.(map[string]interface{}); ok {
-							if _, hasConsumers := schemaMap["consumers"]; hasConsumers {
-								return true
-							}
-						}
-					}
-				}
+// containsConsumersKey recursively searches for a "consumers" key in parsed YAML.
+func (r *DataProductConsumerRule) containsConsumersKey(data interface{}) bool {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		if _, hasConsumers := v["consumers"]; hasConsumers {
+			return true
+		}
+		for _, val := range v {
+			if r.containsConsumersKey(val) {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if r.containsConsumersKey(item) {
+				return true
 			}
 		}
 	}
-
 	return false
 }
 
-// areChangesConsumerOnly checks if only consumer-related lines are being modified
+// areChangesConsumerOnly checks if only consumer-related lines are being modified.
+// Returns true only if at least one consumer-related line was found and no
+// non-consumer lines exist in the range.
 func (r *DataProductConsumerRule) areChangesConsumerOnly(lineRanges []shared.LineRange, fileContent string) bool {
 	if len(lineRanges) == 0 {
 		return false
 	}
 
 	lines := strings.Split(fileContent, "\n")
+	foundConsumerLine := false
 
 	for _, lr := range lineRanges {
 		for lineNum := lr.StartLine; lineNum <= lr.EndLine && lineNum <= len(lines); lineNum++ {
 			line := strings.TrimSpace(lines[lineNum-1])
 
-			// Skip empty lines and comments
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}
 
-			// Check if line is consumer-related
 			if !r.isConsumerRelatedLine(line) {
-				// Found a non-consumer change
 				return false
 			}
+			foundConsumerLine = true
 		}
 	}
 
-	return true
+	return foundConsumerLine
 }
 
 // isConsumerRelatedLine checks if a line is related to consumer configuration
@@ -174,6 +189,90 @@ func (r *DataProductConsumerRule) isConsumerRelatedLine(line string) bool {
 	}
 
 	return false
+}
+
+// extractConsumerGroupNames returns names of all consumers with kind: consumer_group
+// from pre-parsed YAML content.
+func (r *DataProductConsumerRule) extractConsumerGroupNames(yamlContent interface{}) []string {
+	var groupNames []string
+	r.collectConsumerGroups(yamlContent, &groupNames)
+	return groupNames
+}
+
+func readYaml(fileContent string) (interface{}, error) {
+	var yamlContent interface{}
+	err := yaml.Unmarshal([]byte(fileContent), &yamlContent)
+	return yamlContent, err
+}
+
+// collectConsumerGroups recursively traverses parsed YAML to find consumer entries
+// with kind: consumer_group and collects their names.
+func (r *DataProductConsumerRule) collectConsumerGroups(data interface{}, groupNames *[]string) {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		kind, hasKind := v["kind"].(string)
+		name, hasName := v["name"].(string)
+		if hasKind && hasName && kind == "consumer_group" && name != "" {
+			*groupNames = append(*groupNames, name)
+		}
+		for _, val := range v {
+			r.collectConsumerGroups(val, groupNames)
+		}
+	case []interface{}:
+		for _, item := range v {
+			r.collectConsumerGroups(item, groupNames)
+		}
+	}
+}
+
+// listFilesOnBranch lists filenames in a directory on the given branch.
+// Returns an empty set if the client is nil, branch is empty, or the directory doesn't exist.
+func (r *DataProductConsumerRule) listFilesOnBranch(projectID int, dirPath string, branch string) map[string]bool {
+	if r.client == nil || branch == "" {
+		return map[string]bool{}
+	}
+	files, err := r.client.ListDirectoryFiles(projectID, dirPath, branch)
+	if err != nil {
+		logging.Warn("Error listing directory %s on branch %s: %v", dirPath, branch, err)
+		return map[string]bool{}
+	}
+	fileSet := make(map[string]bool, len(files))
+	for _, f := range files {
+		fileSet[f] = true
+	}
+	return fileSet
+}
+
+// validateConsumerGroupFiles checks that each consumer group name has a corresponding
+// YAML file in the product's groups/ folder. Lists the directory once per branch
+// instead of checking each file individually.
+func (r *DataProductConsumerRule) validateConsumerGroupFiles(productFilePath string, groupNames []string) (bool, []string) {
+	mrCtx := r.GetMRContext()
+	if mrCtx == nil || mrCtx.MRInfo == nil {
+		logging.Warn("No MR context available for consumer group file validation")
+		return false, groupNames
+	}
+
+	productDir := filepath.Dir(filepath.Dir(productFilePath))
+	groupsFolderPath := filepath.Join(productDir, "groups")
+
+	sourceGroupFiles := r.listFilesOnBranch(mrCtx.ProjectID, groupsFolderPath, mrCtx.MRInfo.SourceBranch)
+	targetGroupFiles := r.listFilesOnBranch(mrCtx.ProjectID, groupsFolderPath, mrCtx.MRInfo.TargetBranch)
+
+	var missingGroups []string
+	for _, name := range groupNames {
+		expectedFile := name + ".yaml"
+		if sourceGroupFiles[expectedFile] || targetGroupFiles[expectedFile] {
+			continue
+		}
+
+		expectedPath := filepath.Join(groupsFolderPath, expectedFile)
+		logging.Warn("Consumer group file not found: %s (checked branches: %s, %s)",
+			expectedPath, mrCtx.MRInfo.SourceBranch, mrCtx.MRInfo.TargetBranch)
+		missingGroups = append(missingGroups, name)
+	}
+
+	return len(missingGroups) == 0, missingGroups
 }
 
 // extractEnvironmentFromPath attempts to extract the environment name from the file path

@@ -471,3 +471,232 @@ func TestClient_FetchFileContent_EmptyResponse(t *testing.T) {
 	assert.Equal(t, "empty.yaml", content.FileName)
 	assert.Empty(t, content.Content)
 }
+
+func TestClient_FileExists_FileFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "HEAD", r.Method)
+		assert.Contains(t, r.URL.Path, "/api/v4/projects/123/repository/files/")
+		assert.Contains(t, r.URL.RawQuery, "ref=main")
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{
+		BaseURL: server.URL,
+		Token:   "test-token",
+	}
+	client := NewClient(cfg)
+
+	exists, err := client.FileExists(123, "dataproducts/agg/test/groups/consumer1.yaml", "main")
+
+	assert.NoError(t, err)
+	assert.True(t, exists)
+}
+
+func TestClient_FileExists_FileNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "HEAD", r.Method)
+		w.WriteHeader(404)
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{
+		BaseURL: server.URL,
+		Token:   "test-token",
+	}
+	client := NewClient(cfg)
+
+	exists, err := client.FileExists(123, "nonexistent/file.yaml", "main")
+
+	assert.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestClient_FileExists_HTTPErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		expectedError string
+	}{
+		{
+			name:          "401 Unauthorized",
+			statusCode:    401,
+			expectedError: "GitLab API error 401",
+		},
+		{
+			name:          "403 Forbidden",
+			statusCode:    403,
+			expectedError: "GitLab API error 403",
+		},
+		{
+			name:          "500 Internal Server Error",
+			statusCode:    500,
+			expectedError: "GitLab API error 500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+			}))
+			defer server.Close()
+
+			cfg := config.GitLabConfig{
+				BaseURL: server.URL,
+				Token:   "test-token",
+			}
+			client := NewClient(cfg)
+
+			exists, err := client.FileExists(123, "test/file.yaml", "main")
+
+			assert.Error(t, err)
+			assert.False(t, exists)
+			assert.Contains(t, err.Error(), tt.expectedError)
+		})
+	}
+}
+
+func TestClient_FileExists_NetworkError(t *testing.T) {
+	cfg := config.GitLabConfig{
+		BaseURL: "http://localhost:99999",
+		Token:   "test-token",
+	}
+	client := NewClient(cfg)
+
+	exists, err := client.FileExists(123, "test/file.yaml", "main")
+
+	assert.Error(t, err)
+	assert.False(t, exists)
+}
+
+func TestClient_FileExists_URLEncoding(t *testing.T) {
+	filePath := "dataproducts/agg/test product/groups/consumer group.yaml"
+
+	var requestURL string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "HEAD", r.Method)
+		requestURL = r.URL.String()
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{
+		BaseURL: server.URL,
+		Token:   "test-token",
+	}
+	client := NewClient(cfg)
+
+	exists, err := client.FileExists(123, filePath, "feature-branch")
+
+	assert.NoError(t, err)
+	assert.True(t, exists)
+	assert.Contains(t, requestURL, "/repository/files/")
+	assert.Contains(t, requestURL, "ref=feature-branch")
+}
+
+func TestClient_ListDirectoryFiles_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Contains(t, r.URL.Path, "/api/v4/projects/123/repository/tree")
+		assert.Contains(t, r.URL.RawQuery, "ref=main")
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+
+		response := []map[string]string{
+			{"name": "consumer-a.yaml", "type": "blob", "path": "groups/consumer-a.yaml"},
+			{"name": "consumer-b.yaml", "type": "blob", "path": "groups/consumer-b.yaml"},
+			{"name": "subdir", "type": "tree", "path": "groups/subdir"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}
+	client := NewClient(cfg)
+
+	files, err := client.ListDirectoryFiles(123, "dataproducts/analytics/groups", "main")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"consumer-a.yaml", "consumer-b.yaml"}, files)
+}
+
+func TestClient_ListDirectoryFiles_DirectoryNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}
+	client := NewClient(cfg)
+
+	files, err := client.ListDirectoryFiles(123, "nonexistent/dir", "main")
+
+	assert.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+func TestClient_ListDirectoryFiles_HTTPErrors(t *testing.T) {
+	tests := []struct {
+		name          string
+		statusCode    int
+		expectedError string
+	}{
+		{
+			name:          "401 Unauthorized",
+			statusCode:    401,
+			expectedError: "GitLab API error 401",
+		},
+		{
+			name:          "500 Internal Server Error",
+			statusCode:    500,
+			expectedError: "GitLab API error 500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+			}))
+			defer server.Close()
+
+			cfg := config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}
+			client := NewClient(cfg)
+
+			files, err := client.ListDirectoryFiles(123, "some/dir", "main")
+
+			assert.Error(t, err)
+			assert.Nil(t, files)
+			assert.Contains(t, err.Error(), tt.expectedError)
+		})
+	}
+}
+
+func TestClient_ListDirectoryFiles_NetworkError(t *testing.T) {
+	cfg := config.GitLabConfig{BaseURL: "http://localhost:99999", Token: "test-token"}
+	client := NewClient(cfg)
+
+	files, err := client.ListDirectoryFiles(123, "some/dir", "main")
+
+	assert.Error(t, err)
+	assert.Nil(t, files)
+}
+
+func TestClient_ListDirectoryFiles_EmptyDirectory(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]map[string]string{})
+	}))
+	defer server.Close()
+
+	cfg := config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}
+	client := NewClient(cfg)
+
+	files, err := client.ListDirectoryFiles(123, "empty/dir", "main")
+
+	assert.NoError(t, err)
+	assert.Empty(t, files)
+}

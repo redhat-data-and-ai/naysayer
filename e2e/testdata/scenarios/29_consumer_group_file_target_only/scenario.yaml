@@ -1,0 +1,16 @@
+name: "Consumer group file on target branch — auto-approve"
+description: "Adding a consumer_group reference when the group file already exists on the target branch"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Reference existing consumer group from product.yaml"
+  author: "testuser"
+  source_branch: "feature/positivetarget-consumer"
+  target_branch: "main"

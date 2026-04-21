@@ -28,6 +28,22 @@ func TestE2E_ForkMR_WarehouseIncrease(t *testing.T) {
 	runScenario(t, *scenario)
 }
 
+// TestE2E_ConsumerGroupFileOnSourceOnly checks auto-approve when the groups YAML exists only on the MR source branch (mock: after/).
+func TestE2E_ConsumerGroupFileOnSourceOnly(t *testing.T) {
+	scenarioDir := filepath.Join("testdata", "scenarios", "28_consumer_group_file_on_source_only")
+	scenario, err := LoadScenario(scenarioDir)
+	require.NoError(t, err)
+	runScenario(t, *scenario)
+}
+
+// TestE2E_ConsumerGroupFileTargetOnly checks auto-approve when the group file is present on the target branch (mock: before/). The groups file is duplicated unchanged in after/ so the MR diff is product.yaml only; see TestDataProductConsumerRule_ValidateLines_ConsumerGroupValidation for strict target-only listing without that fixture.
+func TestE2E_ConsumerGroupFileTargetOnly(t *testing.T) {
+	scenarioDir := filepath.Join("testdata", "scenarios", "29_consumer_group_file_target_only")
+	scenario, err := LoadScenario(scenarioDir)
+	require.NoError(t, err)
+	runScenario(t, *scenario)
+}
+
 // TestE2E_Scenarios runs all E2E test scenarios
 func TestE2E_Scenarios(t *testing.T) {
 	// Load all scenarios

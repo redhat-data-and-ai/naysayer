@@ -105,7 +105,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Factory: func(client gitlab.GitLabClient) shared.Rule {
 			// Get allowed environments from dedicated consumer rule config
 			cfg := config.Load()
-			return dataproduct_consumer.NewDataProductConsumerRule(cfg.Rules.DataProductConsumerRule.AllowedEnvironments)
+			return dataproduct_consumer.NewDataProductConsumerRule(cfg.Rules.DataProductConsumerRule.AllowedEnvironments, client)
 		},
 		Enabled:  true,
 		Category: "consumer_access",
