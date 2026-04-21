@@ -253,6 +253,53 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string)
 	}, nil
 }
 
+// ListDirectoryFiles lists filenames in a directory on a specific branch by reading from the test fixture directories.
+func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
+	var baseDir string
+	if ref == m.targetBranch {
+		baseDir = m.beforeDir
+	} else {
+		baseDir = m.afterDir
+	}
+
+	fullPath := filepath.Join(baseDir, dirPath)
+	entries, err := os.ReadDir(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
+}
+
+// FileExists checks whether a file exists on a specific branch by reading from the test fixture directories.
+func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
+	var baseDir string
+	if ref == m.targetBranch {
+		baseDir = m.beforeDir
+	} else {
+		baseDir = m.afterDir
+	}
+
+	fullPath := filepath.Join(baseDir, filePath)
+	_, err := os.Stat(fullPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
 // GetMRTargetBranch returns the target branch
 func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	return m.targetBranch, nil
