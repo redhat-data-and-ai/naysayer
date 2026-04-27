@@ -123,7 +123,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Enabled:  true,
 		Category: "codeowners",
 	})
-	
+
 	// Masking policy rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "masking_policy_rule",

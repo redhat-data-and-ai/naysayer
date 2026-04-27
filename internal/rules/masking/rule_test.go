@@ -65,8 +65,17 @@ func (m *MockGitLabClient) ApproveMRWithMessage(projectID, mrIID int, message st
 func (m *MockGitLabClient) ResetNaysayerApproval(projectID, mrIID int) error       { return nil }
 func (m *MockGitLabClient) GetCurrentBotUsername() (string, error)                 { return "bot", nil }
 func (m *MockGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool { return false }
-func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) error                    { return nil }
-func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error)               { return nil, nil }
+func (m *MockGitLabClient) RebaseMR(projectID, mrIID int) (bool, error)            { return false, nil }
+func (m *MockGitLabClient) CompareBranches(sourceProjectID int, sourceBranch string, targetProjectID int, targetBranch string) (*gitlab.CompareResult, error) {
+	return nil, nil
+}
+func (m *MockGitLabClient) GetBranchCommit(projectID int, branch string) (string, error) {
+	return "", nil
+}
+func (m *MockGitLabClient) CompareCommits(projectID int, fromSHA, toSHA string) (*gitlab.CompareResult, error) {
+	return nil, nil
+}
+func (m *MockGitLabClient) ListOpenMRs(projectID int) ([]int, error) { return nil, nil }
 func (m *MockGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
 	return nil, nil
 }
@@ -90,6 +99,8 @@ func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error { return nil }
 func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
 	return false, nil
 }
+
+var _ gitlab.GitLabClient = (*MockGitLabClient)(nil)
 
 func TestRule_Name(t *testing.T) {
 	rule := NewRule(nil)
