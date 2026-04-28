@@ -28,6 +28,13 @@ func TestE2E_ForkMR_WarehouseIncrease(t *testing.T) {
 	runScenario(t, *scenario)
 }
 
+func TestE2E_DeveloperAccessSource(t *testing.T) {
+	scenarioDir := filepath.Join("testdata", "scenarios", "42_developer_access_source")
+	scenario, err := LoadScenario(scenarioDir)
+	require.NoError(t, err)
+	runScenario(t, *scenario)
+}
+
 // TestE2E_Scenarios runs all E2E test scenarios
 func TestE2E_Scenarios(t *testing.T) {
 	// Load all scenarios

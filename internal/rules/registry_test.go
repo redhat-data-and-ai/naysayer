@@ -45,6 +45,12 @@ func TestNewRuleRegistry(t *testing.T) {
 	assert.Equal(t, "warehouse_rule", warehouseRule.Name)
 	assert.Equal(t, "warehouse", warehouseRule.Category)
 	assert.True(t, warehouseRule.Enabled)
+
+	developerRule, exists := registry.GetRule("developer_access_rule")
+	assert.True(t, exists, "Developer access rule should be registered")
+	assert.Equal(t, "developer_access_rule", developerRule.Name)
+	assert.Equal(t, "developer_access", developerRule.Category)
+	assert.True(t, developerRule.Enabled)
 }
 
 func TestRuleRegistry_RegisterRule(t *testing.T) {
@@ -191,6 +197,7 @@ func TestRuleRegistry_ListEnabledRules(t *testing.T) {
 
 	// Should contain built-in enabled rules plus our enabled test rule
 	assert.Contains(t, enabledRules, "warehouse_rule")
+	assert.Contains(t, enabledRules, "developer_access_rule")
 	assert.Contains(t, enabledRules, "enabled_test_rule")
 
 	// Should NOT contain disabled rule
@@ -315,15 +322,15 @@ func TestRuleRegistry_CreateDataverseRuleManager_WithMissingRule(t *testing.T) {
 		rules: make(map[string]*RuleInfo),
 	}
 
-	// Only register warehouse rule, not service account rule
-	warehouseRule := &RuleInfo{
-		Name:        "warehouse_rule",
-		Description: "Warehouse rule",
-		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "warehouse_rule"} },
+	// Only register developer access rule
+	developerRule := &RuleInfo{
+		Name:        "developer_access_rule",
+		Description: "Developer access rule",
+		Factory:     func(client gitlab.GitLabClient) shared.Rule { return &MockRule{name: "developer_access_rule"} },
 		Enabled:     true,
-		Category:    "warehouse",
+		Category:    "developer_access",
 	}
-	err := registry.RegisterRule(warehouseRule)
+	err := registry.RegisterRule(developerRule)
 	assert.NoError(t, err)
 
 	client := &gitlab.Client{}

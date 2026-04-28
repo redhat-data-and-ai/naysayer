@@ -96,7 +96,9 @@ func (m *forkMRTestGitLabClient) ResetNaysayerApproval(projectID, mrIID int) err
 func (m *forkMRTestGitLabClient) GetCurrentBotUsername() (string, error) {
 	return "naysayer-bot", nil
 }
-func (m *forkMRTestGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool { return false }
+func (m *forkMRTestGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool {
+	return false
+}
 func (m *forkMRTestGitLabClient) CompareBranches(sourceProjectID int, sourceBranch string, targetProjectID int, targetBranch string) (*gitlab.CompareResult, error) {
 	return &gitlab.CompareResult{}, nil
 }
@@ -107,7 +109,7 @@ func (m *forkMRTestGitLabClient) CompareCommits(projectID int, fromSHA, toSHA st
 	return &gitlab.CompareResult{}, nil
 }
 func (m *forkMRTestGitLabClient) RebaseMR(projectID, mrIID int) (bool, error) { return false, nil }
-func (m *forkMRTestGitLabClient) ListOpenMRs(projectID int) ([]int, error) { return nil, nil }
+func (m *forkMRTestGitLabClient) ListOpenMRs(projectID int) ([]int, error)    { return nil, nil }
 func (m *forkMRTestGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
 	return nil, nil
 }
@@ -151,10 +153,24 @@ func TestSourceProjectIDForMR_SameRepo(t *testing.T) {
 }
 
 func TestEvaluateAll_ForkMR_WarehouseIncreaseRequiresManualReview(t *testing.T) {
-	rulesPath := filepath.Join("..", "..", "rules.yaml")
-	if _, err := os.Stat(rulesPath); err != nil {
-		t.Skipf("rules.yaml not found at %s (run tests from module root or internal/rules)", rulesPath)
-	}
+	tempDir := t.TempDir()
+	rulesPath := filepath.Join(tempDir, "rules.yaml")
+	rulesYAML := `enabled: true
+files:
+  - name: "product_configs"
+    path: "dataproducts/**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: warehouses
+        yaml_path: warehouses
+        rule_configs:
+          - name: warehouse_rule
+            enabled: true
+        auto_approve: false
+`
+	require.NoError(t, os.WriteFile(rulesPath, []byte(rulesYAML), 0600))
 
 	client := &forkMRTestGitLabClient{
 		targetProjectID: 106670,

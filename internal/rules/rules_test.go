@@ -86,7 +86,7 @@ func TestListEnabledRules(t *testing.T) {
 	}
 
 	// Built-in rules should be enabled by default
-	assert.Contains(t, rules, "warehouse_rule")
+	assert.Contains(t, rules, "developer_access_rule")
 }
 
 func TestListAvailableRules_IsCopy(t *testing.T) {
@@ -98,9 +98,9 @@ func TestListAvailableRules_IsCopy(t *testing.T) {
 	assert.Equal(t, len(rules1), len(rules2))
 
 	// Modify one map and verify the other is unaffected
-	delete(rules1, "warehouse_rule")
-	assert.NotContains(t, rules1, "warehouse_rule")
-	assert.Contains(t, rules2, "warehouse_rule", "Modifying one map should not affect the other")
+	delete(rules1, "developer_access_rule")
+	assert.NotContains(t, rules1, "developer_access_rule")
+	assert.Contains(t, rules2, "developer_access_rule", "Modifying one map should not affect the other")
 }
 
 func TestListEnabledRules_IsCopy(t *testing.T) {
@@ -112,9 +112,9 @@ func TestListEnabledRules_IsCopy(t *testing.T) {
 	assert.Equal(t, len(rules1), len(rules2))
 
 	// Modify one map and verify the other is unaffected
-	delete(rules1, "warehouse_rule")
-	assert.NotContains(t, rules1, "warehouse_rule")
-	assert.Contains(t, rules2, "warehouse_rule", "Modifying one map should not affect the other")
+	delete(rules1, "developer_access_rule")
+	assert.NotContains(t, rules1, "developer_access_rule")
+	assert.Contains(t, rules2, "developer_access_rule", "Modifying one map should not affect the other")
 }
 
 func TestCreateSectionBasedDataverseManager(t *testing.T) {

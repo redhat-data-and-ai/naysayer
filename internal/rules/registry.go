@@ -9,6 +9,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/developer_access"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
@@ -123,6 +124,17 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "codeowners",
 	})
 
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "developer_access_rule",
+		Description: "Auto-approves developer access-request files when path and YAML content are consistent",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return developer_access.NewRule()
+		},
+		Enabled:  true,
+		Category: "developer_access",
+	})
+
 }
 
 // RegisterRule registers a new rule in the registry
@@ -223,9 +235,9 @@ func (r *RuleRegistry) CreateRuleManager(client gitlab.GitLabClient, ruleNames [
 
 // CreateDataverseRuleManager creates a rule manager specifically for dataverse workflows
 func (r *RuleRegistry) CreateDataverseRuleManager(client gitlab.GitLabClient) shared.RuleManager {
-	// Include warehouse rule and auto-approval rules for complete dataverse workflow support
+	// Include developer access rule for dataverse workflow support
 	dataverseRules := []string{
-		"warehouse_rule",
+		"developer_access_rule",
 	}
 
 	manager, err := r.CreateRuleManager(client, dataverseRules)

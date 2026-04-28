@@ -1,21 +1,15 @@
-name: "Fork MR — warehouse size increase"
-description: "Source branch only on fork project; section validation must fetch from fork (regression for MR 7309-style bug)"
+name: "Fork MR — source fetch regression"
+description: "Source branch only on fork project; validation must fetch from fork project and require manual review for uncovered file type"
 
 expected:
   decision: ManualReview
-  reason: "Warehouse changes require manual review"
+  reason: "Uncovered changes require manual review"
   approved: false
-
-  rules_evaluated:
-    - name: warehouse_rule
-      section: warehouses
-      decision: ManualReview
-      reason: "Warehouse size increase detected"
 
   comment_contains:
     - "⚠️ **Manual review required**"
-    - "Warehouse size increase detected"
-    - "user warehouse"
+    - "No validation rules configured for this file type"
+    - "Uncovered changed lines"
 
 mr_metadata:
   title: "Scale up warehouse for increased load (fork)"

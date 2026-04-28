@@ -1,0 +1,17 @@
+name: "Developer access request (source dataproduct)"
+description: "New access-request YAML under source/ matches path and content; auto-approve"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+    - "Developer access-request validated"
+
+mr_metadata:
+  title: "Add developer access request for source dataproduct"
+  author: "testuser"
+  source_branch: "feature/source-access-request"
+  target_branch: "main"

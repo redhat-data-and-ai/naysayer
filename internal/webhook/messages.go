@@ -231,6 +231,7 @@ func (mb *MessageBuilder) formatRuleName(ruleName string) string {
 		"toc_approval_rule":         "TOC approval check",
 		"metadata_rule":             "Metadata validated",
 		"dataproduct_consumer_rule": "Consumer access changes validated",
+		"developer_access_rule":     "Developer access request validated",
 	}
 
 	if friendly, ok := friendlyNames[ruleName]; ok {
@@ -244,7 +245,7 @@ func (mb *MessageBuilder) formatRuleName(ruleName string) string {
 // Returns false for rules with valuable details (warehouse, consumer)
 func (mb *MessageBuilder) shouldUseGenericMessage(ruleName string) bool {
 	switch ruleName {
-	case "metadata_rule", "toc_approval_rule", "service_account_rule":
+	case "metadata_rule", "toc_approval_rule", "service_account_rule", "developer_access_rule":
 		// These rules have generic messages, so use generic for multiple files
 		return true
 	case "warehouse_rule", "dataproduct_consumer_rule":
@@ -269,6 +270,8 @@ func (mb *MessageBuilder) getGenericRuleMessage(ruleName string, fileCount int) 
 		return fmt.Sprintf("✅ Consumer access validated across %d files", fileCount)
 	case "service_account_rule":
 		return fmt.Sprintf("✅ Service account validated across %d files", fileCount)
+	case "developer_access_rule":
+		return fmt.Sprintf("✅ Developer access requests validated across %d files", fileCount)
 	default:
 		return fmt.Sprintf("✅ Changes validated across %d files", fileCount)
 	}
