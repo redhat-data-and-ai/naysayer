@@ -66,6 +66,10 @@ func (m *forkMRTestGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRD
 	}, nil
 }
 
+func (m *forkMRTestGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	return nil, nil
+}
+
 func (m *forkMRTestGitLabClient) FetchMRChanges(projectID, mrIID int) ([]gitlab.FileChange, error) {
 	return []gitlab.FileChange{{
 		NewPath: "dataproducts/marketing/prod/product.yaml",
@@ -96,7 +100,9 @@ func (m *forkMRTestGitLabClient) ResetNaysayerApproval(projectID, mrIID int) err
 func (m *forkMRTestGitLabClient) GetCurrentBotUsername() (string, error) {
 	return "naysayer-bot", nil
 }
-func (m *forkMRTestGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool { return false }
+func (m *forkMRTestGitLabClient) IsNaysayerBotAuthor(author map[string]interface{}) bool {
+	return false
+}
 func (m *forkMRTestGitLabClient) CompareBranches(sourceProjectID int, sourceBranch string, targetProjectID int, targetBranch string) (*gitlab.CompareResult, error) {
 	return &gitlab.CompareResult{}, nil
 }
@@ -107,7 +113,7 @@ func (m *forkMRTestGitLabClient) CompareCommits(projectID int, fromSHA, toSHA st
 	return &gitlab.CompareResult{}, nil
 }
 func (m *forkMRTestGitLabClient) RebaseMR(projectID, mrIID int) (bool, error) { return false, nil }
-func (m *forkMRTestGitLabClient) ListOpenMRs(projectID int) ([]int, error) { return nil, nil }
+func (m *forkMRTestGitLabClient) ListOpenMRs(projectID int) ([]int, error)    { return nil, nil }
 func (m *forkMRTestGitLabClient) ListOpenMRsWithDetails(projectID int) ([]gitlab.MRDetails, error) {
 	return nil, nil
 }

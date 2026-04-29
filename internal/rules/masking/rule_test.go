@@ -42,6 +42,9 @@ func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, erro
 func (m *MockGitLabClient) GetMRDetails(projectID, mrIID int) (*gitlab.MRDetails, error) {
 	return &gitlab.MRDetails{SourceBranch: "feature"}, nil
 }
+func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	return nil, nil
+}
 func (m *MockGitLabClient) FetchMRChanges(projectID, mrIID int) ([]gitlab.FileChange, error) {
 	return nil, nil
 }
