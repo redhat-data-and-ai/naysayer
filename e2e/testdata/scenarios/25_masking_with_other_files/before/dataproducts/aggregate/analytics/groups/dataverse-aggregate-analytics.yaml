@@ -1,0 +1,21 @@
+group_name: dataverse-aggregate-analytics
+approvers:
+- testuser
+members:
+  users:
+  - testuser
+backends:
+- name: snowflake_rhprod
+  type: snowflake
+- name: snowflake_rhpreprod
+  type: snowflake
+- name: snowflake_rhdev
+  type: snowflake
+- name: snowflake_rhsandbox
+  type: snowflake
+group_params:
+- backend: gitlab
+  name: gitlab
+  property: project_access_paths
+  value:
+  - dataverse/dataverse-config/dataproduct-config

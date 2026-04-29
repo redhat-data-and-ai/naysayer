@@ -10,4 +10,4 @@ cases:
       - kind: consumer_group
         name: dataverse-aggregate-analytics
       - kind: consumer_group
-        name: dataverse-analytics-team
+        name: dataverse-consumer-analytics-team

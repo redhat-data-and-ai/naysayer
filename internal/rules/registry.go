@@ -9,6 +9,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/masking"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/warehouse"
@@ -121,6 +122,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "codeowners",
+	})
+
+	// Masking policy rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "masking_policy_rule",
+		Description: "Validates masking policy configurations - auto-approves valid policies, requires manual review for invalid configurations",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return masking.NewRule(client)
+		},
+		Enabled:  true,
+		Category: "masking",
 	})
 
 }
