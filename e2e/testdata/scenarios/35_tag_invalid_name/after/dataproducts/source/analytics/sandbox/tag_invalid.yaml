@@ -1,0 +1,8 @@
+kind: Tag
+name: invalid-name
+description: Invalid tag with bad name format
+data_product: analytics
+masking_policies:
+  - name: analytics_pii_string_policy
+allowed_values:
+  - default

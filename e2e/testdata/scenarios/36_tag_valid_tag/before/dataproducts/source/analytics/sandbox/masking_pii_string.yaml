@@ -1,0 +1,4 @@
+kind: MaskingPolicy
+name: analytics_pii_string_policy
+description: PII string masking for analytics
+data_product: analytics
