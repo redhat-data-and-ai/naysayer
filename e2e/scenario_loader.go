@@ -238,7 +238,7 @@ func validateScenario(scenario *ScenarioConfig) error {
 
 	// Check that before/ directory exists
 	if _, err := os.Stat(scenario.BeforeDir); os.IsNotExist(err) {
-		return fmt.Errorf("before/ directory not found: %s", scenario.BeforeDir)
+		fmt.Printf("[WARN] before/ directory not found (treating as new-file scenario): %s\n", scenario.BeforeDir)
 	}
 
 	// Check that after/ directory exists

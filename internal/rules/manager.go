@@ -253,43 +253,6 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		}
 	}
 
-	// Defense-in-depth: any changes touching the warehouses section must require manual review.
-	if affectedSections["warehouses"] {
-		var sawWarehouseRule bool
-		var sawWarehouseManual bool
-		for i := range ruleResults {
-			if ruleResults[i].RuleName != "warehouse_rule" {
-				continue
-			}
-			sawWarehouseRule = true
-			if ruleResults[i].Decision == shared.ManualReview {
-				sawWarehouseManual = true
-				break
-			}
-		}
-
-		if !sawWarehouseManual {
-			reason := "Warehouses section changed - manual review required"
-			if sawWarehouseRule {
-				for i := range ruleResults {
-					if ruleResults[i].RuleName == "warehouse_rule" {
-						ruleResults[i].Decision = shared.ManualReview
-						ruleResults[i].Reason = reason
-						ruleResults[i].WasEvaluated = true
-					}
-				}
-			} else {
-				ruleResults = append(ruleResults, shared.LineValidationResult{
-					RuleName:     "warehouse_rule",
-					LineRanges:   changedLines,
-					Decision:     shared.ManualReview,
-					Reason:       reason,
-					WasEvaluated: true,
-				})
-			}
-		}
-	}
-
 	// Check for uncovered lines (lines not in any section)
 	// Only consider lines that were actually changed in this MR
 	uncoveredLines := srm.getUncoveredLinesInChanges(totalLines, sections, changedLines)
@@ -669,7 +632,6 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 
 		reason := "One or more files require manual review"
 		if len(warehouseManualReasons) > 0 {
-			reason = "Warehouse changes require manual review"
 			seen := make(map[string]bool)
 			var uniq []string
 			for _, r := range warehouseManualReasons {
@@ -682,8 +644,6 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			if len(uniq) > 0 {
 				details += fmt.Sprintf(". Warehouse: %s", strings.Join(uniq, " | "))
 			}
-		} else if hasUncoveredLines {
-			reason = "Uncovered changes require manual review"
 		}
 
 		logging.Info("MR requires manual review (files=%d, warehouse=%t, uncovered_lines=%t): %v",

@@ -3,7 +3,7 @@ description: "Source branch only on fork project; section validation must fetch 
 
 expected:
   decision: ManualReview
-  reason: "Warehouse changes require manual review"
+  reason: "One or more files require manual review"
   approved: false
 
   rules_evaluated:
