@@ -1,0 +1,4 @@
+name: marketing
+warehouses:
+  user:
+    size: SMALL

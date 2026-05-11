@@ -144,8 +144,9 @@ func (mb *MessageBuilder) buildRulesSummary(fileValidations map[string]*shared.F
 	for _, filePath := range filePaths {
 		fileValidation := fileValidations[filePath]
 		for _, ruleResult := range fileValidation.RuleResults {
-			// Only show rules that were actually evaluated
-			if !ruleResult.WasEvaluated {
+			// Keep non-evaluated manual-review reasons (fallback/safety signals),
+			// but skip non-evaluated approvals to avoid noisy comments.
+			if !ruleResult.WasEvaluated && ruleResult.Decision != shared.ManualReview {
 				continue
 			}
 

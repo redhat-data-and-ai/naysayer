@@ -235,3 +235,55 @@ func TestBuildManualReviewComment(t *testing.T) {
 	assert.Contains(t, comment, "warehouse size increase detected")
 	assert.Contains(t, comment, "**What was checked:**")
 }
+
+func TestBuildManualReviewComment_IncludesNonEvaluatedManualReviewReason(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "detailed",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+	fallbackReason := "Manual review required: expected rule 'missing_metadata_rule' was not evaluated for changed section(s)"
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.ManualReview,
+			Reason: "One or more files require manual review",
+		},
+		FileValidations: map[string]*shared.FileValidationSummary{
+			"test/product.yaml": {
+				FilePath:     "test/product.yaml",
+				TotalLines:   2,
+				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 2, FilePath: "test/product.yaml"}},
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName:     "missing_metadata_rule",
+						Decision:     shared.ManualReview,
+						Reason:       fallbackReason,
+						LineRanges:   []shared.LineRange{{StartLine: 1, EndLine: 2, FilePath: "test/product.yaml"}},
+						WasEvaluated: false,
+					},
+				},
+				FileDecision: shared.ManualReview,
+			},
+		},
+		TotalFiles:     1,
+		ApprovedFiles:  0,
+		ReviewFiles:    1,
+		UncoveredFiles: 0,
+		ExecutionTime:  time.Millisecond * 50,
+	}
+
+	mrInfo := &gitlab.MRInfo{
+		ProjectID: 123,
+		MRIID:     456,
+		Author:    "testuser",
+		Title:     "Fallback reason visibility",
+	}
+
+	comment := builder.BuildManualReviewComment(result, mrInfo)
+
+	assert.Contains(t, comment, "**What was checked:**")
+	assert.Contains(t, comment, fallbackReason)
+}

@@ -253,6 +253,12 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		}
 	}
 
+	// Generic defense-in-depth:
+	// if a changed section expects a rule that did not produce a result,
+	// inject a manual-review fallback without overwriting existing reasons.
+	expectedRules := srm.getExpectedRulesForAffectedSections(sections, affectedSections)
+	ruleResults = srm.appendMissingExpectedRuleFallbacks(ruleResults, expectedRules, changedLines)
+
 	// Check for uncovered lines (lines not in any section)
 	// Only consider lines that were actually changed in this MR
 	uncoveredLines := srm.getUncoveredLinesInChanges(totalLines, sections, changedLines)
@@ -282,6 +288,66 @@ func diffMentionsWarehouses(diffText string) bool {
 		return true
 	}
 	return false
+}
+
+// Get all rules (enabled and disabled) defined for the affected sections
+func (srm *SectionRuleManager) getExpectedRulesForAffectedSections(sections []shared.Section, affectedSections map[string]bool) []string {
+	if len(affectedSections) == 0 {
+		return nil
+	}
+
+	ruleSet := make(map[string]bool)
+	for _, section := range sections {
+		if !affectedSections[section.Name] {
+			continue
+		}
+		for _, rc := range section.RuleConfigs {
+			if rc.Enabled && rc.Name != "" {
+				ruleSet[rc.Name] = true
+			}
+		}
+	}
+
+	var expected []string
+	for name := range ruleSet {
+		expected = append(expected, name)
+	}
+	sort.Strings(expected)
+	return expected
+}
+
+// Rule that were either disabled or not evaluated should result in a manual review.
+func (srm *SectionRuleManager) appendMissingExpectedRuleFallbacks(
+	ruleResults []shared.LineValidationResult,
+	expectedRules []string,
+	changedLines []shared.LineRange,
+) []shared.LineValidationResult {
+	if len(expectedRules) == 0 {
+		return ruleResults
+	}
+
+	seen := make(map[string]bool)
+	for _, rr := range ruleResults {
+		if rr.RuleName != "" {
+			seen[rr.RuleName] = true
+		}
+	}
+
+	for _, ruleName := range expectedRules {
+		if seen[ruleName] {
+			continue
+		}
+
+		ruleResults = append(ruleResults, shared.LineValidationResult{
+			RuleName:     ruleName,
+			LineRanges:   changedLines,
+			Decision:     shared.ManualReview,
+			Reason:       fmt.Sprintf("Manual review required: expected rule '%s' was not evaluated for changed section(s)", ruleName),
+			WasEvaluated: false,
+		})
+	}
+
+	return ruleResults
 }
 
 // createManualReviewValidation creates a validation summary that requires manual review
