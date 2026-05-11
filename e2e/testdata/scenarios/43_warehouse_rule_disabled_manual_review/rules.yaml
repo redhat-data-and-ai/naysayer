@@ -1,0 +1,15 @@
+enabled: true
+
+files:
+  - name: "product_configs"
+    path: "dataproducts/**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: warehouses
+        yaml_path: warehouses
+        rule_configs:
+          - name: warehouse_rule
+            enabled: false
+        auto_approve: false
