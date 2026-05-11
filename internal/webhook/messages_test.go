@@ -244,7 +244,7 @@ func TestBuildManualReviewComment_IncludesNonEvaluatedManualReviewReason(t *test
 	}
 
 	builder := NewMessageBuilder(cfg)
-	fallbackReason := "Manual review required: expected rule 'missing_metadata_rule' was not evaluated for changed section(s)"
+	fallbackReason := "Manual review required: 'missing_metadata_rule' was not evaluated for changed section(s)"
 
 	result := &shared.RuleEvaluation{
 		FinalDecision: shared.Decision{

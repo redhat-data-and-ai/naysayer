@@ -8,7 +8,7 @@ expected:
 
   comment_contains:
     - "⚠️ **Manual review required**"
-    - "expected rule 'missing_metadata_rule' was not evaluated"
+    - "'missing_metadata_rule' was not evaluated"
 
 mr_metadata:
   title: "Fallback for missing expected rule"

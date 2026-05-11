@@ -342,7 +342,7 @@ func (srm *SectionRuleManager) appendMissingExpectedRuleFallbacks(
 			RuleName:     ruleName,
 			LineRanges:   changedLines,
 			Decision:     shared.ManualReview,
-			Reason:       fmt.Sprintf("Manual review required: expected rule '%s' was not evaluated for changed section(s)", ruleName),
+			Reason:       fmt.Sprintf("Manual review required: '%s' was not evaluated for changed section(s)", ruleName),
 			WasEvaluated: false,
 		})
 	}
