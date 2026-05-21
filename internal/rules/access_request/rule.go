@@ -85,13 +85,13 @@ func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []s
 		return r.CreateManualReviewResult("Could not derive expected name from filename")
 	}
 
-	if doc.Name != expectedName {
+	if !strings.EqualFold(doc.Name, expectedName) {
 		return r.CreateManualReviewResult(
 			"name field '" + doc.Name + "' does not match filename '" + expectedName + "'",
 		)
 	}
 
-	if doc.DataProduct != expectedProduct {
+	if !strings.EqualFold(doc.DataProduct, expectedProduct) {
 		return r.CreateManualReviewResult(
 			"data_product '" + doc.DataProduct + "' does not match expected '" + expectedProduct + "' for this path",
 		)
