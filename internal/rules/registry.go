@@ -6,6 +6,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/access_request"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
@@ -147,6 +148,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "tag",
+	})
+
+	// Access request files for helloaggregate and hellosource
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "hello_access_request",
+		Description: "Auto-approves access-request YAML files for helloaggregate and hellosource when the MR contains only those files",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return access_request.NewRule()
+		},
+		Enabled:  true,
+		Category: "hello_access_request",
 	})
 
 }

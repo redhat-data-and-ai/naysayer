@@ -1,0 +1,14 @@
+name: "hello_access_request_helloaggregate"
+description: "Valid helloaggregate access-request file should be auto-approved"
+
+expected:
+  decision: Approve
+  approved: true
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Add helloaggregate access request for tvaldez"
+  author: "testuser"
+  source_branch: "feature/access-request-tvaldez"
+  target_branch: "main"

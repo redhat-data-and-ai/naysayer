@@ -1,0 +1,15 @@
+name: "hello_access_request_data_product_mismatch"
+description: "Access-request with data_product not matching path requires manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "Manual review required"
+    - "data_product"
+
+mr_metadata:
+  title: "Add hellosource access request with wrong data_product"
+  author: "testuser"
+  source_branch: "feature/access-request-dp-mismatch"
+  target_branch: "main"
