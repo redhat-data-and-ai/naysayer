@@ -4,9 +4,10 @@ on:
   # Trigger on pull requests to any branch
   pull_request:
     branches: [ "*" ]
-  # Trigger on pushes to main branch
+  # Trigger on pushes to main branch and new tags
   push:
     branches: [ "main" ]
+    tags: [ "*" ]
 
 jobs:
   build:
