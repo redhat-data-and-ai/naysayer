@@ -187,9 +187,12 @@ jobs:
             continue
           fi
           echo "Building image for tag ${TAG}..."
-          git checkout ${TAG}
-          go mod download && go mod tidy && go mod vendor
-          docker build -t ${IMAGE}:${TAG} .
-          docker push ${IMAGE}:${TAG}
-          echo "Pushed ${IMAGE}:${TAG}"
+          if git checkout ${TAG} && \
+             go mod download && go mod tidy && go mod vendor && \
+             docker build -t ${IMAGE}:${TAG} . && \
+             docker push ${IMAGE}:${TAG}; then
+            echo "Pushed ${IMAGE}:${TAG}"
+          else
+            echo "::warning::Failed to build or push image for tag ${TAG}"
+          fi
         done
