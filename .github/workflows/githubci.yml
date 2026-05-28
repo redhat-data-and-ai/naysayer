@@ -180,7 +180,8 @@ jobs:
     - name: Build and push missing tag images
       run: |
         IMAGE=ghcr.io/${{ github.repository }}
-        for TAG in $(git tag -l 'v*'); do
+        git fetch --tags --force
+        for TAG in $(git tag -l); do
           if docker manifest inspect ${IMAGE}:${TAG} > /dev/null 2>&1; then
             echo "Image ${IMAGE}:${TAG} already exists, skipping"
             continue
