@@ -160,35 +160,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.25.8'
 
     - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/${{ github.repository }}
-        tags: |
-          type=sha
-          type=raw,value=latest,enable={{is_default_branch}}
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
     - name: Vendor Go modules
-      run: |
-        go mod download && go mod tidy && go mod vendor
+      run: go mod download && go mod tidy && go mod vendor
 
-    - name: Build and push image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Build image
+      run: |
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+        docker build -t ghcr.io/${{ github.repository }}:sha-${SHORT_SHA} \
+                     -t ghcr.io/${{ github.repository }}:latest .
+
+    - name: Push image
+      run: |
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+        docker push ghcr.io/${{ github.repository }}:sha-${SHORT_SHA}
+        docker push ghcr.io/${{ github.repository }}:latest
