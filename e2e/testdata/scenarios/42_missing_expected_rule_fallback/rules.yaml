@@ -1,0 +1,15 @@
+enabled: true
+
+files:
+  - name: "product_configs"
+    path: "dataproducts/**/"
+    filename: "product.{yaml,yml}"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: missing_metadata_rule
+            enabled: true
+        auto_approve: true
