@@ -1,4 +1,4 @@
-# String Masking Policy
+# String Masking Policy - Updated
 kind: MaskingPolicy
 name: analytics_pii_string_policy
 data_product: analytics

@@ -1,0 +1,14 @@
+name: "tag_valid_tag"
+description: "Valid tag CR - should be auto-approved"
+
+mr_metadata:
+  title: "Add analytics PII tag"
+  author: "testuser"
+  source_branch: "feature/add-tag"
+  target_branch: "main"
+
+expected:
+  decision: "approve"
+  approved: true
+  comment_contains:
+    - "auto-approved"

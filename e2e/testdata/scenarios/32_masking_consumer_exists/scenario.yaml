@@ -1,0 +1,17 @@
+name: "Masking policy with existing consumer group - auto-approve"
+description: "Masking policy referencing a consumer group that exists in the repository should be auto-approved"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add masking policy with existing consumer"
+  author: "testuser"
+  source_branch: "feature/add-masking-policy"
+  target_branch: "main"
+

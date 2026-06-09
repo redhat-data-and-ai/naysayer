@@ -103,8 +103,29 @@ func runScenario(t *testing.T, scenario ScenarioConfig) {
 	// 3. Create test configuration
 	testConfig := createTestConfig(t)
 
-	// 4. Create webhook handler with mock client
-	handler := createWebhookHandler(t, testConfig, mockGitLab)
+	// 4. Create webhook handler with mock client.
+	// If scenario has local rules.yaml, load rules from that folder.
+	// Otherwise keep default shared rules loaded from current test cwd.
+	scenarioDir := filepath.Dir(scenario.BeforeDir)
+	localRulesPath := filepath.Join(scenarioDir, "rules.yaml")
+	handler := func() *webhook.DataProductConfigMrReviewHandler {
+		if _, err := os.Stat(localRulesPath); err == nil {
+			originalCWD, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("Failed to get current working directory: %v", err)
+			}
+			if err := os.Chdir(scenarioDir); err != nil {
+				t.Fatalf("Failed to switch to scenario directory %s: %v", scenarioDir, err)
+			}
+			defer func() {
+				_ = os.Chdir(originalCWD)
+			}()
+			return createWebhookHandler(t, testConfig, mockGitLab)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("Failed to check local rules file %s: %v", localRulesPath, err)
+		}
+		return createWebhookHandler(t, testConfig, mockGitLab)
+	}()
 
 	// 5. Create webhook payload
 	payload := createWebhookPayload(scenario, changes)

@@ -1,0 +1,12 @@
+# Invalid masking policy - HASH_SHA1 with float (only valid for string)
+kind: MaskingPolicy
+name: analytics_pii_float_policy
+data_product: analytics
+datatype: float
+mask: "-9.0"
+cases:
+  - strategy: HASH_SHA1
+    consumers:
+      - kind: consumer_group
+        name: dataverse-source-analytics
+

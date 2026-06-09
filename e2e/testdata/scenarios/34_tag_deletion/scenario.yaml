@@ -1,0 +1,14 @@
+name: "tag_deletion"
+description: "Tag file deletion - should require manual review"
+
+mr_metadata:
+  title: "Delete analytics PII tag"
+  author: "testuser"
+  source_branch: "feature/delete-tag"
+  target_branch: "main"
+
+expected:
+  decision: "manual_review"
+  approved: false
+  comment_contains:
+    - "deletion"

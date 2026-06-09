@@ -160,19 +160,19 @@ func TestClient_FetchFileContent_HTTPErrors(t *testing.T) {
 			name:          "401 Unauthorized",
 			statusCode:    401,
 			responseBody:  `{"message": "401 Unauthorized"}`,
-			expectedError: "GitLab API error 401",
+			expectedError: "gitlab API error 401",
 		},
 		{
 			name:          "403 Forbidden",
 			statusCode:    403,
 			responseBody:  `{"message": "403 Project access forbidden"}`,
-			expectedError: "GitLab API error 403",
+			expectedError: "gitlab API error 403",
 		},
 		{
 			name:          "500 Internal Server Error",
 			statusCode:    500,
 			responseBody:  `{"message": "Internal Server Error"}`,
-			expectedError: "GitLab API error 500",
+			expectedError: "gitlab API error 500",
 		},
 	}
 
@@ -278,7 +278,7 @@ func TestClient_GetMRTargetBranch_HTTPError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Empty(t, targetBranch)
-	assert.Contains(t, err.Error(), "GitLab API error 404")
+	assert.Contains(t, err.Error(), "gitlab API error 404")
 }
 
 func TestClient_GetMRTargetBranch_InvalidJSON(t *testing.T) {
@@ -356,7 +356,7 @@ func TestClient_GetMRDetails_HTTPError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, details)
-	assert.Contains(t, err.Error(), "GitLab API error 403")
+	assert.Contains(t, err.Error(), "gitlab API error 403")
 }
 
 func TestClient_GetMRDetails_InvalidJSON(t *testing.T) {

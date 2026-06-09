@@ -46,3 +46,12 @@ type PipelineJob struct {
 	FailureReason string `json:"failure_reason"`
 	AllowFailure  bool   `json:"allow_failure"`
 }
+
+// RepositoryFile represents a file or directory in a GitLab repository tree
+type RepositoryFile struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type"` // "blob" for files, "tree" for directories
+	Mode string `json:"mode"`
+}

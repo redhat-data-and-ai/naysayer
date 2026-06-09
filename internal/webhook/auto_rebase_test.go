@@ -247,6 +247,10 @@ func (m *MockRebaseGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref 
 	return nil, nil
 }
 
+func (m *MockRebaseGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	return []gitlab.RepositoryFile{}, nil
+}
+
 func TestNewFivetranTerraformRebaseHandler(t *testing.T) {
 	cfg := createTestConfig()
 	handler := NewAutoRebaseHandlerWithClient(cfg, &MockRebaseGitLabClient{})

@@ -137,6 +137,10 @@ func (m *MockStaleMRClient) ListDirectoryFiles(projectID int, dirPath, ref strin
 	return nil, nil
 }
 
+func (m *MockStaleMRClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	return []gitlab.RepositoryFile{}, nil
+}
+
 func createStaleMRTestConfig() *config.Config {
 	return &config.Config{
 		GitLab: config.GitLabConfig{

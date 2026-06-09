@@ -4,9 +4,10 @@ on:
   # Trigger on pull requests to any branch
   pull_request:
     branches: [ "*" ]
-  # Trigger on pushes to main branch
+  # Trigger on pushes to main branch and new tags
   push:
     branches: [ "main" ]
+    tags: [ "*" ]
 
 jobs:
   build:
@@ -148,4 +149,51 @@ jobs:
           e2e/*.log
         if-no-files-found: warn
 
+  image:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
 
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.25.8'
+
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Build and push latest
+      run: |
+        IMAGE=ghcr.io/${{ github.repository }}
+        go mod download && go mod tidy && go mod vendor
+        docker build -t ${IMAGE}:latest .
+        docker push ${IMAGE}:latest
+
+    - name: Build and push missing tag images
+      run: |
+        IMAGE=ghcr.io/${{ github.repository }}
+        git fetch --tags --force
+        for TAG in $(git tag -l); do
+          if docker manifest inspect ${IMAGE}:${TAG} > /dev/null 2>&1; then
+            echo "Image ${IMAGE}:${TAG} already exists, skipping"
+            continue
+          fi
+          echo "Building image for tag ${TAG}..."
+          if git checkout ${TAG} && \
+             go mod download && go mod tidy && go mod vendor && \
+             docker build -t ${IMAGE}:${TAG} . && \
+             docker push ${IMAGE}:${TAG}; then
+            echo "Pushed ${IMAGE}:${TAG}"
+          else
+            echo "::warning::Failed to build or push image for tag ${TAG}"
+          fi
+        done

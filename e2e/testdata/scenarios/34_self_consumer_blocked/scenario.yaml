@@ -1,0 +1,18 @@
+name: "Self-consumer blocked"
+description: "Adding a data product as consumer of itself should require manual review"
+
+expected:
+  decision: manual_review
+  reason: "manual review"
+  approved: false
+
+  comment_contains:
+    - "⚠️ **Manual review required**"
+    - "Self-consumer detected"
+    - "cannot be added as a consumer of itself"
+
+mr_metadata:
+  title: "Add analytics as consumer of itself"
+  author: "testuser"
+  source_branch: "feature/add-self-consumer"
+  target_branch: "main"

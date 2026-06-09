@@ -1,14 +1,13 @@
 name: "Masking files with other auto-approved files"
-description: "Masking files require manual review even when mixed with auto-approved files (no rules configured yet - see masking-policy-validation.md plan)"
+description: "Valid masking policy files are auto-approved along with other auto-approved files"
 
 expected:
-  decision: ManualReview
-  reason: "One or more files require manual review"
-  approved: false
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
 
   comment_contains:
-    - "⚠️ **Manual review required**"
-    - "No validation rules configured for this file type"
+    - "✅ **Auto-approved**"
 
 mr_metadata:
   title: "Update masking, sourcebinding and product config"
