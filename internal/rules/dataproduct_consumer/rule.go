@@ -2,10 +2,11 @@ package dataproduct_consumer
 
 import (
 	"fmt"
-	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"path/filepath"
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
