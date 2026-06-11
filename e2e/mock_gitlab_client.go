@@ -1,3 +1,4 @@
+// Package e2e provides a mock GitLab client for E2E testing.
 package e2e
 
 import (
@@ -251,33 +252,6 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string)
 		Content:  content,
 		Ref:      ref,
 	}, nil
-}
-
-// ListDirectoryFiles lists filenames in a directory on a specific branch by reading from the test fixture directories.
-func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	var baseDir string
-	if ref == m.targetBranch {
-		baseDir = m.beforeDir
-	} else {
-		baseDir = m.afterDir
-	}
-
-	fullPath := filepath.Join(baseDir, dirPath)
-	entries, err := os.ReadDir(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			files = append(files, entry.Name())
-		}
-	}
-	return files, nil
 }
 
 // FileExists checks whether a file exists on a specific branch by reading from the test fixture directories.

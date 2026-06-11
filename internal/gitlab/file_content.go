@@ -105,49 +105,6 @@ func (c *Client) FileExists(projectID int, filePath, ref string) (bool, error) {
 	return false, fmt.Errorf("GitLab API error %d checking file existence: %s", resp.StatusCode, filePath)
 }
 
-// ListDirectoryFiles lists filenames (blobs only) in a directory on a specific branch
-// using the Repository Tree API. Returns an empty slice if the directory does not exist (404).
-func (c *Client) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	apiURL := fmt.Sprintf("%s/api/v4/projects/%d/repository/tree?path=%s&ref=%s&per_page=100",
-		strings.TrimRight(c.config.BaseURL, "/"), projectID, url.QueryEscape(dirPath), url.QueryEscape(ref))
-
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.config.Token)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == 404 {
-		return []string{}, nil
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GitLab API error %d listing directory: %s", resp.StatusCode, dirPath)
-	}
-
-	var entries []struct {
-		Name string `json:"name"`
-		Type string `json:"type"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
-		return nil, fmt.Errorf("failed to parse directory listing: %w", err)
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if entry.Type == "blob" {
-			files = append(files, entry.Name)
-		}
-	}
-	return files, nil
-}
-
 // GetMRTargetBranch fetches the target branch of a merge request
 func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",

@@ -620,7 +620,7 @@ func TestClient_ListDirectoryFiles_Success(t *testing.T) {
 	files, err := client.ListDirectoryFiles(123, "dataproducts/analytics/groups", "main")
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"consumer-a.yaml", "consumer-b.yaml"}, files)
+	assert.Equal(t, []string{"consumer-a.yaml", "consumer-b.yaml"}, []string{files[0].Name, files[1].Name})
 }
 
 func TestClient_ListDirectoryFiles_DirectoryNotFound(t *testing.T) {
@@ -647,12 +647,12 @@ func TestClient_ListDirectoryFiles_HTTPErrors(t *testing.T) {
 		{
 			name:          "401 Unauthorized",
 			statusCode:    401,
-			expectedError: "GitLab API error 401",
+			expectedError: "gitlab API error 401",
 		},
 		{
 			name:          "500 Internal Server Error",
 			statusCode:    500,
-			expectedError: "GitLab API error 500",
+			expectedError: "gitlab API error 500",
 		},
 	}
 

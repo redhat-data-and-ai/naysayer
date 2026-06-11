@@ -102,9 +102,6 @@ func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern st
 func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
 	return false, nil
 }
-func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	return nil, nil
-}
 
 func TestCODEOWNERSSyncRule_isCODEOWNERSFile(t *testing.T) {
 	rule := NewCODEOWNERSSyncRule(nil)

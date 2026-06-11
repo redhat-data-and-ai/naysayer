@@ -1,11 +1,15 @@
+// Package dataproduct_consumer provides the implementation of the data product consumer rule.
+//
+//nolint:staticcheck // ST1003 accepted here
 package dataproduct_consumer
 
 import (
 	"fmt"
-	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"path/filepath"
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
@@ -426,7 +430,7 @@ func (r *DataProductConsumerRule) listFilesOnBranch(projectID int, dirPath strin
 	}
 	fileSet := make(map[string]bool, len(files))
 	for _, f := range files {
-		fileSet[f] = true
+		fileSet[f.Name] = true
 	}
 	return fileSet
 }

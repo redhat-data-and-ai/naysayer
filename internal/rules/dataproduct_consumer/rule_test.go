@@ -1,3 +1,4 @@
+//nolint:staticcheck // ST1003 accepted here
 package dataproduct_consumer
 
 import (
@@ -99,15 +100,15 @@ func (m *mockGitLabClient) FileExists(projectID int, filePath, ref string) (bool
 	}
 	return false, nil
 }
-func (m *mockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	var files []string
+func (m *mockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	var files []gitlab.RepositoryFile
 	if branchFiles, ok := m.existingFiles[ref]; ok {
 		prefix := dirPath + "/"
 		for filePath := range branchFiles {
 			if strings.HasPrefix(filePath, prefix) && branchFiles[filePath] {
 				fileName := filePath[len(prefix):]
 				if !strings.Contains(fileName, "/") {
-					files = append(files, fileName)
+					files = append(files, gitlab.RepositoryFile{Name: fileName})
 				}
 			}
 		}
@@ -794,7 +795,6 @@ data_product_db:
 	}
 }
 
-
 func TestDataProductConsumerRule_detectSelfConsumer(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -969,7 +969,7 @@ data_product_db:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+			rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 			// Pre-parse the YAML content to match the new function signature
 			parsedContent := rule.parseYAMLContent(tt.fileContent)
@@ -1021,7 +1021,7 @@ func TestDataProductConsumerRule_extractProductNameFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+			rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 			result := rule.extractProductNameFromPath(tt.filePath)
 			assert.Equal(t, tt.expectedName, result)
@@ -1112,7 +1112,7 @@ data_product_db:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+			rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 			rule.SetMRContext(tt.mrContext)
 
 			decision, reason := rule.ValidateLines(tt.filePath, tt.fileContent, tt.lineRanges)
@@ -1124,7 +1124,7 @@ data_product_db:
 }
 
 func TestDataProductConsumerRule_parseYAMLContent_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 	tests := []struct {
 		name      string
@@ -1161,7 +1161,7 @@ func TestDataProductConsumerRule_parseYAMLContent_EdgeCases(t *testing.T) {
 }
 
 func TestDataProductConsumerRule_fileContainsConsumersSection_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 	tests := []struct {
 		name     string
@@ -1219,7 +1219,7 @@ func TestDataProductConsumerRule_fileContainsConsumersSection_EdgeCases(t *testi
 }
 
 func TestDataProductConsumerRule_detectSelfConsumer_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 	tests := []struct {
 		name                 string
@@ -1288,7 +1288,7 @@ data_product_db:
 }
 
 func TestDataProductConsumerRule_extractConsumersFromContent_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 	t.Run("nil content should return nil", func(t *testing.T) {
 		result := rule.extractConsumersFromContent(nil)
@@ -1320,7 +1320,7 @@ func TestDataProductConsumerRule_extractConsumersFromContent_EdgeCases(t *testin
 }
 
 func TestDataProductConsumerRule_extractConsumersFromMap_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"})
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 	t.Run("data_product_db as array should be processed", func(t *testing.T) {
 		content := `data_product_db:

@@ -562,10 +562,6 @@ func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID 
 func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
 	return false, nil
 }
-func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	return nil, nil
-}
-
 func (m *MockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
 	return []gitlab.RepositoryFile{}, nil
 }

@@ -140,9 +140,6 @@ func (m *forkMRTestGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, 
 func (m *forkMRTestGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
 	return false, nil
 }
-func (m *forkMRTestGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]string, error) {
-	return nil, nil
-}
 
 func TestSourceProjectIDForMR_Fork(t *testing.T) {
 	ruleConfig := &config.GlobalRuleConfig{Enabled: true, Files: []config.FileRuleConfig{}}

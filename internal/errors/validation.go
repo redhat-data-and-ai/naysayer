@@ -277,7 +277,7 @@ func (v *Validator) ValidateYAMLStructure(field string, content map[string]inter
 	return v
 }
 
-// Validate webhook payload structure for security
+// ValidateWebhookPayload validates the structure of a webhook payload for security
 func ValidateWebhookPayload(payload map[string]interface{}) *AppError {
 	validator := NewValidator()
 

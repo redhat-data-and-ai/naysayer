@@ -80,23 +80,33 @@ vet:
 # Run linter
 lint:
 	@echo "Running golangci-lint..."
-	@if command -v $$(go env GOPATH)/bin/golangci-lint > /dev/null; then \
+	@if GOFLAGS=-mod=mod go tool golangci-lint version > /dev/null 2>&1; then \
+		GOFLAGS=-mod=mod go tool golangci-lint run ./... && echo "✅ Linting completed"; \
+	elif [ -x "$$(go env GOPATH)/bin/golangci-lint" ]; then \
 		$$(go env GOPATH)/bin/golangci-lint run ./... && echo "✅ Linting completed"; \
+	elif command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run ./... && echo "✅ Linting completed"; \
 	else \
-		echo "⚠️  golangci-lint not installed. Install with:"; \
-		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v2.6.0"; \
+		echo "⚠️  golangci-lint not available via Go toolchain or PATH. Install with:"; \
+		echo "   go get -tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2"; \
 		exit 1; \
 	fi
 
 # Run linter with automatic fixes
 lint-fix:
 	@echo "Running golangci-lint with automatic fixes..."
-	@if command -v golangci-lint > /dev/null; then \
+	@if GOFLAGS=-mod=mod go tool golangci-lint version > /dev/null 2>&1; then \
+		GOFLAGS=-mod=mod go tool golangci-lint run --fix --skip-dirs=vendor ./...; \
+		echo "✅ Linting with fixes completed"; \
+	elif [ -x "$$(go env GOPATH)/bin/golangci-lint" ]; then \
+		$$(go env GOPATH)/bin/golangci-lint run --fix --skip-dirs=vendor ./...; \
+		echo "✅ Linting with fixes completed"; \
+	elif command -v golangci-lint > /dev/null 2>&1; then \
 		golangci-lint run --fix --skip-dirs=vendor ./...; \
 		echo "✅ Linting with fixes completed"; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with:"; \
-		echo "   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b \$$(go env GOPATH)/bin v1.54.2"; \
+		echo "   go get -tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2"; \
 	fi
 
 # Clean built files and coverage files
