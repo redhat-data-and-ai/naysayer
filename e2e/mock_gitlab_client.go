@@ -254,26 +254,6 @@ func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string)
 	}, nil
 }
 
-// FileExists checks whether a file exists on a specific branch by reading from the test fixture directories.
-func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	var baseDir string
-	if ref == m.targetBranch {
-		baseDir = m.beforeDir
-	} else {
-		baseDir = m.afterDir
-	}
-
-	fullPath := filepath.Join(baseDir, filePath)
-	_, err := os.Stat(fullPath)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
 // GetMRTargetBranch returns the target branch
 func (m *MockGitLabClient) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	return m.targetBranch, nil

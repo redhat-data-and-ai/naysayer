@@ -5,7 +5,6 @@ package gitlab
 type GitLabClient interface {
 	// File operations
 	FetchFileContent(projectID int, filePath, ref string) (*FileContent, error)
-	FileExists(projectID int, filePath, ref string) (bool, error)
 	GetMRTargetBranch(projectID, mrIID int) (string, error)
 	GetMRDetails(projectID, mrIID int) (*MRDetails, error)
 	// ListDirectoryFiles lists files in a directory using GitLab Repository Tree API

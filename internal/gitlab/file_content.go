@@ -74,37 +74,6 @@ func (c *Client) FetchFileContent(projectID int, filePath, ref string) (*FileCon
 	return &fileContent, nil
 }
 
-// FileExists checks whether a file exists on a specific branch using a HEAD request.
-// Returns (true, nil) if the file exists, (false, nil) if it does not,
-// or (false, error) for unexpected API errors.
-func (c *Client) FileExists(projectID int, filePath, ref string) (bool, error) {
-	encodedPath := url.QueryEscape(filePath)
-
-	url := fmt.Sprintf("%s/api/v4/projects/%d/repository/files/%s?ref=%s",
-		strings.TrimRight(c.config.BaseURL, "/"), projectID, encodedPath, ref)
-
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.config.Token)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == 200 {
-		return true, nil
-	}
-	if resp.StatusCode == 404 {
-		return false, nil
-	}
-	return false, fmt.Errorf("GitLab API error %d checking file existence: %s", resp.StatusCode, filePath)
-}
-
 // GetMRTargetBranch fetches the target branch of a merge request
 func (c *Client) GetMRTargetBranch(projectID, mrIID int) (string, error) {
 	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d",

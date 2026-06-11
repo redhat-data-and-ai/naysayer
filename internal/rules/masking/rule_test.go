@@ -15,10 +15,6 @@ type MockGitLabClient struct {
 	fetchError    error           // error to return for FetchFileContent
 }
 
-func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	panic("implement me")
-}
-
 func NewMockGitLabClient() *MockGitLabClient {
 	return &MockGitLabClient{
 		existingFiles: make(map[string]bool),

@@ -99,9 +99,6 @@ func (m *MockGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID 
 func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
 	return false, nil
 }
-func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	return false, nil
-}
 
 func TestCODEOWNERSSyncRule_isCODEOWNERSFile(t *testing.T) {
 	rule := NewCODEOWNERSSyncRule(nil)

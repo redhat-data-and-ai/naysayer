@@ -130,9 +130,7 @@ func (m *MockStaleMRClient) AreAllPipelineJobsSucceeded(projectID, pipelineID in
 func (m *MockStaleMRClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
 	return false, ""
 }
-func (m *MockStaleMRClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	return false, nil
-}
+
 func (m *MockStaleMRClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
 	return []gitlab.RepositoryFile{}, nil
 }

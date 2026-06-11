@@ -94,10 +94,6 @@ func (m *MockGitLabClient) CloseMR(projectID, mrIID int) error { return nil }
 func (m *MockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
 	return false, nil
 }
-func (m *MockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	return false, nil
-}
-
 func TestRule_Name(t *testing.T) {
 	r := NewRule(nil)
 	assert.Equal(t, "tag_rule", r.Name())

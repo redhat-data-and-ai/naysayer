@@ -137,9 +137,6 @@ func (m *forkMRTestGitLabClient) AreAllPipelineJobsSucceeded(projectID, pipeline
 func (m *forkMRTestGitLabClient) CheckAtlantisCommentForPlanFailures(projectID, mrIID int) (bool, string) {
 	return false, ""
 }
-func (m *forkMRTestGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	return false, nil
-}
 
 func TestSourceProjectIDForMR_Fork(t *testing.T) {
 	ruleConfig := &config.GlobalRuleConfig{Enabled: true, Files: []config.FileRuleConfig{}}

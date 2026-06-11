@@ -94,12 +94,6 @@ func (m *mockGitLabClient) CloseMR(projectID, mrIID int) error { return nil }
 func (m *mockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern string) (bool, error) {
 	return false, nil
 }
-func (m *mockGitLabClient) FileExists(projectID int, filePath, ref string) (bool, error) {
-	if branchFiles, ok := m.existingFiles[ref]; ok {
-		return branchFiles[filePath], nil
-	}
-	return false, nil
-}
 func (m *mockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
 	var files []gitlab.RepositoryFile
 	if branchFiles, ok := m.existingFiles[ref]; ok {
