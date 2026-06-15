@@ -1,0 +1,15 @@
+name: "Sandbox Personal - Without Unstructured Pipeline File"
+description: "MR without unstructured-data-pipeline.yaml should still auto-approve (file is optional)"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Update sandbox personal product without pipeline"
+  author: "alice@company.com"
+  source_branch: "feature/update-sandbox-no-pipeline"
+  target_branch: "main"

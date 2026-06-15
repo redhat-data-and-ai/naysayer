@@ -1,0 +1,16 @@
+name: "Sandbox Personal - New Product with Correct Warehouses"
+description: "NEW sandbox/product.yaml with kind=UnstructuredDataProduct, type=Personal, and all XSMALL warehouses should auto-approve"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Sandbox Personal UnstructuredDataProduct"
+
+mr_metadata:
+  title: "Add new sandbox personal unstructured data product"
+  author: "alice@company.com"
+  source_branch: "feature/new-sandbox-personal"
+  target_branch: "main"

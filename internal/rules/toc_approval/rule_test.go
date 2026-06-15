@@ -37,7 +37,7 @@ func TestNewTOCApprovalRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewTOCApprovalRule(tt.preprodProdEnvs)
+			rule := NewTOCApprovalRule(tt.preprodProdEnvs, nil)
 
 			assert.Equal(t, tt.expectedName, rule.Name())
 			assert.Contains(t, rule.Description(), "TOC approval")
@@ -143,7 +143,7 @@ func TestTOCApprovalRule_ValidateLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewTOCApprovalRule([]string{"preprod", "prod"})
+			rule := NewTOCApprovalRule([]string{"preprod", "prod"}, nil)
 			rule.SetMRContext(tt.mrContext)
 
 			lineRanges := []shared.LineRange{
@@ -210,7 +210,7 @@ func TestTOCApprovalRule_GetCoveredLines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewTOCApprovalRule([]string{"preprod", "prod"})
+			rule := NewTOCApprovalRule([]string{"preprod", "prod"}, nil)
 			rule.SetMRContext(tt.mrContext)
 
 			coveredLines := rule.GetCoveredLines(tt.filePath, tt.fileContent)
@@ -295,7 +295,7 @@ func TestTOCApprovalRule_analyzeFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewTOCApprovalRule([]string{"preprod", "prod"})
+			rule := NewTOCApprovalRule([]string{"preprod", "prod"}, nil)
 			rule.SetMRContext(tt.mrContext)
 
 			context := rule.analyzeFile(tt.filePath)
@@ -354,7 +354,7 @@ func TestTOCApprovalRule_extractEnvironmentFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rule := NewTOCApprovalRule(tt.envs)
+			rule := NewTOCApprovalRule(tt.envs, nil)
 
 			result := rule.extractEnvironmentFromPath(tt.filePath)
 			assert.Equal(t, tt.expected, result)

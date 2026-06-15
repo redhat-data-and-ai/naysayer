@@ -3,7 +3,9 @@ package toc_approval
 import (
 	"strings"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandbox_personal"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 )
 
@@ -13,10 +15,11 @@ type TOCApprovalRule struct {
 	*common.FileTypeMatcher
 	*common.ValidationHelper
 	config *TOCEnvironmentConfig
+	client gitlab.GitLabClient
 }
 
 // NewTOCApprovalRule creates a new TOC approval rule instance
-func NewTOCApprovalRule(preprodProdEnvs []string) *TOCApprovalRule {
+func NewTOCApprovalRule(preprodProdEnvs []string, client gitlab.GitLabClient) *TOCApprovalRule {
 	config := DefaultTOCEnvironmentConfig()
 	if preprodProdEnvs != nil {
 		config.RequiredEnvironments = preprodProdEnvs
@@ -27,6 +30,7 @@ func NewTOCApprovalRule(preprodProdEnvs []string) *TOCApprovalRule {
 		FileTypeMatcher:  common.NewFileTypeMatcher(),
 		ValidationHelper: common.NewValidationHelper(),
 		config:           config,
+		client:           client,
 	}
 }
 
@@ -35,6 +39,12 @@ func (r *TOCApprovalRule) ValidateLines(filePath string, fileContent string, lin
 	// Only apply to product.yaml files
 	if !r.IsProductFile(filePath) {
 		return r.CreateApprovalResult("Not a product.yaml file - no TOC approval required")
+	}
+
+	// Skip sandbox Personal UnstructuredDataProduct files - they're handled by sandbox rules
+	mrCtx := r.GetMRContext()
+	if mrCtx != nil && r.client != nil && sandbox_personal.IsSandboxPersonalMR(mrCtx, r.client) {
+		return r.CreateApprovalResult("Auto-approved: Sandbox Personal UnstructuredDataProduct - handled by sandbox rules")
 	}
 
 	// Analyze the context for this file
@@ -152,3 +162,4 @@ func (r *TOCApprovalRule) getTOCApprovalReason(filePath, environment string) str
 
 	return "Manual review required: New data product in critical environment requires TOC (Technical Oversight Committee) approval before deployment"
 }
+

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandbox_personal"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 )
 
@@ -73,6 +74,14 @@ func (r *Rule) GetCoveredLines(filePath string, fileContent string) []shared.Lin
 func (r *Rule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
 	if !r.isWarehouseFile(filePath) {
 		return shared.Approve, "Not a warehouse file"
+	}
+
+	// Skip NEW sandbox Personal product.yaml files - validated by sandbox_product_warehouse_rule.
+	// Existing sandbox Personal products fall through to warehouse_rule for warehouse changes.
+	if r.mrCtx != nil && r.client != nil &&
+		sandbox_personal.IsSandboxPersonalProductForFile(r.mrCtx, r.client, filePath) &&
+		sandbox_personal.IsNewSandboxProductFile(r.mrCtx, r.client, filePath) {
+		return shared.Approve, "Auto-approved: Sandbox Personal UnstructuredDataProduct - handled by sandbox rules"
 	}
 
 	// If we don't have analyzer or MR context, require manual review for safety
@@ -219,3 +228,4 @@ func formatSizeChangeDetail(warehouseType, from, to string, hasMixedChanges bool
 	}
 	return fmt.Sprintf("%s warehouse: %s → %s", warehouseType, from, to)
 }
+

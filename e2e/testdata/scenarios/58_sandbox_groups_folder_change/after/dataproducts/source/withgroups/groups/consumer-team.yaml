@@ -1,0 +1,5 @@
+group_name: consumer-team
+approvers:
+  - bob@company.com
+  - charlie@company.com
+description: Consumer team access group

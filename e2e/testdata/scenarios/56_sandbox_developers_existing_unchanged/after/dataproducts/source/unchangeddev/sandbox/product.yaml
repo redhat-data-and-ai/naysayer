@@ -1,0 +1,13 @@
+---
+name: unchangeddev
+kind: UnstructuredDataProduct
+type: Personal
+rover_group: dataverse-source-unchangeddev
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+tags:
+  data_product: unchangeddev
+  updated: true
