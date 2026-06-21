@@ -1,0 +1,15 @@
+name: "hello_access_request_name_mismatch"
+description: "Access-request with name field not matching filename requires manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "Manual review required"
+    - "does not match filename"
+
+mr_metadata:
+  title: "Add hellosource access request with invalid name"
+  author: "testuser"
+  source_branch: "feature/access-request-name-mismatch"
+  target_branch: "main"

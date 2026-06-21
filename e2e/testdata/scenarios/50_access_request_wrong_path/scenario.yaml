@@ -1,0 +1,15 @@
+name: "hello_access_request_wrong_path"
+description: "Access-request file outside allowed group path requires manual review"
+
+expected:
+  decision: ManualReview
+  reason: "Uncovered changes require manual review"
+  approved: false
+  comment_contains:
+    - "Manual review required"
+
+mr_metadata:
+  title: "Add access request under wrong group path"
+  author: "testuser"
+  source_branch: "feature/access-request-wrong-path"
+  target_branch: "main"

@@ -1,0 +1,14 @@
+name: "hello_access_request_hellosource"
+description: "Valid hellosource access-request file should be auto-approved"
+
+expected:
+  decision: Approve
+  approved: true
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Add hellosource access request for mbramle"
+  author: "testuser"
+  source_branch: "feature/access-request-mbramle"
+  target_branch: "main"

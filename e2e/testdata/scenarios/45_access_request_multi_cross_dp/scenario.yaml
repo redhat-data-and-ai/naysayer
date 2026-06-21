@@ -1,0 +1,14 @@
+name: "hello_access_request_multi_cross_dp"
+description: "Valid access-request files for helloaggregate and hellosource in one MR should be auto-approved"
+
+expected:
+  decision: Approve
+  approved: true
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Add cross data product access requests"
+  author: "testuser"
+  source_branch: "feature/access-requests-cross-dp"
+  target_branch: "main"
