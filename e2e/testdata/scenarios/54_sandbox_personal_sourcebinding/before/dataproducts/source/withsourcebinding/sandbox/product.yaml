@@ -1,0 +1,12 @@
+---
+name: withsourcebinding
+kind: UnstructuredDataProduct
+type: Personal
+rover_group: dataverse-source-withsourcebinding
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+tags:
+  data_product: withsourcebinding

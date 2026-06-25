@@ -1,0 +1,12 @@
+---
+name: existingprod
+kind: UnstructuredDataProduct
+type: Personal
+rover_group: dataverse-source-existingprod
+warehouses:
+- type: user
+  size: SMALL
+- type: service_account
+  size: XSMALL
+tags:
+  data_product: existingprod

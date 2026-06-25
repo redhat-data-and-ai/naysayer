@@ -1,0 +1,16 @@
+name: "Sandbox Groups Folder Change"
+description: "Adding a file to product-level groups/ folder should require manual review for sandbox Personal product"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "Changes to product-level groups/ folder require manual review"
+
+mr_metadata:
+  title: "Add consumer group configuration"
+  author: "bob@company.com"
+  source_branch: "feature/add-consumer-group"
+  target_branch: "main"

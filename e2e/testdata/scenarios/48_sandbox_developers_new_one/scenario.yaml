@@ -1,0 +1,16 @@
+name: "Sandbox Developers - New with One Owner"
+description: "NEW developers.yaml with exactly 1 owner should auto-approve for sandbox Personal product"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "New developers.yaml with 1 developer"
+
+mr_metadata:
+  title: "Add developers.yaml with single owner"
+  author: "alice@company.com"
+  source_branch: "feature/add-developers"
+  target_branch: "main"

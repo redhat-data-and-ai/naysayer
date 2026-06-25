@@ -1,0 +1,15 @@
+name: "Sandbox Developers - Existing Unchanged"
+description: "EXISTING developers.yaml with no changes should auto-approve for sandbox Personal product"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Update product without changing developers"
+  author: "alice@company.com"
+  source_branch: "feature/update-product-no-dev-change"
+  target_branch: "main"

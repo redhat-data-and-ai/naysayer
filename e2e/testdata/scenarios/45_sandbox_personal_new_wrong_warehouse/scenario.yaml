@@ -1,0 +1,17 @@
+name: "Sandbox Personal - New Product with Wrong Warehouse Size"
+description: "NEW sandbox/product.yaml with kind=UnstructuredDataProduct, type=Personal, but SMALL warehouse should require manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "New sandbox Personal product must have all warehouses set to XSMALL"
+    - "user:SMALL"
+
+mr_metadata:
+  title: "Add new sandbox personal unstructured data product with SMALL warehouse"
+  author: "bob@company.com"
+  source_branch: "feature/new-sandbox-wrong-size"
+  target_branch: "main"

@@ -1,0 +1,16 @@
+name: "Sandbox Existing Product Warehouse Change"
+description: "EXISTING sandbox/product.yaml warehouse change should be handled by warehouse_rule (not sandbox_product_warehouse_rule)"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "Warehouse size increase detected"
+
+mr_metadata:
+  title: "Increase sandbox warehouse size"
+  author: "alice@company.com"
+  source_branch: "feature/increase-sandbox-warehouse"
+  target_branch: "main"

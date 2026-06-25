@@ -10,6 +10,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/masking"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandbox_personal"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/tag"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
@@ -147,6 +148,57 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "tag",
+	})
+
+	// Sandbox Personal UnstructuredDataProduct Rules
+	// These rules apply ONLY when sandbox/product.yaml has kind=UnstructuredDataProduct, type=Personal
+
+	// Sandbox unstructured pipeline rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_unstructured_pipeline_rule",
+		Description: "Always auto-approves sandbox unstructured-data-pipeline.yaml for Personal UnstructuredDataProducts",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewUnstructuredPipelineRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
+	})
+
+	// Sandbox product warehouse rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_product_warehouse_rule",
+		Description: "Validates NEW sandbox/product.yaml files have all XSMALL warehouses for Personal UnstructuredDataProducts",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewProductWarehouseRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
+	})
+
+	// Sandbox developers rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_developers_rule",
+		Description: "Validates exactly 1 developer in product-level developers.yaml for Personal UnstructuredDataProducts, no changes allowed",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewDevelopersRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
+	})
+
+	// Sandbox groups strict rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_groups_strict_rule",
+		Description: "Requires manual review for all groups/ folder changes in sandbox Personal UnstructuredDataProducts",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewGroupsStrictRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
 	})
 
 }
