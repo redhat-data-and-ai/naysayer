@@ -165,18 +165,6 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "sandbox_personal",
 	})
 
-	// Sandbox product warehouse rule
-	_ = r.RegisterRule(&RuleInfo{
-		Name:        "sandbox_product_warehouse_rule",
-		Description: "Validates NEW sandbox/product.yaml files have all XSMALL warehouses for Personal UnstructuredDataProducts",
-		Version:     "1.0.0",
-		Factory: func(client gitlab.GitLabClient) shared.Rule {
-			return sandbox_personal.NewProductWarehouseRule(client)
-		},
-		Enabled:  true,
-		Category: "sandbox_personal",
-	})
-
 	// Sandbox developers rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "sandbox_developers_rule",

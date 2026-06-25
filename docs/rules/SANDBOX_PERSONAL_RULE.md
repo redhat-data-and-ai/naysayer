@@ -31,11 +31,11 @@ If either condition fails, every sandbox rule **no-ops** (returns auto-approve/s
 
 ```
 dataproducts/source/<product_name>/
-├── developers.yaml              ← product root (Rule 3)
-├── groups/                      ← product root (Rule 4)
+├── developers.yaml              ← product root (Rule 2)
+├── groups/                      ← product root (Rule 3)
 │   └── *.yaml
 ├── sandbox/
-│   ├── product.yaml             ← activation + warehouse validation (Rule 2)
+│   ├── product.yaml             ← activation file
 │   ├── unstructured-data-pipeline.yaml   ← optional (Rule 1)
 │   ├── sourcebinding.yaml       ← existing metadata_rule
 │   ├── snowpipeconfig.yaml      ← existing metadata_rule
@@ -49,14 +49,13 @@ dataproducts/source/<product_name>/
 
 ## Rule overview
 
-Four dedicated rules are registered in `internal/rules/registry.go` and wired in `rules.yaml` under the **SANDBOX PERSONAL UNSTRUCTURED DATA PRODUCT RULES** section.
+Three dedicated rules are registered in `internal/rules/registry.go` and wired in `rules.yaml` under the **SANDBOX PERSONAL UNSTRUCTURED DATA PRODUCT RULES** section.
 
 | # | Rule name | File(s) | NEW vs EXISTING | Decision |
 |---|-----------|---------|-----------------|----------|
 | 1 | `sandbox_unstructured_pipeline_rule` | `sandbox/unstructured-data-pipeline.yaml` | Any (file is optional) | ✅ Always auto-approve |
-| 2 | `sandbox_product_warehouse_rule` | `sandbox/product.yaml` → `warehouses` | NEW: validate XSMALL; EXISTING: delegate to warehouse logic | ✅ if XSMALL / ⚠️ if wrong size or warehouse change |
-| 3 | `sandbox_developers_rule` | Product-root `developers.yaml` | NEW: exactly 1 owner; EXISTING: unchanged | ✅ if valid / ⚠️ if invalid or changed |
-| 4 | `sandbox_groups_strict_rule` | Product-root `groups/*.yaml` | Any change | ⚠️ Always manual review |
+| 2 | `sandbox_developers_rule` | Product-root `developers.yaml` | NEW: exactly 1 owner; EXISTING: unchanged | ✅ if valid / ⚠️ if invalid or changed |
+| 3 | `sandbox_groups_strict_rule` | Product-root `groups/*.yaml` | Any change | ⚠️ Always manual review |
 
 ### What is **not** covered by sandbox rules
 
@@ -88,34 +87,7 @@ pipeline:
 
 ---
 
-## Rule 2 — Sandbox product warehouses (`sandbox_product_warehouse_rule`)
-
-**Applies to**: `warehouses` section in `dataproducts/**/sandbox/product.yaml`
-
-### NEW `sandbox/product.yaml`
-
-All warehouse entries must use size **`XSMALL`**:
-
-```yaml
-warehouses:
-- type: user
-  size: XSMALL
-- type: service_account
-  size: XSMALL
-```
-
-| Condition | Decision |
-|-----------|----------|
-| All warehouses `XSMALL` | ✅ Auto-approve |
-| Any warehouse ≠ `XSMALL` | ⚠️ Manual review |
-
-### EXISTING `sandbox/product.yaml`
-
-Warehouse changes are evaluated using the standard **`warehouse_rule`** logic (delegated inside `sandbox_product_warehouse_rule` — the warehouse package itself is **not** modified). Size increases and other warehouse changes require manual review, same as non-sandbox products.
-
----
-
-## Rule 3 — Developers (`sandbox_developers_rule`)
+## Rule 2 — Developers (`sandbox_developers_rule`)
 
 **Applies to**: Product-root `dataproducts/**/developers.yaml`  
 **Does not apply to**: `developers.yaml` inside `sandbox/`, `dev/`, `preprod/`, or `prod/`
@@ -143,7 +115,7 @@ group:
 
 ---
 
-## Rule 4 — Groups folder (`sandbox_groups_strict_rule`)
+## Rule 3 — Groups folder (`sandbox_groups_strict_rule`)
 
 **Applies to**: Product-root `dataproducts/**/groups/*.yaml`
 
@@ -178,13 +150,11 @@ kind=UnstructuredDataProduct + type=Personal?
    NO ──┴── YES → sandbox personal rules apply to matching files
         │              │
         │              ├── pipeline.yaml        → Rule 1 (always approve)
-        │              ├── sandbox/product.yaml → Rule 2 (warehouses)
-        │              ├── developers.yaml      → Rule 3
-        │              └── groups/*.yaml         → Rule 4 (always review)
+        │              ├── developers.yaml      → Rule 2
+        │              └── groups/*.yaml         → Rule 3 (always review)
         │
         ▼
-Existing rules apply (warehouse_rule, metadata_rule,
-toc_approval_rule, strict policy, etc.)
+Existing rules apply (metadata_rule, toc_approval_rule, strict policy, etc.)
 ```
 
 **MR-level decision**: If **any** file requires manual review, the entire MR requires manual review.
@@ -201,17 +171,14 @@ go test ./e2e -run 'TestE2E_Scenarios/Sandbox' -v -count=1
 
 | Scenario | E2E path | What it validates | Expected |
 |----------|----------|-------------------|----------|
-| 44 | `44_sandbox_personal_new_correct_warehouses` | NEW `sandbox/product.yaml`, all `XSMALL` warehouses | ✅ Approve |
-| 45 | `45_sandbox_personal_new_wrong_warehouse` | NEW product with `SMALL` warehouse | ⚠️ Manual review |
-| 46 | `46_sandbox_personal_with_pipeline` | NEW product + `unstructured-data-pipeline.yaml` | ✅ Approve |
-| 47 | `47_sandbox_personal_without_pipeline` | NEW product, no pipeline file (optional) | ✅ Approve |
-| 48 | `48_sandbox_developers_new_one` | NEW product-root `developers.yaml`, 1 owner | ✅ Approve |
-| 49 | `49_sandbox_developers_new_multiple` | NEW `developers.yaml`, 2 owners | ⚠️ Manual review |
-| 50 | `50_sandbox_developers_existing_unchanged` | EXISTING `developers.yaml`, no owner change | ✅ Approve |
-| 51 | `51_sandbox_developers_existing_changed` | EXISTING `developers.yaml`, owner changed | ⚠️ Manual review |
-| 52 | `52_sandbox_groups_folder_change` | NEW file under product-root `groups/` | ⚠️ Manual review |
-| 53 | `53_sandbox_existing_product_warehouse_change` | EXISTING product, warehouse size increase | ⚠️ Manual review (warehouse logic) |
-| 54 | `54_sandbox_personal_sourcebinding` | `sandbox/sourcebinding.yaml` change | ✅ Approve (`metadata_rule`) |
+| 44 | `44_sandbox_personal_with_pipeline` | NEW product + `unstructured-data-pipeline.yaml` | ✅ Approve |
+| 45 | `45_sandbox_personal_without_pipeline` | NEW product, no pipeline file (optional) | ✅ Approve |
+| 46 | `46_sandbox_developers_new_one` | NEW product-root `developers.yaml`, 1 owner | ✅ Approve |
+| 47 | `47_sandbox_developers_new_multiple` | NEW `developers.yaml`, 2 owners | ⚠️ Manual review |
+| 48 | `48_sandbox_developers_existing_unchanged` | EXISTING `developers.yaml`, no owner change | ✅ Approve |
+| 49 | `49_sandbox_developers_existing_changed` | EXISTING `developers.yaml`, owner changed | ⚠️ Manual review |
+| 50 | `50_sandbox_groups_folder_change` | NEW file under product-root `groups/` | ⚠️ Manual review |
+| 51 | `51_sandbox_personal_sourcebinding` | `sandbox/sourcebinding.yaml` change | ✅ Approve (`metadata_rule`) |
 
 Test fixtures live under:
 
@@ -229,7 +196,7 @@ e2e/testdata/scenarios/<scenario_name>/
 ### ✅ Typical auto-approved setup (new Personal unstructured product)
 
 ```
-dataproducts/source/myproduct/sandbox/product.yaml          (NEW, XSMALL warehouses)
+dataproducts/source/myproduct/sandbox/product.yaml          (NEW)
 dataproducts/source/myproduct/developers.yaml               (NEW, 1 owner)
 dataproducts/source/myproduct/sandbox/unstructured-data-pipeline.yaml  (optional)
 ```
@@ -238,8 +205,9 @@ dataproducts/source/myproduct/sandbox/unstructured-data-pipeline.yaml  (optional
 
 ```
 dataproducts/source/myproduct/groups/consumer-team.yaml     (any groups/ change)
-dataproducts/source/myproduct/sandbox/sourcebinding.yaml    (only if metadata_rule doesn't apply — normally auto-approved)
 ```
+
+**Note**: `sandbox/sourcebinding.yaml` is auto-approved by `metadata_rule`.
 
 ---
 
@@ -252,11 +220,6 @@ dataproducts/source/myproduct/sandbox/sourcebinding.yaml    (only if metadata_ru
    - `type: Personal`
 2. Confirm the changed file path matches the expected layout (`dataproducts/source/<product>/...`).
 3. Check Naysayer logs for: `MR affects sandbox Personal UnstructuredDataProduct at ...`
-
-### MR blocked on warehouse for NEW product
-
-- Every warehouse entry must be `size: XSMALL` (case-insensitive).
-- Check for typos like `SMALL`, `MEDIUM`, or missing warehouse types.
 
 ### MR blocked on `developers.yaml`
 
@@ -272,6 +235,5 @@ dataproducts/source/myproduct/sandbox/sourcebinding.yaml    (only if metadata_ru
 ## Related documentation
 
 - [Section-Based Architecture](../SECTION_BASED_ARCHITECTURE.md) — how `rules.yaml` sections work
-- [Warehouse Rule](WAREHOUSE_RULE.md) — warehouse change logic for **existing** sandbox products
 - [Metadata Rule](METADATA_RULE.md) — `sourcebinding.yaml`, `snowpipeconfig.yaml`, etc.
 - [Rule Creation Guide](../RULE_CREATION_GUIDE.md) — adding or extending rules
