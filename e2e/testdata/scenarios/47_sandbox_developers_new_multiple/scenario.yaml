@@ -1,5 +1,5 @@
-name: "Sandbox Developers - New with Multiple Owners"
-description: "NEW developers.yaml with 2+ owners should require manual review for sandbox Personal product"
+name: "Sandbox Developers - New with Multiple Owners (Should FAIL)"
+description: "NEW developers.yaml with 3 owners should require manual review - must have exactly 2"
 
 expected:
   decision: ManualReview
@@ -7,11 +7,10 @@ expected:
 
   comment_contains:
     - "Manual review required"
-    - "New developers.yaml must have exactly 1 developer"
-    - "found: 2"
+    - "must have exactly 2 developers"
 
 mr_metadata:
   title: "Add developers.yaml with multiple owners"
-  author: "bob@company.com"
-  source_branch: "feature/add-multiple-developers"
+  author: "alice@company.com"
+  source_branch: "feature/add-developers-multi"
   target_branch: "main"

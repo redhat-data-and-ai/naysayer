@@ -1,5 +1,5 @@
 name: "Sandbox Developers - Existing Unchanged"
-description: "EXISTING developers.yaml with no changes should auto-approve for sandbox Personal product"
+description: "Product config change without developer changes should auto-approve"
 
 expected:
   decision: Approve
@@ -9,7 +9,7 @@ expected:
     - "Auto-approved"
 
 mr_metadata:
-  title: "Update product without changing developers"
+  title: "Update product configuration without developer changes"
   author: "alice@company.com"
-  source_branch: "feature/update-product-no-dev-change"
+  source_branch: "feature/update-config"
   target_branch: "main"

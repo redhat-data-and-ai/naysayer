@@ -1,5 +1,5 @@
-name: "Sandbox Developers - New with One Owner"
-description: "NEW developers.yaml with exactly 1 owner should auto-approve for sandbox Personal product"
+name: "Sandbox Developers - New with Two Owners Matching CODEOWNERS"
+description: "NEW developers.yaml with exactly 2 owners (human + service account) matching CODEOWNERS should auto-approve"
 
 expected:
   decision: Approve
@@ -7,10 +7,10 @@ expected:
 
   comment_contains:
     - "Auto-approved"
-    - "New developers.yaml with 1 developer"
+    - "New developers.yaml with 2 developers matching CODEOWNERS"
 
 mr_metadata:
-  title: "Add developers.yaml with single owner"
+  title: "Add developers.yaml with two owners"
   author: "alice@company.com"
   source_branch: "feature/add-developers"
   target_branch: "main"

@@ -40,7 +40,13 @@ func (r *GroupsStrictRule) ValidateLines(filePath string, fileContent string, li
 	}
 
 	// Only apply when the associated product is a sandbox Personal UnstructuredDataProduct
-	if !IsSandboxPersonalProductForFile(r.mrContext, r.client, filePath) {
+	isAIFProduct, err := IsSandboxPersonalProductForFile(r.mrContext, r.client, filePath)
+	if err != nil {
+		// Fail-closed: if we can't verify the product type, require manual review
+		logging.Error("[%s] Failed to check product type: %v", r.Name(), err)
+		return r.CreateManualReviewResult(fmt.Sprintf("Manual review required: Failed to verify product type: %v", err))
+	}
+	if !isAIFProduct {
 		return r.CreateApprovalResult("Auto-approved: Not a sandbox Personal UnstructuredDataProduct")
 	}
 

@@ -1,5 +1,5 @@
-name: "Sandbox Developers - Existing Changed"
-description: "EXISTING developers.yaml with owner change should require manual review for sandbox Personal product"
+name: "Sandbox Developers - Existing Changed (Should FAIL)"
+description: "EXISTING developers.yaml with changed owners should require manual review - changes not allowed"
 
 expected:
   decision: ManualReview
@@ -7,10 +7,10 @@ expected:
 
   comment_contains:
     - "Manual review required"
-    - "Developer cannot be changed"
+    - "Developers cannot be changed"
 
 mr_metadata:
-  title: "Change developer ownership"
+  title: "Change developer in developers.yaml"
   author: "bob@company.com"
   source_branch: "feature/change-developer"
   target_branch: "main"

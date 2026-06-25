@@ -1,0 +1,4 @@
+group:
+  owners:
+    - alice
+    - {{SERVICE_ACCOUNT_NAME}}

@@ -1,6 +1,0 @@
-consumers: []
-data_product: withsourcebinding
-database: snowpipe_db
-kind: SourceBinding
-schema: withsourcebinding
-type: snowpipe

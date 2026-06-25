@@ -1,0 +1,10 @@
+source_crawler_config:
+  type: "azure_blob"
+  azureBlobConfig:
+    container: "mycontainer"
+
+destination_syncer_config:
+  type: "s3"
+  s3DestinationConfig:
+    bucket: "dataverse-sandbox-unstructured"
+    prefix: "aif-unsupported/destination/"

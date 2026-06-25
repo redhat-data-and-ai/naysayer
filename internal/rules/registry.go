@@ -32,13 +32,15 @@ type RuleInfo struct {
 
 // RuleRegistry manages available rules and their creation
 type RuleRegistry struct {
-	rules map[string]*RuleInfo
+	rules  map[string]*RuleInfo
+	config *config.Config // Application config for rule initialization
 }
 
 // NewRuleRegistry creates a new rule registry
 func NewRuleRegistry() *RuleRegistry {
 	registry := &RuleRegistry{
-		rules: make(map[string]*RuleInfo),
+		rules:  make(map[string]*RuleInfo),
+		config: config.Load(), // Load config once at registry creation
 	}
 
 	// Register built-in rules
@@ -168,10 +170,10 @@ func (r *RuleRegistry) registerBuiltInRules() {
 	// Sandbox developers rule
 	_ = r.RegisterRule(&RuleInfo{
 		Name:        "sandbox_developers_rule",
-		Description: "Validates exactly 1 developer in product-level developers.yaml for Personal UnstructuredDataProducts, no changes allowed",
+		Description: "Validates exactly 2 developers (1 human + 1 service account) in product-level developers.yaml for aif-* UnstructuredDataProducts, matches CODEOWNERS",
 		Version:     "1.0.0",
 		Factory: func(client gitlab.GitLabClient) shared.Rule {
-			return sandbox_personal.NewDevelopersRule(client)
+			return sandbox_personal.NewDevelopersRule(client, r.config)
 		},
 		Enabled:  true,
 		Category: "sandbox_personal",

@@ -1,0 +1,15 @@
+name: "Sandbox Pipeline - Unsupported Type (Should FAIL)"
+description: "Tests manual review required for unsupported source type"
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "not supported"
+    - "only 's3' and 'google_drive' are allowed"
+
+mr_metadata:
+  title: "Add unsupported type pipeline"
+  author: "alice@company.com"
+  source_branch: "feature/unsupported-type"
+  target_branch: "main"

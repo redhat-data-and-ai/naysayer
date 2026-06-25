@@ -1,5 +1,5 @@
-name: "Sandbox Personal - With Unstructured Pipeline File"
-description: "Adding unstructured-data-pipeline.yaml to existing sandbox Personal product should auto-approve"
+name: "Sandbox Unstructured - With Valid Pipeline File"
+description: "Adding unstructured-data-pipeline.yaml with correct prefixes to aif-* product should auto-approve"
 
 expected:
   decision: Approve
@@ -7,7 +7,7 @@ expected:
 
   comment_contains:
     - "Auto-approved"
-    - "Unstructured data pipeline configuration in sandbox personal environment"
+    - "Unstructured data pipeline configuration valid"
 
 mr_metadata:
   title: "Add unstructured data pipeline configuration"
