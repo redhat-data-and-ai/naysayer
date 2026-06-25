@@ -56,6 +56,7 @@ type RulesConfig struct {
 	ServiceAccountRule      ServiceAccountRuleConfig      // Service account rule configuration
 	TOCApprovalRule         TOCApprovalRuleConfig         // TOC approval rule configuration
 	WarehouseRule           WarehouseRuleConfig           // Warehouse rule configuration
+	SandboxPersonalRule     SandboxPersonalRuleConfig     // Sandbox personal unstructured data product rule configuration
 }
 
 // WarehouseRuleConfig holds warehouse-specific configuration
@@ -63,6 +64,11 @@ type WarehouseRuleConfig struct {
 	AllowTOCBypass       bool     // Allow bypassing TOC approval for specific cases
 	PlatformEnvironments []string // Environments requiring platform approval
 	AutoApproveEnvs      []string // Environments allowing auto-approval
+}
+
+// SandboxPersonalRuleConfig holds sandbox personal unstructured data product rule configuration
+type SandboxPersonalRuleConfig struct {
+	ServiceAccountName string // Service account name for developers.yaml validation (e.g., "project_106670_bot_...")
 }
 
 // ServiceAccountRuleConfig holds service account validation configuration
@@ -168,6 +174,9 @@ func Load() *Config {
 				AllowTOCBypass:       getEnv("WAREHOUSE_ALLOW_TOC_BYPASS", "false") == "true",
 				PlatformEnvironments: parseStringList(getEnv("WAREHOUSE_PLATFORM_ENVS", "preprod,prod")),
 				AutoApproveEnvs:      parseStringList(getEnv("WAREHOUSE_AUTO_APPROVE_ENVS", "dev,sandbox")),
+			},
+			SandboxPersonalRule: SandboxPersonalRuleConfig{
+				ServiceAccountName: getEnv("SANDBOX_SERVICE_ACCOUNT_NAME", ""),
 			},
 		},
 		Approval: ApprovalConfig{

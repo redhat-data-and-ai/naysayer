@@ -10,6 +10,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/masking"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandbox_personal"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/tag"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
@@ -31,13 +32,15 @@ type RuleInfo struct {
 
 // RuleRegistry manages available rules and their creation
 type RuleRegistry struct {
-	rules map[string]*RuleInfo
+	rules  map[string]*RuleInfo
+	config *config.Config // Application config for rule initialization
 }
 
 // NewRuleRegistry creates a new rule registry
 func NewRuleRegistry() *RuleRegistry {
 	registry := &RuleRegistry{
-		rules: make(map[string]*RuleInfo),
+		rules:  make(map[string]*RuleInfo),
+		config: config.Load(), // Load config once at registry creation
 	}
 
 	// Register built-in rules
@@ -147,6 +150,45 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "tag",
+	})
+
+	// Sandbox Personal UnstructuredDataProduct Rules
+	// These rules apply ONLY when sandbox/product.yaml has kind=UnstructuredDataProduct, type=Personal
+
+	// Sandbox unstructured pipeline rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_unstructured_pipeline_rule",
+		Description: "Always auto-approves sandbox unstructured-data-pipeline.yaml for Personal UnstructuredDataProducts",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewUnstructuredPipelineRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
+	})
+
+	// Sandbox developers rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_developers_rule",
+		Description: "Validates exactly 2 developers (1 human + 1 service account) in product-level developers.yaml for aif-* UnstructuredDataProducts, matches CODEOWNERS",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewDevelopersRule(client, r.config)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
+	})
+
+	// Sandbox groups strict rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "sandbox_groups_strict_rule",
+		Description: "Requires manual review for all groups/ folder changes in sandbox Personal UnstructuredDataProducts",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return sandbox_personal.NewGroupsStrictRule(client)
+		},
+		Enabled:  true,
+		Category: "sandbox_personal",
 	})
 
 }

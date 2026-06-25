@@ -1,0 +1,5 @@
+[Data Product Configuration Maintainers]
+* @dataverse/maintainers
+
+[Unstructured Data Products]
+/dataproducts/unstructured/aif-changeddev/ @alice @{{SERVICE_ACCOUNT_NAME}}

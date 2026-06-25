@@ -1,0 +1,11 @@
+source_crawler_config:
+  type: "s3"
+  s3Config:
+    bucket: "dataverse-sandbox-unstructured"
+    prefix: "aif-testpipeline/source/"
+
+destination_syncer_config:
+  type: "s3"
+  s3DestinationConfig:
+    bucket: "dataverse-sandbox-unstructured"
+    prefix: "aif-testpipeline/destination/"

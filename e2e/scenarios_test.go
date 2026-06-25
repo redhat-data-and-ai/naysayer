@@ -21,6 +21,11 @@ import (
 // TestE2E_ForkMR_WarehouseIncrease exercises fork MR handling: source branch exists only on
 // ForkSourceProjectID (regression for section validation fetching from target project only).
 func TestE2E_ForkMR_WarehouseIncrease(t *testing.T) {
+	// Set default service account name for e2e tests if not already set
+	if os.Getenv("SANDBOX_SERVICE_ACCOUNT_NAME") == "" {
+		t.Setenv("SANDBOX_SERVICE_ACCOUNT_NAME", "test-service-account")
+	}
+
 	scenarioDir := filepath.Join("testdata", "scenarios", "27_fork_mr_warehouse_increase")
 	scenario, err := LoadScenario(scenarioDir)
 	require.NoError(t, err)
@@ -30,6 +35,11 @@ func TestE2E_ForkMR_WarehouseIncrease(t *testing.T) {
 
 // TestE2E_Scenarios runs all E2E test scenarios
 func TestE2E_Scenarios(t *testing.T) {
+	// Set default service account name for e2e tests if not already set
+	if os.Getenv("SANDBOX_SERVICE_ACCOUNT_NAME") == "" {
+		t.Setenv("SANDBOX_SERVICE_ACCOUNT_NAME", "test-service-account")
+	}
+
 	// Load all scenarios
 	testdataPath := filepath.Join("testdata")
 	scenarios, err := LoadScenarios(testdataPath)

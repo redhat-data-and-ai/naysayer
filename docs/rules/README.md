@@ -36,6 +36,12 @@ This directory contains detailed documentation for each validation rule implemen
 **Purpose**: Streamlined consumer access management across all environments
 **Key behavior**: Auto-approves consumer-only changes with data product owner approval (no TOC needed)
 
+### 🧪 [Sandbox Personal Unstructured Data Product Rules](SANDBOX_PERSONAL_RULE.md)
+**Validates**: Personal `UnstructuredDataProduct` setups in sandbox
+**Triggers on**: `sandbox/product.yaml` with `kind: UnstructuredDataProduct` and `type: Personal`
+**Purpose**: Self-service sandbox onboarding with guardrails (XSMALL warehouses, single developer, no groups changes)
+**Key behavior**: Auto-approves safe sandbox setup files; manual review for groups/ and invalid configurations
+
 ### 🔄 [Auto-Rebase Rule](AUTOREBASE_RULE_AND_SETUP.md)
 **Validates**: Automated rebase operations for all repository
 **Triggers on**: Push events to `main`/`master` branch
@@ -58,6 +64,7 @@ This directory contains detailed documentation for each validation rule implemen
 | `**/product.{yaml,yml}` | [Warehouse](WAREHOUSE_RULE.md) | Size increases, YAML syntax | Use `XSMALL`/`SMALL`/`MEDIUM`/`LARGE`, validate YAML |
 | `**/product.{yaml,yml}` (new) | [TOC Approval](TOC_APPROVAL_RULE.md) | New products in prod/preprod | Get TOC approval or deploy to dev/test first |
 | `**/product.{yaml,yml}` (consumers) | [Consumer](DATAPRODUCT_CONSUMER_RULE.md) | Mixed changes with non-consumer fields | Separate consumer changes into dedicated MR |
+| `**/sandbox/product.yaml` (Personal Unstructured) | [Sandbox Personal](SANDBOX_PERSONAL_RULE.md) | Wrong warehouse size, groups/ changes, developer edits | Use XSMALL warehouses, 1 owner, avoid groups/ in same MR |
 | `**/*serviceaccount*.{yaml,yml}` | [Service Account](SERVICE_ACCOUNT_RULE.md) | Non-Astro accounts, domain violations | Use Astro patterns, @redhat.com emails |
 | `**/*.md`, docs files | [Metadata](METADATA_RULE.md) | File access issues | Check file permissions, valid UTF-8 encoding |
 
