@@ -181,6 +181,99 @@ files:
             enabled: true
         auto_approve: true
 
+  # ============================================================================
+  # SANDBOX UNSTRUCTURED DATA PRODUCT RULES (AIF-*)
+  # ============================================================================
+  # These rules apply ONLY when sandbox/unstructured-data-product.yaml exists with:
+  #   kind: UnstructuredDataProduct
+  #   name: aif-*
+  #
+  # When active, they OVERRIDE the default behavior for specific files:
+  # 1. unstructured-data-pipeline.yaml → Validate file path and s3 prefixes match product name
+  # 2. developers.yaml → Must have exactly 2 owners (1 human + 1 service account), match CODEOWNERS
+  # 3. groups/*.yaml → Always manual review
+  # ============================================================================
+
+  # Rule 1: Unstructured Data Product Config - Auto-approve config changes
+  - name: "sandbox_unstructured_product_config"
+    path: "dataproducts/unstructured/aif-*/sandbox/"
+    filename: "unstructured-data-product.yaml"
+    parser_type: yaml
+    enabled: true
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true  # Auto-approve product config changes
+
+  # Rule 2: Unstructured Data Pipeline - Validate path and prefix matching
+  - name: "sandbox_unstructured_pipeline"
+    path: "dataproducts/unstructured/aif-*/sandbox/"
+    filename: "unstructured-data-pipeline.yaml"
+    parser_type: yaml
+    enabled: true
+    prerequisite_check:
+      # Only apply if sandbox/unstructured-data-product.yaml has kind=UnstructuredDataProduct
+      file_path: "sandbox/unstructured-data-product.yaml"
+      yaml_conditions:
+        - path: "kind"
+          value: "UnstructuredDataProduct"
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: sandbox_unstructured_pipeline_rule
+            enabled: true
+        auto_approve: true  # Conditional - validates path and prefix match
+
+  # Rule 3: Developers.yaml (Product Root Level) - Must have exactly 2 owners matching CODEOWNERS
+  - name: "sandbox_unstructured_developers"
+    path: "dataproducts/unstructured/aif-*/"
+    filename: "developers.yaml"
+    parser_type: yaml
+    enabled: true
+    prerequisite_check:
+      # Only apply if sandbox/unstructured-data-product.yaml has kind=UnstructuredDataProduct
+      file_path: "sandbox/unstructured-data-product.yaml"
+      yaml_conditions:
+        - path: "kind"
+          value: "UnstructuredDataProduct"
+    exclusions:
+      # Exclude developers.yaml inside sandbox/dev/preprod/prod folders
+      - "**/sandbox/**"
+      - "**/dev/**"
+      - "**/preprod/**"
+      - "**/prod/**"
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: sandbox_developers_rule
+            enabled: true
+        auto_approve: false  # Conditional - only if count=2, unchanged, and matches CODEOWNERS
+
+  # Rule 4: Groups folder - Always manual review for sandbox unstructured products
+  - name: "sandbox_unstructured_groups"
+    path: "dataproducts/unstructured/aif-*/groups/"
+    filename: "*.{yaml,yml}"
+    parser_type: yaml
+    enabled: true
+    prerequisite_check:
+      # Only apply if sandbox/unstructured-data-product.yaml has kind=UnstructuredDataProduct
+      file_path: "../sandbox/unstructured-data-product.yaml"
+      yaml_conditions:
+        - path: "kind"
+          value: "UnstructuredDataProduct"
+    sections:
+      - name: full_file
+        yaml_path: .
+        rule_configs:
+          - name: sandbox_groups_strict_rule
+            enabled: true
+        auto_approve: false  # Always manual review
+
 # STRICT POLICY ENFORCEMENT:
 # Any file type not explicitly configured above will require manual review by default.
 # This includes:

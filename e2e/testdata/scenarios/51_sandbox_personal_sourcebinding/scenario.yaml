@@ -1,0 +1,12 @@
+name: "Sandbox Unstructured - Product Config Update"
+description: "Changes to unstructured-data-product.yaml should not trigger sandbox rules if no developers/pipeline/groups change"
+
+expected:
+  decision: Approve
+  approved: true
+
+mr_metadata:
+  title: "Update sandbox unstructured product configuration"
+  author: "alice@company.com"
+  source_branch: "feature/update-product-config"
+  target_branch: "main"

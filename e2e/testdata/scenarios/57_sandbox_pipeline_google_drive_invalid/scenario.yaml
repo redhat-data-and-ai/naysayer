@@ -1,0 +1,14 @@
+name: "Sandbox Pipeline - Google Drive Invalid (Should FAIL)"
+description: "Tests manual review required when google_drive has no folder_ids"
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "folder_ids must have at least one"
+
+mr_metadata:
+  title: "Add invalid google drive pipeline"
+  author: "alice@company.com"
+  source_branch: "feature/invalid-google-drive"
+  target_branch: "main"

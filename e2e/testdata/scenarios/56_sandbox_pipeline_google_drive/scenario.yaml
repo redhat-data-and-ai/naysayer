@@ -1,0 +1,12 @@
+name: "Sandbox Pipeline - Google Drive Source"
+description: "Tests auto-approval of sandbox pipeline with google_drive source type"
+
+expected:
+  decision: Approve
+  approved: true
+
+mr_metadata:
+  title: "Add google drive pipeline"
+  author: "alice@company.com"
+  source_branch: "feature/add-google-drive-pipeline"
+  target_branch: "main"
