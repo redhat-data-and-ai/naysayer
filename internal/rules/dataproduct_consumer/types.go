@@ -1,3 +1,6 @@
+// Package dataproduct_consumer provides types for the data product consumer rule.
+//
+//nolint:staticcheck // ST1003 accepted here
 package dataproduct_consumer
 
 // DataProductConsumerConfig holds configuration for consumer access validation

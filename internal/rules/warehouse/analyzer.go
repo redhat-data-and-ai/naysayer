@@ -1,3 +1,4 @@
+// Package warehouse provides the implementation of the warehouse rule.
 package warehouse
 
 import (

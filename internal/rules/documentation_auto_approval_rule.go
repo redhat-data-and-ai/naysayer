@@ -1,3 +1,4 @@
+// Package rules provides the implementation of the rules for the application.
 package rules
 
 import (

@@ -1,3 +1,6 @@
+// Package toc_approval provides the implementation of the TOC approval rule.
+//
+//nolint:staticcheck // ST1003 accepted here
 package toc_approval
 
 import (

@@ -1,3 +1,4 @@
+// Package shared provides shared types for the rules package.
 package shared
 
 import (

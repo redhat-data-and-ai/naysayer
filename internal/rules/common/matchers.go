@@ -1,3 +1,4 @@
+// Package common provides common functionality for the rules package.
 package common
 
 import (

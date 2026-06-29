@@ -127,10 +127,10 @@ func (pm *PatternMatcher) MatchesAnyPattern(filePath string, patterns []string) 
 	return false
 }
 
-// Global pattern matcher instance for convenience
+// GlobalPatternMatcher is a global pattern matcher instance for convenience
 var GlobalPatternMatcher = NewPatternMatcher()
 
-// Convenience functions for backward compatibility
+// MatchesPattern checks if a file path matches a glob pattern. Convenience functions for backward compatibility
 func MatchesPattern(filePath, pattern string) bool {
 	return GlobalPatternMatcher.MatchesPattern(filePath, pattern)
 }

@@ -1,3 +1,4 @@
+// Package gitlab provides a client for the GitLab API.
 package gitlab
 
 import (

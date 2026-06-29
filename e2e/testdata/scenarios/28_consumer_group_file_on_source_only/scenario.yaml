@@ -1,0 +1,16 @@
+name: "Consumer group file only on source branch — auto-approve"
+description: "Group YAML exists only in MR source (after/); target has no groups file — consumer_group validation passes"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Add consumer group reference (group file on feature branch only)"
+  author: "testuser"
+  source_branch: "feature/positivesource-consumer"
+  target_branch: "main"
