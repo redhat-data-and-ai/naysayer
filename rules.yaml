@@ -26,13 +26,13 @@ files:
             enabled: true
         auto_approve: false
 
-      # Consumer access changes - auto-approve with data product owner approval
+      # Consumer access changes - only approve when consumer rule explicitly validates
       - name: data_product_db_validation
         yaml_path: data_product_db
         rule_configs:
           - name: dataproduct_consumer_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
       - name: service_account
         yaml_path: service_account
@@ -46,28 +46,28 @@ files:
         rule_configs:
           - name: metadata_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
       - name: rover_group
         yaml_path: rover_group
         rule_configs:
           - name: metadata_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
       - name: tags
         yaml_path: tags
         rule_configs:
           - name: metadata_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
       - name: kind
         yaml_path: kind
         rule_configs:
           - name: metadata_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
   # Documentation files - Auto-approve
   - name: "documentation_files"
