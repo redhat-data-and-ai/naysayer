@@ -1,3 +1,6 @@
+// Package toc_approval provides types for the TOC approval rule.
+//
+//nolint:staticcheck // ST1003 accepted here
 package toc_approval
 
 // TOCEnvironmentConfig holds configuration for TOC approval environments

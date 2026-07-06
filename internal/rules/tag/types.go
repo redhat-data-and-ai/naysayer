@@ -1,3 +1,4 @@
+// Package tag provides types for the tag rule.
 package tag
 
 // Tag represents the structure of a Tag CR YAML

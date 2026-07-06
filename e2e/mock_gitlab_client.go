@@ -1,3 +1,4 @@
+// Package e2e provides a mock GitLab client for E2E testing.
 package e2e
 
 import (

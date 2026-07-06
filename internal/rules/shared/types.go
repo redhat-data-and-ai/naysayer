@@ -8,7 +8,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
-// Decision represents a binary approval decision
+// DecisionType represents a binary approval decision
 type DecisionType string
 
 const (

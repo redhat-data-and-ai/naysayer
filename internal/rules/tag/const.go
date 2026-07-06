@@ -2,10 +2,10 @@ package tag
 
 import "regexp"
 
-// Kind constant
+// TagKind constant
 const TagKind = "Tag"
 
-// MaskingPolicy kind constant
+// MaskingPolicyKind constant
 const MaskingPolicyKind = "MaskingPolicy"
 
 // Allowed values constraints

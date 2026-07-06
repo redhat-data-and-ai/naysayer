@@ -1,0 +1,20 @@
+---
+name: positivesource
+kind: source-aligned
+rover_group: dataverse-source-positivesource
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+tags:
+  data_product: positivesource
+data_product_db:
+- database: positivesource_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: dataverse-consumer-positivesource-marts
+      kind: consumer_group

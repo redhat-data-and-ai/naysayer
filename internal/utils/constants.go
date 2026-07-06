@@ -1,3 +1,4 @@
+// Package utils provides constants used throughout the application.
 package utils
 
 // Default Actions - used in configuration validation

@@ -1,3 +1,4 @@
+// Package errors provides shared error types and handlers for API responses.
 package errors
 
 import (
