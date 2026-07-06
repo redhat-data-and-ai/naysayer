@@ -134,7 +134,7 @@ data_product_db:
 			expectedReasonContains: "data product owner approval sufficient",
 		},
 		{
-			name:        "non-consumer changes should approve with generic message",
+			name:        "non-consumer changes should require manual review",
 			filePath:    "dataproducts/analytics/prod/product.yaml",
 			fileContent: consumerYaml,
 			lineRanges: []shared.LineRange{
@@ -148,8 +148,62 @@ data_product_db:
 					},
 				},
 			},
-			expectedDecision:       shared.Approve,
-			expectedReasonContains: "No consumer-only changes detected",
+			expectedDecision:       shared.ManualReview,
+			expectedReasonContains: "Non-consumer changes detected",
+		},
+		{
+			name:     "access_policy changes should require manual review",
+			filePath: "dataproducts/source/fammatrix/sandbox/product.yaml",
+			fileContent: `---
+name: fammatrix
+kind: source-aligned
+rover_group: dataverse-source-fammatrix
+data_product_db:
+- database: fammatrix_db
+  presentation_schemas:
+  - name: marts
+    access_policy: rh_internal
+    consumers:
+    - kind: data_product
+      name: expensemaster`,
+			lineRanges: []shared.LineRange{
+				{StartLine: 9, EndLine: 9, FilePath: "dataproducts/source/fammatrix/sandbox/product.yaml"},
+			},
+			mrContext: &shared.MRContext{
+				Changes: []gitlab.FileChange{
+					{
+						OldPath: "dataproducts/source/fammatrix/sandbox/product.yaml",
+						NewPath: "dataproducts/source/fammatrix/sandbox/product.yaml",
+						NewFile: false,
+					},
+				},
+			},
+			expectedDecision:       shared.ManualReview,
+			expectedReasonContains: "Non-consumer changes detected",
+		},
+		{
+			name:     "product file without consumers section should require manual review",
+			filePath: "dataproducts/source/newproduct/sandbox/product.yaml",
+			fileContent: `---
+name: newproduct
+kind: source-aligned
+data_product_db:
+- database: newproduct_db
+  presentation_schemas:
+  - name: marts`,
+			lineRanges: []shared.LineRange{
+				{StartLine: 4, EndLine: 6, FilePath: "dataproducts/source/newproduct/sandbox/product.yaml"},
+			},
+			mrContext: &shared.MRContext{
+				Changes: []gitlab.FileChange{
+					{
+						NewPath: "dataproducts/source/newproduct/sandbox/product.yaml",
+						NewFile: false,
+					},
+				},
+			},
+			expectedDecision:       shared.ManualReview,
+			expectedReasonContains: "not consumer-related",
 		},
 	}
 

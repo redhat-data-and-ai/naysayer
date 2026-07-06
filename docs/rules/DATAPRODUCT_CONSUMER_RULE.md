@@ -51,7 +51,8 @@ data_product_db:
 |---------------|--------------|------------|
 | Self-consumer detected (product as consumer of itself) | ⚠️ **Manual Review** | Data product cannot consume itself |
 | Consumer-only changes in any environment | ✅ **Auto-approve** | Data product owner approval sufficient, no TOC needed |
-| Consumer + other field changes | 🔄 **Other Rules Apply** | Let other rules handle non-consumer changes |
+| Non-consumer changes in data_product_db (e.g. access_policy, database) | ⚠️ **Manual Review** | Rule cannot validate non-consumer fields |
+| Changes in data_product_db without consumers section | ⚠️ **Manual Review** | Rule cannot validate non-consumer changes |
 | Non-product files | ✅ **Auto-approve** | Rule doesn't apply |
 
 ## 🚫 Self-Consumer Detection
@@ -113,6 +114,22 @@ consumers:
 4. **Flexibility**: Works across all environments
 
 ## 🚫 When This Rule Doesn't Apply
+
+### Non-Consumer Changes in data_product_db
+If a change within `data_product_db` modifies fields that are NOT consumer-related, the rule requires manual review:
+
+```yaml
+# This MR adds access_policy - NOT a consumer change
+data_product_db:
+- database: fammatrix_db
+  presentation_schemas:
+  - name: marts
+    access_policy: rh_internal  # ⚠️ Not a consumer field - manual review required
+    consumers:
+    - kind: data_product
+      name: expensemaster
+```
+**Result**: ⚠️ Manual review required (non-consumer changes detected in data_product_db section)
 
 ### Mixed Changes Require Other Rules
 If an MR contains consumer changes **AND** other changes, the other rules take precedence:

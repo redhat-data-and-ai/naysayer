@@ -57,8 +57,14 @@ func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent str
 		return r.CreateApprovalResult("Consumer access changes - data product owner approval sufficient (no TOC approval required)")
 	}
 
-	// Not a consumer-only change, let other rules handle it
-	return r.CreateApprovalResult("No consumer-only changes detected")
+	// Non-consumer changes in data_product_db require manual review
+	// The rule can only vouch for consumer-only modifications
+	if context.HasConsumers && !context.IsConsumerOnly {
+		return shared.ManualReview, "Non-consumer changes detected in data_product_db section - manual review required (changes include fields not validated by consumer rule)"
+	}
+
+	// File has no consumers section - rule cannot validate these changes
+	return shared.ManualReview, "Changes in data_product_db are not consumer-related - manual review required"
 }
 
 // GetCoveredLines returns line ranges this rule covers
