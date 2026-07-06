@@ -1,4 +1,4 @@
-package sandbox_personal
+package sandboxpersonal
 
 import (
 	"fmt"

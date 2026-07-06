@@ -1,4 +1,5 @@
-package sandbox_personal
+// Package sandboxpersonal provides validation rules for sandbox unstructured data products (AIF-*).
+package sandboxpersonal
 
 import (
 	"fmt"

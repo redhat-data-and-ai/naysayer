@@ -1,4 +1,4 @@
-package sandbox_personal
+package sandboxpersonal
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ type UnstructuredPipelineRule struct {
 
 // PipelineConfig represents the structure of unstructured-data-pipeline.yaml
 type PipelineConfig struct {
-	SourceCrawlerConfig      SourceCrawlerConfig      `yaml:"source_crawler_config"`
+	SourceCrawlerConfig     SourceCrawlerConfig     `yaml:"source_crawler_config"`
 	DestinationSyncerConfig DestinationSyncerConfig `yaml:"destination_syncer_config"`
 }
 

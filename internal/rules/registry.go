@@ -10,7 +10,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/masking"
-	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandbox_personal"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/sandboxpersonal"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/tag"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/toc_approval"
@@ -161,7 +161,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Description: "Always auto-approves sandbox unstructured-data-pipeline.yaml for Personal UnstructuredDataProducts",
 		Version:     "1.0.0",
 		Factory: func(client gitlab.GitLabClient) shared.Rule {
-			return sandbox_personal.NewUnstructuredPipelineRule(client)
+			return sandboxpersonal.NewUnstructuredPipelineRule(client)
 		},
 		Enabled:  true,
 		Category: "sandbox_personal",
@@ -173,7 +173,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Description: "Validates exactly 2 developers (1 human + 1 service account) in product-level developers.yaml for aif-* UnstructuredDataProducts, matches CODEOWNERS",
 		Version:     "1.0.0",
 		Factory: func(client gitlab.GitLabClient) shared.Rule {
-			return sandbox_personal.NewDevelopersRule(client, r.config)
+			return sandboxpersonal.NewDevelopersRule(client, r.config)
 		},
 		Enabled:  true,
 		Category: "sandbox_personal",
@@ -185,7 +185,7 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Description: "Requires manual review for all groups/ folder changes in sandbox Personal UnstructuredDataProducts",
 		Version:     "1.0.0",
 		Factory: func(client gitlab.GitLabClient) shared.Rule {
-			return sandbox_personal.NewGroupsStrictRule(client)
+			return sandboxpersonal.NewGroupsStrictRule(client)
 		},
 		Enabled:  true,
 		Category: "sandbox_personal",
