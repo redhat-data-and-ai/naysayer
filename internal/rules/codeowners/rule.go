@@ -1,3 +1,4 @@
+// Package codeowners provides the implementation of the codeowners rule.
 package codeowners
 
 import (

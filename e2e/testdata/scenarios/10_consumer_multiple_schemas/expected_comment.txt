@@ -5,7 +5,7 @@
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ No consumer-only changes detected
+• ✅ Consumer access changes in prod environment - data product owner approval sufficient (no TOC approval required)
 • ✅ Auto-approved: Product metadata changes are safe
 • ✅ Existing product.yaml file or not in critical environment - no TOC approval required
 

@@ -1,3 +1,4 @@
+// Package e2e provides utilities for generating diffs between directories for E2E tests.
 package e2e
 
 import (

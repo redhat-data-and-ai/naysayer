@@ -1,0 +1,16 @@
+name: "Sandbox Developers - No Service Account (Should FAIL)"
+description: "developers.yaml without service account should require manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "must include service account '{{SERVICE_ACCOUNT_NAME}}'"
+
+mr_metadata:
+  title: "Add developers.yaml without service account"
+  author: "alice@company.com"
+  source_branch: "feature/add-developers-no-sa"
+  target_branch: "main"

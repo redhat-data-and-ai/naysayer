@@ -1,0 +1,15 @@
+name: "Sandbox Developers - Existing Unchanged"
+description: "Product config change without developer changes should auto-approve"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Update product configuration without developer changes"
+  author: "alice@company.com"
+  source_branch: "feature/update-config"
+  target_branch: "main"

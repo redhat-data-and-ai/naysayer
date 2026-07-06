@@ -1,0 +1,17 @@
+name: "Sandbox Pipeline - Wrong Source Prefix (Should FAIL)"
+description: "Pipeline with source prefix not matching product name should require manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "source_crawler_config.s3Config.prefix"
+    - "must start with 'aif-wrongprefix/source/'"
+
+mr_metadata:
+  title: "Add pipeline with wrong source prefix"
+  author: "alice@company.com"
+  source_branch: "feature/add-pipeline-wrong-prefix"
+  target_branch: "main"

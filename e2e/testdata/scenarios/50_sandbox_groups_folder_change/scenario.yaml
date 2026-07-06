@@ -1,0 +1,16 @@
+name: "Sandbox Groups - Folder Change (Manual Review Required)"
+description: "Changes to groups/ folder in sandbox unstructured product should always require manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "Changes to product-level groups/ folder require manual review"
+
+mr_metadata:
+  title: "Add consumer group for sandbox product"
+  author: "alice@company.com"
+  source_branch: "feature/add-consumer-group"
+  target_branch: "main"

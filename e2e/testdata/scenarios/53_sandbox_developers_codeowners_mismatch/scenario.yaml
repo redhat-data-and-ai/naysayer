@@ -1,0 +1,17 @@
+name: "Sandbox Developers - CODEOWNERS Mismatch (Should FAIL)"
+description: "developers.yaml members not matching CODEOWNERS should require manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "developers.yaml members"
+    - "must exactly match CODEOWNERS members"
+
+mr_metadata:
+  title: "Add developers.yaml with mismatched CODEOWNERS"
+  author: "alice@company.com"
+  source_branch: "feature/add-developers-mismatch"
+  target_branch: "main"

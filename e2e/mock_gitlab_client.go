@@ -1,3 +1,4 @@
+// Package e2e provides a mock GitLab client for E2E testing.
 package e2e
 
 import (
@@ -7,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 )
 
@@ -108,7 +110,17 @@ func (m *MockGitLabClient) GetFileContent(projectID int, filePath, ref string) (
 		return "", fmt.Errorf("file not found: %s (ref: %s)", filePath, ref)
 	}
 
-	return string(content), nil
+	// Replace placeholder with actual service account name from config
+	cfg := config.Load()
+	serviceAccountName := cfg.Rules.SandboxPersonalRule.ServiceAccountName
+	if serviceAccountName == "" {
+		serviceAccountName = "test-service-account" // Default for e2e tests
+	}
+
+	contentStr := string(content)
+	contentStr = strings.ReplaceAll(contentStr, "{{SERVICE_ACCOUNT_NAME}}", serviceAccountName)
+
+	return contentStr, nil
 }
 
 // FetchMRChanges returns the file changes set via SetFileChanges

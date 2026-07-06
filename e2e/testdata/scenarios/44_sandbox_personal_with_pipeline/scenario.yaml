@@ -1,0 +1,16 @@
+name: "Sandbox Unstructured - With Valid Pipeline File"
+description: "Adding unstructured-data-pipeline.yaml with correct prefixes to aif-* product should auto-approve"
+
+expected:
+  decision: Approve
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Unstructured data pipeline configuration valid"
+
+mr_metadata:
+  title: "Add unstructured data pipeline configuration"
+  author: "alice@company.com"
+  source_branch: "feature/add-pipeline-config"
+  target_branch: "main"

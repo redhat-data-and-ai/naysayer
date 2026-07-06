@@ -1,0 +1,12 @@
+source_crawler_config:
+  type: "google_drive"
+  googleDriveConfig:
+    folder_ids:
+      - id: "abc123xyz456"
+      - id: "def789uvw012"
+
+destination_syncer_config:
+  type: "s3"
+  s3DestinationConfig:
+    bucket: "dataverse-sandbox-unstructured"
+    prefix: "aif-googledrive/destination/"

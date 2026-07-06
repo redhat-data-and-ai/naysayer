@@ -1,3 +1,4 @@
+// Package masking provides types for the masking rule.
 package masking
 
 // MaskingPolicy represents the structure of a masking policy YAML

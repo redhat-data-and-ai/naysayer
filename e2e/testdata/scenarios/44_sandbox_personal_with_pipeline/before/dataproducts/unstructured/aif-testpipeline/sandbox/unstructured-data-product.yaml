@@ -1,0 +1,14 @@
+---
+name: aif-testpipeline
+kind: UnstructuredDataProduct
+rover_group: dataverse-source-test
+
+notification_config:
+  - email: team-test@redhat.com
+
+source_config:
+  - type: google_drive
+    sync_permissions: true
+
+destination_config:
+  - type: s3

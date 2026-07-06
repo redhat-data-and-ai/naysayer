@@ -1,0 +1,16 @@
+name: "Sandbox Developers - Existing Changed (Should FAIL)"
+description: "EXISTING developers.yaml with changed owners should require manual review - changes not allowed"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "Developers cannot be changed"
+
+mr_metadata:
+  title: "Change developer in developers.yaml"
+  author: "bob@company.com"
+  source_branch: "feature/change-developer"
+  target_branch: "main"

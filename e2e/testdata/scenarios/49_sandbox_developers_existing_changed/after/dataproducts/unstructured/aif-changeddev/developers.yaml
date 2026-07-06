@@ -1,0 +1,4 @@
+group:
+  owners:
+    - bob
+    - {{SERVICE_ACCOUNT_NAME}}

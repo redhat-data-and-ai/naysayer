@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"gopkg.in/yaml.v3"
 )
@@ -193,6 +194,17 @@ func loadScenarioYAML(scenarioDir string) (*ScenarioYAML, error) {
 		return nil, fmt.Errorf("scenario.yaml not found in %s", scenarioDir)
 	}
 
+	// Replace placeholder with actual service account name from config
+	cfg := config.Load()
+	serviceAccountName := cfg.Rules.SandboxPersonalRule.ServiceAccountName
+	if serviceAccountName == "" {
+		serviceAccountName = "test-service-account" // Default for e2e tests
+	}
+
+	contentStr := string(content)
+	contentStr = strings.ReplaceAll(contentStr, "{{SERVICE_ACCOUNT_NAME}}", serviceAccountName)
+	content = []byte(contentStr)
+
 	var scenarioYAML ScenarioYAML
 	if err := yaml.Unmarshal(content, &scenarioYAML); err != nil {
 		return nil, fmt.Errorf("failed to parse scenario.yaml: %w", err)
@@ -236,7 +248,7 @@ func validateScenario(scenario *ScenarioConfig) error {
 		return fmt.Errorf("scenario name is required")
 	}
 
-	// Check that before/ directory exists
+	// before/ directory is optional (new-file scenarios may not have one)
 	if _, err := os.Stat(scenario.BeforeDir); os.IsNotExist(err) {
 		fmt.Printf("[WARN] before/ directory not found (treating as new-file scenario): %s\n", scenario.BeforeDir)
 	}
