@@ -84,7 +84,14 @@ func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent str
 		return r.CreateApprovalResult("Consumer access changes - data product owner approval sufficient (no TOC approval required)")
 	}
 
-	return r.CreateApprovalResult("No consumer-only changes detected")
+	// Non-consumer changes in data_product_db require manual review
+	// The rule can only vouch for consumer-only modifications
+	if context.HasConsumers && !context.IsConsumerOnly {
+		return shared.ManualReview, "Non-consumer changes detected in data_product_db section - manual review required (changes include fields not validated by consumer rule)"
+	}
+
+	// File has no consumers section - rule cannot validate these changes
+	return shared.ManualReview, "Changes in data_product_db are not consumer-related - manual review required"
 }
 
 // GetCoveredLines returns line ranges this rule covers
@@ -343,6 +350,13 @@ func (r *DataProductConsumerRule) areChangesConsumerOnly(lineRanges []shared.Lin
 	}
 
 	lines := strings.Split(fileContent, "\n")
+
+	// Section-based validation passes full-file line numbers but section-sliced
+	// content. Detect this and check all section content instead.
+	if len(lineRanges) > 0 && lineRanges[0].StartLine > len(lines) {
+		return r.isSectionContentConsumerOnly(lines)
+	}
+
 	foundConsumerLine := false
 
 	for _, lr := range lineRanges {
@@ -363,19 +377,54 @@ func (r *DataProductConsumerRule) areChangesConsumerOnly(lineRanges []shared.Lin
 	return foundConsumerLine
 }
 
+// isSectionContentConsumerOnly checks if section content only contains
+// structural YAML and consumer entries. Used when the rule receives
+// section-sliced content from the section manager.
+func (r *DataProductConsumerRule) isSectionContentConsumerOnly(lines []string) bool {
+	foundConsumerLine := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || trimmed == "---" {
+			continue
+		}
+
+		if r.isConsumerRelatedLine(trimmed) {
+			foundConsumerLine = true
+			continue
+		}
+
+		// Structural lines always present in data_product_db sections
+		if strings.HasPrefix(trimmed, "database:") || strings.HasPrefix(trimmed, "- database:") ||
+			strings.HasPrefix(trimmed, "presentation_schemas:") || strings.HasPrefix(trimmed, "- presentation_schemas:") {
+			continue
+		}
+
+		// Simple list items without colons are consumer name strings
+		if strings.HasPrefix(trimmed, "- ") && !strings.Contains(trimmed, ":") {
+			foundConsumerLine = true
+			continue
+		}
+
+		return false
+	}
+
+	return foundConsumerLine
+}
+
 // isConsumerRelatedLine checks if a line is related to consumer configuration
 func (r *DataProductConsumerRule) isConsumerRelatedLine(line string) bool {
 	line = strings.TrimSpace(line)
 
-	// Consumer-related keywords
 	consumerKeywords := []string{
 		"consumers:",
-		"- name:",
+		"name:",
 		"kind:",
 	}
 
 	for _, keyword := range consumerKeywords {
-		if strings.Contains(line, keyword) {
+		if strings.HasPrefix(line, keyword) || strings.HasPrefix(line, "- "+keyword) {
 			return true
 		}
 	}
