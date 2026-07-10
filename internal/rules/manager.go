@@ -369,24 +369,14 @@ func (srm *SectionRuleManager) createManualReviewValidation(filePath string, tot
 	}
 }
 
-// getParserForFile returns the most specific section parser for a file.
-// When multiple patterns match (e.g. dataproducts/**/product.yaml vs dataproducts/**/sandbox/product.yaml),
-// the longest pattern wins so sandbox-specific rules take precedence.
+// getParserForFile returns the appropriate section parser for a file
 func (srm *SectionRuleManager) getParserForFile(filePath string) shared.SectionParser {
-	var bestPattern string
-	var bestParser shared.SectionParser
-
 	for pattern, parser := range srm.sectionParsers {
-		if !shared.MatchesPattern(filePath, pattern) {
-			continue
-		}
-		if bestParser == nil || len(pattern) > len(bestPattern) {
-			bestPattern = pattern
-			bestParser = parser
+		if shared.MatchesPattern(filePath, pattern) {
+			return parser
 		}
 	}
-
-	return bestParser
+	return nil
 }
 
 // getEnabledRulesForSection returns enabled rules that apply to a specific section
