@@ -1,3 +1,4 @@
+// Package access_policy implements the access_policy validation rule.
 package access_policy
 
 import (
