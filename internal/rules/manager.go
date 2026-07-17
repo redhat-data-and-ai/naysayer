@@ -666,6 +666,7 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 	var manualReviewFiles []string
 	var approvedFiles []string
 	var warehouseManualReasons []string
+	var manualReviewReasons []string
 	var hasUncoveredLines bool
 
 	// Collect file results
@@ -682,8 +683,12 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 
 		if fileValidation != nil {
 			for _, rr := range fileValidation.RuleResults {
-				if rr.RuleName == "warehouse_rule" && rr.Decision == shared.ManualReview {
-					warehouseManualReasons = append(warehouseManualReasons, rr.Reason)
+				if rr.Decision == shared.ManualReview {
+					if rr.RuleName == "warehouse_rule" {
+						warehouseManualReasons = append(warehouseManualReasons, rr.Reason)
+					} else {
+						manualReviewReasons = append(manualReviewReasons, rr.Reason)
+					}
 				}
 			}
 		}
@@ -710,6 +715,8 @@ func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[stri
 			if len(uniq) > 0 {
 				details += fmt.Sprintf(". Warehouse: %s", strings.Join(uniq, " | "))
 			}
+		} else if len(manualReviewReasons) > 0 {
+			details += fmt.Sprintf(". Manual review reasons: %s", strings.Join(manualReviewReasons, ", "))
 		}
 
 		logging.Info("MR requires manual review (files=%d, warehouse=%t, uncovered_lines=%t): %v",

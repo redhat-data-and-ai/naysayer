@@ -32,7 +32,9 @@ files:
         rule_configs:
           - name: dataproduct_consumer_rule
             enabled: true
-        auto_approve: true
+          - name: access_policy_rule
+            enabled: true
+        auto_approve: false
 
       - name: service_account
         yaml_path: service_account

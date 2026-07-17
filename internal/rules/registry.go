@@ -6,6 +6,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/access_policy"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
@@ -147,6 +148,18 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		},
 		Enabled:  true,
 		Category: "tag",
+	})
+
+	// Access policy rule
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "access_policy_rule",
+		Description: "Requires manual review for any access_policy field changes in product.yaml",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return access_policy.NewAccessPolicyRule()
+		},
+		Enabled:  true,
+		Category: "access_policy",
 	})
 
 }
