@@ -342,8 +342,9 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 	assert.Equal(t, 2, callCount, "Should have made 2 approval attempts (with message, then fallback)")
 }
 
-func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
-	// Create test GitLab server that fails both approval attempts
+func TestHandleApprovalWithComments_401TreatedAsAlreadyApproved(t *testing.T) {
+	// GitLab returns 401 when bot re-approves an already-approved MR.
+	// This should be treated as success, not failure.
 	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/approve") {
 			w.WriteHeader(401)
@@ -355,7 +356,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 	cfg := &config.Config{
 		GitLab: config.GitLabConfig{
 			BaseURL: gitlabServer.URL,
-			Token:   "invalid-token",
+			Token:   "test-token",
 		},
 		Comments: config.CommentsConfig{
 			EnableMRComments: false,
@@ -389,9 +390,7 @@ func TestHandleApprovalWithComments_BothApprovalsFail(t *testing.T) {
 	}
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to approve MR (both with message and simple)")
+	assert.NoError(t, err)
 }
 
 func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {

@@ -567,18 +567,57 @@ func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRC
 	return fileContent.Content, nil
 }
 
-// extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff
+// extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff.
+// Only lines actually added/modified ('+' prefix) are included; context lines are skipped
+// so that sections appearing only as diff context aren't flagged as affected.
 func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared.LineRange {
 	var changedRanges []shared.LineRange
 	lines := strings.Split(diff, "\n")
 
+	newLineNum := 0
+	rangeStart := 0
+
 	for _, line := range lines {
 		if strings.HasPrefix(line, "@@") {
-			// Parse hunk header like "@@ -1,4 +1,6 @@"
-			if lineRange := srm.parseHunkHeader(line); lineRange != nil {
-				changedRanges = append(changedRanges, *lineRange)
+			// Flush any open range
+			if rangeStart > 0 {
+				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
+				rangeStart = 0
 			}
+			if hdr := srm.parseHunkHeader(line); hdr != nil {
+				newLineNum = hdr.StartLine
+			}
+			continue
 		}
+
+		if newLineNum == 0 {
+			continue
+		}
+
+		if strings.HasPrefix(line, "+") {
+			if rangeStart == 0 {
+				rangeStart = newLineNum
+			}
+			newLineNum++
+		} else if strings.HasPrefix(line, "-") {
+			// Deleted line: doesn't exist in new file, don't advance newLineNum
+			if rangeStart > 0 {
+				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
+				rangeStart = 0
+			}
+		} else {
+			// Context line: exists in new file but unchanged
+			if rangeStart > 0 {
+				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
+				rangeStart = 0
+			}
+			newLineNum++
+		}
+	}
+
+	// Flush trailing range
+	if rangeStart > 0 {
+		changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
 	}
 
 	return changedRanges

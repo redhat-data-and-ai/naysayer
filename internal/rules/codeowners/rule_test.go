@@ -363,6 +363,49 @@ func TestCODEOWNERSSyncRule_ValidateLines_ValidModification(t *testing.T) {
 	assert.Contains(t, reason, "Auto-approved")
 }
 
+// Regression: MR adds a new consumer group YAML + product.yaml changes + CODEOWNERS entries.
+// The rule must detect the group YAML change and auto-approve the matching CODEOWNERS additions.
+func TestCODEOWNERSSyncRule_ValidateLines_NewConsumerGroupWithProductChanges(t *testing.T) {
+	mock := NewMockGitLabClient()
+
+	// New consumer group file on source branch
+	mock.SetFileContent("feature",
+		"dataproducts/aggregate/analytics/groups/dataverse-consumer-analytics-reportmarts.yaml",
+		"group_name: dataverse-consumer-analytics-reportmarts\napprovers:\n- alice\n- bob\n- carol\nmembers:\n  users:\n  - alice\nbackends:\n- name: snowflake_rhprod\n  type: snowflake\n")
+
+	// Existing data product (proves it's not a new DP)
+	mock.SetFileContent("main",
+		"dataproducts/aggregate/analytics/developers.yaml",
+		"group:\n  owners:\n  - alice\n  - bob\n  - carol\n")
+
+	rule := NewCODEOWNERSSyncRule(mock)
+
+	// CODEOWNERS diff adds two entries for the new consumer group
+	codeownersDiff := "@@ -10,6 +10,7 @@\n /dataproducts/aggregate/analytics/ @alice @bob @carol @dave\n /dataproducts/aggregate/analytics/access-requests/groups/dataverse-aggregate-analytics/ @alice @bob @carol\n" +
+		"+/dataproducts/aggregate/analytics/access-requests/groups/dataverse-consumer-analytics-reportmarts/ @alice @bob @carol\n" +
+		" /dataproducts/aggregate/analytics/access-requests/groups/dataverse-consumer-analytics-coremarts/ @alice @bob @carol\n" +
+		"@@ -20,6 +21,7 @@\n /dataproducts/aggregate/analytics/groups/dataverse-aggregate-analytics.yaml @alice @bob @carol\n" +
+		"+/dataproducts/aggregate/analytics/groups/dataverse-consumer-analytics-reportmarts.yaml @alice @bob @carol\n" +
+		" /dataproducts/aggregate/analytics/groups/dataverse-consumer-analytics-coremarts.yaml @alice @bob @carol\n"
+
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID: 1, MRIID: 100,
+		Changes: []gitlab.FileChange{
+			{NewPath: "CODEOWNERS", Diff: codeownersDiff},
+			{NewPath: "dataproducts/aggregate/analytics/groups/dataverse-consumer-analytics-reportmarts.yaml", NewFile: true},
+			// product.yaml changes — these are not developers/group files, rule ignores them
+			{NewPath: "dataproducts/aggregate/analytics/dev/product.yaml"},
+			{NewPath: "dataproducts/aggregate/analytics/preprod/product.yaml"},
+			{NewPath: "dataproducts/aggregate/analytics/prod/product.yaml"},
+		},
+		MRInfo: &gitlab.MRInfo{SourceBranch: "feature", TargetBranch: "main"},
+	})
+
+	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
+	assert.Equal(t, shared.Approve, decision, "expected auto-approve for matching group YAML + CODEOWNERS, got: %s", reason)
+	assert.Contains(t, reason, "Auto-approved")
+}
+
 func TestCODEOWNERSSyncRule_GetCoveredLines(t *testing.T) {
 	rule := NewCODEOWNERSSyncRule(nil)
 

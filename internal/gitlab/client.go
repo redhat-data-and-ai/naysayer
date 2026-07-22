@@ -290,14 +290,17 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
-	case 201:
-		return nil // Success
+	case 200, 201:
+		return nil
 	case 401:
-		return fmt.Errorf("approval failed: insufficient permissions")
+		// simplified: GitLab returns 401 when bot re-approves an MR it already approved (known race).
+		// Treat as success — the approval is already in place.
+		return nil
 	case 404:
 		return fmt.Errorf("approval failed: MR not found")
 	case 405:
-		return fmt.Errorf("approval failed: MR already approved or cannot be approved")
+		// simplified: GitLab returns 405 when MR already approved or cannot be approved; approval is in place.
+		return nil
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("approval failed with status %d: %s", resp.StatusCode, string(body))

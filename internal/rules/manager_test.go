@@ -122,6 +122,106 @@ func TestPatternMatching(t *testing.T) {
 	}
 }
 
+// A root-level CODEOWNERS file must be picked up by the parser configured with
+// path:"**/" filename:"CODEOWNERS" (producing pattern "**/CODEOWNERS").
+func TestSectionRuleManager_GetParserForFile_RootCodeowners(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{
+			{
+				Name:       "codeowners_file",
+				Path:       "**/",
+				Filename:   "CODEOWNERS",
+				ParserType: "yaml",
+				Enabled:    true,
+				Sections: []config.SectionDefinition{
+					{
+						Name:     "codeowners_sync_validation",
+						YAMLPath: ".",
+						RuleConfigs: []config.RuleConfig{
+							{Name: "codeowners_sync_rule", Enabled: true},
+						},
+						AutoApprove: true,
+					},
+				},
+			},
+		},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// Root-level CODEOWNERS (no directory prefix) must match
+	parser := manager.getParserForFile("CODEOWNERS")
+	assert.NotNil(t, parser, "root-level CODEOWNERS must be picked up by **/CODEOWNERS pattern")
+
+	// Nested CODEOWNERS should also match
+	parser = manager.getParserForFile("some/path/CODEOWNERS")
+	assert.NotNil(t, parser, "nested CODEOWNERS must also match **/CODEOWNERS pattern")
+
+	// Non-CODEOWNERS files should not match
+	parser = manager.getParserForFile("CODEOWNERS.bak")
+	assert.Nil(t, parser)
+	parser = manager.getParserForFile("product.yaml")
+	assert.Nil(t, parser)
+}
+
+// End-to-end: a root-level CODEOWNERS change must be picked up and routed through
+// section-based validation. Uses the same config shape as rules.yaml.
+func TestSectionRuleManager_CodeownersFileValidation(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{
+			{
+				Name:       "codeowners_file",
+				Path:       "**/",
+				Filename:   "CODEOWNERS",
+				ParserType: "yaml",
+				Enabled:    true,
+				Sections: []config.SectionDefinition{
+					{
+						Name:     "codeowners_sync_validation",
+						YAMLPath: ".",
+						RuleConfigs: []config.RuleConfig{
+							{Name: "codeowners_sync_rule", Enabled: true},
+						},
+						AutoApprove: true,
+					},
+				},
+			},
+		},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// Step 1: Parser must be found for root-level CODEOWNERS
+	parser := manager.getParserForFile("CODEOWNERS")
+	assert.NotNil(t, parser, "parser must be found for root-level CODEOWNERS")
+
+	// Step 2: Diff parsing must return only the actually changed line
+	diff := "@@ -1,3 +1,3 @@\n # Data Product Owners\n [Aggregate Data Products]\n-/dataproducts/aggregate/analytics/ @alice @bob\n+/dataproducts/aggregate/analytics/ @alice @bob @charlie\n"
+	changedLines := manager.extractChangedLinesFromDiff(diff)
+	assert.Len(t, changedLines, 1)
+	assert.Equal(t, 3, changedLines[0].StartLine)
+	assert.Equal(t, 3, changedLines[0].EndLine)
+
+	// Step 3: CODEOWNERS content is parseable as YAML (Go yaml.v3 accepts it).
+	// The section parser finds the full-file section, and the codeowners_sync_validation
+	// section is affected by the change.
+	codeownersContent := "# Data Product Owners\n[Aggregate Data Products]\n/dataproducts/aggregate/analytics/ @alice @bob @charlie\n"
+	sections, err := parser.ParseSections("CODEOWNERS", codeownersContent)
+	assert.NoError(t, err, "CODEOWNERS content must be parseable")
+	assert.NotEmpty(t, sections, "full-file section must be found")
+
+	affected := manager.getAffectedSections(sections, changedLines)
+	assert.Len(t, affected, 1, "codeowners_sync_validation section must be affected")
+	assert.Equal(t, "codeowners_sync_validation", affected[0].Name)
+
+	// Step 4: Full validation — codeowners_sync_rule is not registered in the manager
+	// (no AddRule was called), so the fallback mechanism injects a manual review.
+	result := manager.validateFileWithSections("CODEOWNERS", codeownersContent, 3, parser, changedLines, diff)
+	assert.NotNil(t, result)
+	assert.Equal(t, shared.ManualReview, result.FileDecision,
+		"codeowners_sync_rule not registered → fallback manual review expected")
+}
+
 func TestSectionRuleManager_DetermineOverallDecision_ZeroFiles(t *testing.T) {
 	ruleConfig := &config.GlobalRuleConfig{
 		Files: []config.FileRuleConfig{},
@@ -262,6 +362,94 @@ func TestSectionRuleManager_AppendMissingExpectedRuleFallbacks_DoesNotOverwriteE
 	assert.Equal(t, "warehouse_rule", got[0].RuleName)
 	assert.Equal(t, originalReason, got[0].Reason)
 	assert.True(t, got[0].WasEvaluated)
+}
+
+// extractChangedLinesFromDiff must return only actually-added lines, not the full
+// hunk range. When a section like "warehouses:" appears only as a context line in
+// the diff (not modified), it must NOT be flagged as an affected section.
+//
+// Regression: adding ai_experimental above the warehouses key produces a diff like:
+//   @@ -1,6 +1,8 @@
+//    name: accountsreceivable
+//   +ai_experimental: true
+//    warehouses:
+//
+// Only lines 4-5 were added. The warehouses section (line 6+) is unchanged.
+func TestExtractChangedLinesFromDiff_IncludesContextLinesInRange(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+
+	// Actual diff from MR !12606: adds ai_ready/ai_experimental before warehouses
+	diff := "@@ -1,6 +1,8 @@\n name: accountsreceivable\n kind: aggregated\n rover_group: dataverse-aggregate-accountsreceivable\n+ai_ready: false\n+ai_experimental: true\n warehouses:\n - type: user\n   size: XSMALL\n"
+
+	changedLines := manager.extractChangedLinesFromDiff(diff)
+
+	// Only the two added lines (lines 4-5 in the new file) should be reported
+	assert.Len(t, changedLines, 1)
+	assert.Equal(t, 4, changedLines[0].StartLine)
+	assert.Equal(t, 5, changedLines[0].EndLine)
+
+	// The warehouses section starts at line 6 in the new file.
+	// Since changed range is 4-5, it does NOT overlap with warehouses (6-8).
+	warehouseSection := shared.Section{Name: "warehouses", StartLine: 6, EndLine: 8}
+	affected := manager.getAffectedSections([]shared.Section{warehouseSection}, changedLines)
+	assert.Len(t, affected, 0, "warehouses was not modified, should not be affected")
+}
+
+// Verify that a CODEOWNERS file change is correctly picked up: the modified line
+// must fall inside the codeowners section so the codeowners_sync_rule is triggered.
+func TestExtractChangedLinesFromDiff_CodeownersChangeDetected(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+
+	// Typical CODEOWNERS diff: adding a new owner to an existing line
+	// Before: /dataproducts/aggregate/analytics/ @alice @bob
+	// After:  /dataproducts/aggregate/analytics/ @alice @bob @charlie
+	diff := "@@ -1,3 +1,3 @@\n # Data Product Owners\n [Aggregate Data Products]\n-/dataproducts/aggregate/analytics/ @alice @bob\n+/dataproducts/aggregate/analytics/ @alice @bob @charlie\n"
+
+	changedLines := manager.extractChangedLinesFromDiff(diff)
+
+	// The deletion (-) on old line 3 and addition (+) on new line 3
+	// should produce a single changed range at line 3
+	assert.Len(t, changedLines, 1)
+	assert.Equal(t, 3, changedLines[0].StartLine)
+	assert.Equal(t, 3, changedLines[0].EndLine)
+
+	// CODEOWNERS is configured as a single full-file section (yaml_path: .)
+	// covering lines 1-3. The change at line 3 must overlap.
+	codeownersSection := shared.Section{
+		Name:      "codeowners_sync_validation",
+		StartLine: 1,
+		EndLine:   3,
+		RuleConfigs: []config.RuleConfig{
+			{Name: "codeowners_sync_rule", Enabled: true},
+		},
+	}
+	affected := manager.getAffectedSections([]shared.Section{codeownersSection}, changedLines)
+	assert.Len(t, affected, 1, "CODEOWNERS change should be detected in the codeowners section")
+	assert.Equal(t, "codeowners_sync_validation", affected[0].Name)
+}
+
+// Verify a CODEOWNERS diff that adds a new line is picked up correctly.
+func TestExtractChangedLinesFromDiff_CodeownersNewLineAdded(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+
+	// Adding a brand new data product entry to CODEOWNERS
+	diff := "@@ -1,3 +1,4 @@\n # Data Product Owners\n [Aggregate Data Products]\n /dataproducts/aggregate/analytics/ @alice @bob\n+/dataproducts/aggregate/newproduct/ @dave\n"
+
+	changedLines := manager.extractChangedLinesFromDiff(diff)
+
+	// Only the added line (line 4 in new file) should be reported
+	assert.Len(t, changedLines, 1)
+	assert.Equal(t, 4, changedLines[0].StartLine)
+	assert.Equal(t, 4, changedLines[0].EndLine)
+
+	// Full-file section now spans 1-4, so the addition at line 4 is inside it
+	codeownersSection := shared.Section{
+		Name:      "codeowners_sync_validation",
+		StartLine: 1,
+		EndLine:   4,
+	}
+	affected := manager.getAffectedSections([]shared.Section{codeownersSection}, changedLines)
+	assert.Len(t, affected, 1, "new CODEOWNERS line should be detected")
 }
 
 func TestSectionRuleManager_ValidateFileWithSections_AddsFallbackForMissingExpectedRule(t *testing.T) {

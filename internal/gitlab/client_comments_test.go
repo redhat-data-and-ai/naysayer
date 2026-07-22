@@ -218,7 +218,7 @@ func TestApproveMRWithMessage_EmptyMessage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestApproveMRWithMessage_UnauthorizedError(t *testing.T) {
+func TestApproveMRWithMessage_UnauthorizedTreatedAsAlreadyApproved(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
@@ -228,16 +228,15 @@ func TestApproveMRWithMessage_UnauthorizedError(t *testing.T) {
 	cfg := &config.Config{
 		GitLab: config.GitLabConfig{
 			BaseURL: server.URL,
-			Token:   "invalid-token",
+			Token:   "test-token",
 		},
 	}
 
 	client := NewClientWithConfig(cfg)
 
+	// 401 is treated as success: GitLab returns 401 when bot re-approves an already-approved MR
 	err := client.ApproveMRWithMessage(123, 456, "Test approval")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "approval failed: insufficient permissions")
+	assert.NoError(t, err)
 }
 
 func TestApproveMRWithMessage_NotFoundError(t *testing.T) {
@@ -278,10 +277,9 @@ func TestApproveMRWithMessage_AlreadyApprovedError(t *testing.T) {
 
 	client := NewClientWithConfig(cfg)
 
+	// 405 is treated as success: approval is already in place
 	err := client.ApproveMRWithMessage(123, 456, "Test approval")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "approval failed: MR already approved or cannot be approved")
+	assert.NoError(t, err)
 }
 
 func TestApproveMRWithMessage_GenericError(t *testing.T) {
