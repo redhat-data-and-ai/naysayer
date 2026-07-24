@@ -144,7 +144,7 @@ files:
     path: "dataproducts/**/"
     filename: "*masking.{yaml,yml}"
     parser_type: yaml
-    enabled: false
+    enabled: true
     sections:
       - name: full_file
         yaml_path: .
@@ -158,7 +158,7 @@ files:
     path: "dataproducts/**/"
     filename: "*tag*.{yaml,yml}"
     parser_type: yaml
-    enabled: false
+    enabled: true
     sections:
       - name: full_file
         yaml_path: .
