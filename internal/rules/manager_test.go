@@ -470,61 +470,55 @@ func TestGetDeletionReason(t *testing.T) {
 		manager.getDeletionReason("dataproducts/source/analytics/unknown_file.yaml"))
 }
 
-// func TestParseHunkHeader(t *testing.T) {
-// 	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
-// 	tests := []struct {
-// 		name     string
-// 		header   string
-// 		expected *shared.LineRange
-// 	} {
-// 		{
-// 			name:     "lines added",
-// 			header: "@@ -574,0 +577,3 @@ func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared",
-// 			expected: &shared.LineRange{StartLine: 577, EndLine: 580},
-// 		},
-// 		{
-// 			name:     "line replaced",
-// 			header: "@@ -570 +570,3 @@ func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRC",
-// 			expected: &shared.LineRange{StartLine: 570, EndLine: 573},
-// 		},
-// 		{
-// 			name:     "lines replaced",
-// 			header: "@@ -577,3 +582,18 @@ func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared",
-// 			expected: &shared.LineRange{StartLine: 582, EndLine: 599},
-// 		},
-// 		{
-// 			name:     "lines removed",
-// 			header: "@@ -11,17 +10,0 @@ Naysayer provides three core capabilities through webhook endpoints:",
-// 			expected: &shared.LineRange{StartLine: 10, EndLine: 10},
-// 		},
-// 		{
-// 			name:     "line updated",
-// 			header: "@@ -238 +221 @@ kubectl apply -f config/",
-// 			expected: &shared.LineRange{StartLine: 221, EndLine: 222},
-// 		},
-// 		{
-// 			name:     "new file",
-// 			header: "@@ -0,0 +1,3 @@ this is untracked",
-// 			expected: &shared.LineRange{StartLine: 1, EndLine: 3},
-// 		},
-// 		{
-// 			name:     "deleted file",
-// 			header: "@@ -1,6 +0,0 @@ this is deleted",
-// 			expected: &shared.LineRange{StartLine: 0, EndLine: 0},
-// 		},
-// 	}
-// 		// @@ -570 +570,3 @@ func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRC
-// 		// 	@@ -577,3 +582,18 @@ func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared
-
-// 		// 	@@ -11,17 +10,0 @@ Naysayer provides three core capabilities through webhook endpoints:
-// 		// 	@@ -238 +221 @@ kubectl apply -f config/
+func TestParseHunkHeader(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+	tests := []struct {
+		name     string
+		header   string
+		expected *shared.LineRange
+	} {
+		{
+			name:     "lines added",
+			header: "@@ -574,0 +577,3 @@ multiple new lines added",
+			expected: &shared.LineRange{StartLine: 577, EndLine: 579},
+		},
+		{
+			name:     "line replaced",
+			header: "@@ -570 +570,3 @@ single line replaced with multiple lines",
+			expected: &shared.LineRange{StartLine: 570, EndLine: 572},
+		},
+		{
+			name:     "lines replaced",
+			header: "@@ -577,3 +582,18 @@ multiple lines replaced with multiple lines",
+			expected: &shared.LineRange{StartLine: 582, EndLine: 599},
+		},
+		{
+			name:     "lines removed",
+			header: "@@ -11,17 +10,0 @@ Naysayer provides three core capabilities through webhook endpoints:",
+			expected: nil, // count=0 means no new lines in this hunk
+		},
+		{
+			name:     "line updated",
+			header: "@@ -238 +221 @@ kubectl apply -f config/",
+			expected: &shared.LineRange{StartLine: 221, EndLine: 221}, // single line (count defaults to 1)
+		},
+		{
+			name:     "new file",
+			header: "@@ -0,0 +1,3 @@ this is untracked",
+			expected: &shared.LineRange{StartLine: 1, EndLine: 3},
+		},
+		{
+			name:     "deleted file contents",
+			header: "@@ -1,6 +0,0 @@ this is deleted content",
+			expected: nil, // startLine=0 means file doesn't exist in new version
+		},
+	}
 
 
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			result := manager.parseHunkHeader(tt.header)
-// 			assert.Equal(t, tt.expected, result)
-// 		})
-// 	}
-// }
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := manager.parseHunkHeader(tt.header)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
