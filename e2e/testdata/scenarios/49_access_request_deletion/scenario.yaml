@@ -1,0 +1,14 @@
+name: "hello_access_request_deletion"
+description: "Deleting an access-request file requires manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "Manual review required"
+
+mr_metadata:
+  title: "Remove hellosource access request for mbramle"
+  author: "testuser"
+  source_branch: "feature/remove-access-request-mbramle"
+  target_branch: "main"

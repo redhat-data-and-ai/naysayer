@@ -1,0 +1,14 @@
+name: "hello_access_request_multi_hellosource"
+description: "Multiple valid hellosource access-request files in one MR should be auto-approved"
+
+expected:
+  decision: Approve
+  approved: true
+  comment_contains:
+    - "Auto-approved"
+
+mr_metadata:
+  title: "Add hellosource access requests for mbramle and jkimura"
+  author: "testuser"
+  source_branch: "feature/access-requests-multi-hellosource"
+  target_branch: "main"
