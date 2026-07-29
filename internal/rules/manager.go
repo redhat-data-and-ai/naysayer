@@ -284,9 +284,7 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		for i, section := range sections {
 			if affectedSections[section.Name] {
 				decisionSectionResults = append(decisionSectionResults, sectionResults[i])
-				for _, rr := range sectionResults[i].RuleResults {
-					decisionRuleResults = append(decisionRuleResults, rr)
-				}
+				decisionRuleResults = append(decisionRuleResults, sectionResults[i].RuleResults...)
 			}
 		}
 		// Include defense-in-depth fallback results (they target affected sections by design)

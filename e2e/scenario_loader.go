@@ -249,7 +249,7 @@ func validateScenario(scenario *ScenarioConfig) error {
 		noAfterDir = true
 	}
 	if noBeforeDir && noAfterDir {
-		return fmt.Errorf("Incorrect scenario structure: scenario must have either before/ or after/ directory")
+		return fmt.Errorf("incorrect scenario structure: scenario must have either before/ or after/ directory")
 	}
 
 	return nil
