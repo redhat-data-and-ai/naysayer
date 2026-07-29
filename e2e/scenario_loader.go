@@ -235,15 +235,21 @@ func validateScenario(scenario *ScenarioConfig) error {
 	if scenario.Name == "" {
 		return fmt.Errorf("scenario name is required")
 	}
-
+	noBeforeDir := false
+	noAfterDir := false
 	// before/ directory is optional (new-file scenarios may not have one)
 	if _, err := os.Stat(scenario.BeforeDir); os.IsNotExist(err) {
 		fmt.Printf("[WARN] before/ directory not found (treating as new-file scenario): %s\n", scenario.BeforeDir)
+		noBeforeDir = true
 	}
 
-	// Check that after/ directory exists
+	// after/ directory is optional (deleted-file scenarios may not have one)
 	if _, err := os.Stat(scenario.AfterDir); os.IsNotExist(err) {
-		return fmt.Errorf("after/ directory not found: %s", scenario.AfterDir)
+		fmt.Printf("[WARN] after/ directory not found (treating as deleted-file scenario): %s\n", scenario.AfterDir)
+		noAfterDir = true
+	}
+	if noBeforeDir && noAfterDir {
+		return fmt.Errorf("incorrect scenario structure: scenario must have either before/ or after/ directory")
 	}
 
 	return nil

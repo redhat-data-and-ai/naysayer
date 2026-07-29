@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
+	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/shared"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,6 +35,25 @@ func (sp *stubSectionParser) ValidateSection(section *shared.Section, rules []sh
 
 func (sp *stubSectionParser) GetSectionDefinitions() map[string]config.SectionDefinition {
 	return map[string]config.SectionDefinition{}
+}
+
+// stubRule is a minimal Rule implementation for unit tests.
+type stubRule struct {
+	name     string
+	decision shared.DecisionType
+	reason   string
+}
+
+func (r *stubRule) Name() string        { return r.name }
+func (r *stubRule) Description() string { return r.name }
+func (r *stubRule) Version() string     { return "1.0.0" }
+func (r *stubRule) IsEnabled() bool     { return true }
+func (r *stubRule) SetEnabled(bool)     {}
+func (r *stubRule) GetCoveredLines(filePath string, fileContent string) []shared.LineRange {
+	return []shared.LineRange{{StartLine: 1, EndLine: 1, FilePath: filePath}}
+}
+func (r *stubRule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
+	return r.decision, r.reason
 }
 
 func TestNewSectionRuleManager(t *testing.T) {
@@ -369,10 +389,11 @@ func TestSectionRuleManager_AppendMissingExpectedRuleFallbacks_DoesNotOverwriteE
 // the diff (not modified), it must NOT be flagged as an affected section.
 //
 // Regression: adding ai_experimental above the warehouses key produces a diff like:
-//   @@ -1,6 +1,8 @@
-//    name: accountsreceivable
-//   +ai_experimental: true
-//    warehouses:
+//
+//	@@ -1,6 +1,8 @@
+//	 name: accountsreceivable
+//	+ai_experimental: true
+//	 warehouses:
 //
 // Only lines 4-5 were added. The warehouses section (line 6+) is unchanged.
 func TestExtractChangedLinesFromDiff_IncludesContextLinesInRange(t *testing.T) {
@@ -501,4 +522,160 @@ func TestSectionRuleManager_ValidateFileWithSections_AddsFallbackForMissingExpec
 	assert.Equal(t, changedLines, fallback.LineRanges)
 	assert.False(t, fallback.WasEvaluated)
 	assert.Contains(t, fallback.Reason, "not evaluated")
+}
+
+func TestValidateFileWithSections_UnaffectedSectionDoesNotBlockApproval(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+
+	// Register a stub rule that always returns ManualReview
+	manager.AddRule(&stubRule{name: "blocking_rule", decision: shared.ManualReview, reason: "blocked"})
+	// Register a stub rule that always approves
+	manager.AddRule(&stubRule{name: "metadata_rule", decision: shared.Approve, reason: "approved"})
+
+	parser := &stubSectionParser{
+		sections: []shared.Section{
+			{
+				Name:      "tags",
+				StartLine: 4,
+				EndLine:   7,
+				FilePath:  "product.yaml",
+				RuleConfigs: []config.RuleConfig{
+					{Name: "metadata_rule", Enabled: true},
+				},
+				AutoApprove: true,
+			},
+			{
+				Name:      "warehouses",
+				StartLine: 8,
+				EndLine:   12,
+				FilePath:  "product.yaml",
+				RuleConfigs: []config.RuleConfig{
+					{Name: "blocking_rule", Enabled: true},
+				},
+				AutoApprove: false,
+			},
+		},
+		validateFn: func(section *shared.Section, rules []shared.Rule) *shared.SectionValidationResult {
+			if len(rules) == 0 {
+				return &shared.SectionValidationResult{Section: section, Decision: shared.Approve}
+			}
+			decision, reason := rules[0].ValidateLines(section.FilePath, section.Content, nil)
+			return &shared.SectionValidationResult{
+				Section:  section,
+				Decision: decision,
+				Reason:   reason,
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName:     rules[0].Name(),
+						Decision:     decision,
+						Reason:       reason,
+						LineRanges:   []shared.LineRange{{StartLine: section.StartLine, EndLine: section.EndLine, FilePath: section.FilePath}},
+						WasEvaluated: true,
+					},
+				},
+			}
+		},
+	}
+
+	// Changed lines only overlap with 'tags' (lines 6-7), not 'warehouses' (lines 8-12)
+	changedLines := []shared.LineRange{
+		{StartLine: 6, EndLine: 7, FilePath: "product.yaml"},
+	}
+
+	result := manager.validateFileWithSections(
+		"product.yaml",
+		"kind: DataProduct\nname: analytics\nrover_group: team\ntags:\n  env: prod\n  version: v1.1.0\n  owner: team\nwarehouses:\n  - name: wh\n    type: user\n    size: XSMALL\n",
+		12,
+		parser,
+		changedLines,
+		"+  version: v1.1.0\n+  owner: team",
+	)
+
+	assert.Equal(t, shared.Approve, result.FileDecision,
+		"unaffected warehouses section (ManualReview) must not block approval")
+}
+
+func TestIsDeletedFile(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+
+	changes := []gitlab.FileChange{
+		{OldPath: "dataproducts/prod/pii_masking.yaml", NewPath: "", DeletedFile: true, Diff: "@@ -1,5 +0,0 @@"},
+		{OldPath: "dataproducts/prod/product.yaml", NewPath: "dataproducts/prod/product.yaml", DeletedFile: false, Diff: "@@ -1,3 +1,4 @@"},
+	}
+
+	assert.True(t, manager.isDeletedFile("dataproducts/prod/pii_masking.yaml", changes))
+	assert.False(t, manager.isDeletedFile("dataproducts/prod/product.yaml", changes))
+	assert.False(t, manager.isDeletedFile("nonexistent.yaml", changes))
+}
+
+func TestGetDeletionReason(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{
+			{Name: "masking_files", Path: "dataproducts/**/", Filename: "*masking.{yaml,yml}", Enabled: true},
+			{Name: "tag_files", Path: "dataproducts/**/", Filename: "*tag*.{yaml,yml}", Enabled: true},
+			{Name: "product_configs", Path: "dataproducts/**/", Filename: "product.{yaml,yml}", Enabled: true},
+		},
+	}
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	assert.Equal(t, "Deletion requires manual review: masking_files",
+		manager.getDeletionReason("dataproducts/source/analytics/prod/pii_masking.yaml"))
+	assert.Equal(t, "Deletion requires manual review: tag_files",
+		manager.getDeletionReason("dataproducts/source/analytics/sandbox/tag_pii.yaml"))
+	assert.Equal(t, "Deletion requires manual review: product_configs",
+		manager.getDeletionReason("dataproducts/source/analytics/prod/product.yaml"))
+	assert.Equal(t, "Deletion requires manual review: dataproducts/source/analytics/unknown_file.yaml",
+		manager.getDeletionReason("dataproducts/source/analytics/unknown_file.yaml"))
+}
+
+func TestParseHunkHeader(t *testing.T) {
+	manager := NewSectionRuleManager(&config.GlobalRuleConfig{Files: []config.FileRuleConfig{}}, nil)
+	tests := []struct {
+		name     string
+		header   string
+		expected *shared.LineRange
+	}{
+		{
+			name:     "lines added",
+			header:   "@@ -574,0 +577,3 @@ multiple new lines added",
+			expected: &shared.LineRange{StartLine: 577, EndLine: 579},
+		},
+		{
+			name:     "line replaced",
+			header:   "@@ -570 +570,3 @@ single line replaced with multiple lines",
+			expected: &shared.LineRange{StartLine: 570, EndLine: 572},
+		},
+		{
+			name:     "lines replaced",
+			header:   "@@ -577,3 +582,18 @@ multiple lines replaced with multiple lines",
+			expected: &shared.LineRange{StartLine: 582, EndLine: 599},
+		},
+		{
+			name:     "lines removed",
+			header:   "@@ -11,17 +10,0 @@ Naysayer provides three core capabilities through webhook endpoints:",
+			expected: nil, // count=0 means no new lines in this hunk
+		},
+		{
+			name:     "line updated",
+			header:   "@@ -238 +221 @@ kubectl apply -f config/",
+			expected: &shared.LineRange{StartLine: 221, EndLine: 221}, // single line (count defaults to 1)
+		},
+		{
+			name:     "new file",
+			header:   "@@ -0,0 +1,3 @@ this is untracked",
+			expected: &shared.LineRange{StartLine: 1, EndLine: 3},
+		},
+		{
+			name:     "deleted file contents",
+			header:   "@@ -1,6 +0,0 @@ this is deleted content",
+			expected: nil, // startLine=0 means file doesn't exist in new version
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := manager.parseHunkHeader(tt.header)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

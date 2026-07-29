@@ -8,7 +8,7 @@ expected:
 
   comment_contains:
     - "⚠️ **Manual review required**"
-    - "Masking policy deletion requires manual review"
+    - "Deletion requires manual review: masking_files"
 
 mr_metadata:
   title: "Delete masking policy"

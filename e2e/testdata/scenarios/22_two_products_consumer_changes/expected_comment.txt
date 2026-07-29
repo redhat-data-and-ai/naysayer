@@ -5,7 +5,7 @@
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ No consumer-only changes detected
+• ✅ Consumer access changes in preprod environment - data product owner approval sufficient (no TOC approval required)
 • ✅ Metadata changes validated across 2 files
 • ✅ TOC approval validated across 2 files
 • ✅ No warehouse size changes detected - approved

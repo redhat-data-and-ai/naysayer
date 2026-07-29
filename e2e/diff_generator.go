@@ -77,6 +77,11 @@ func buildFileMap(rootDir string) (map[string]string, error) {
 			return nil
 		}
 
+		// Skip .gitkeep files (used only to preserve empty directories in Git)
+		if info.Name() == ".gitkeep" {
+			return nil
+		}
+
 		// Get relative path from root
 		relPath, err := filepath.Rel(rootDir, path)
 		if err != nil {

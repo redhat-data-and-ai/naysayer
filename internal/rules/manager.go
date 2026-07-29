@@ -141,6 +141,14 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	sourceProjectID := srm.sourceProjectIDForMR(mrCtx)
 
 	for _, filePath := range filePaths {
+		// Check if file was deleted in this MR
+		if srm.isDeletedFile(filePath, mrCtx.Changes) {
+			reason := srm.getDeletionReason(filePath)
+			logging.Info("File deleted in MR: %s - requiring manual review", filePath)
+			fileValidations[filePath] = srm.createDeletionValidation(filePath, reason)
+			continue
+		}
+
 		// Get file content from source branch
 		fileContent, fetchErr := srm.getFileContent(filePath, mrCtx, sourceProjectID)
 		if fetchErr != nil {
@@ -263,8 +271,31 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	// Only consider lines that were actually changed in this MR
 	uncoveredLines := srm.getUncoveredLinesInChanges(totalLines, sections, changedLines)
 
-	// If there are uncovered lines and config requires manual review
-	fileDecision := srm.determineFileDecisionWithSections(ruleResults, uncoveredLines, sectionResults)
+	// Filter results: only affected sections influence the decision.
+	// Unaffected sections are still validated (for MR comment display) but
+	// their outcomes must not block auto-approval.
+	var decisionRuleResults []shared.LineValidationResult
+	var decisionSectionResults []shared.SectionValidationResult
+
+	if len(affectedSections) == 0 {
+		decisionRuleResults = ruleResults
+		decisionSectionResults = sectionResults
+	} else {
+		for i, section := range sections {
+			if affectedSections[section.Name] {
+				decisionSectionResults = append(decisionSectionResults, sectionResults[i])
+				decisionRuleResults = append(decisionRuleResults, sectionResults[i].RuleResults...)
+			}
+		}
+		// Include defense-in-depth fallback results (they target affected sections by design)
+		for _, rr := range ruleResults {
+			if !rr.WasEvaluated {
+				decisionRuleResults = append(decisionRuleResults, rr)
+			}
+		}
+	}
+
+	fileDecision := srm.determineFileDecisionWithSections(decisionRuleResults, uncoveredLines, decisionSectionResults)
 
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
@@ -366,6 +397,46 @@ func (srm *SectionRuleManager) createManualReviewValidation(filePath string, tot
 		UncoveredLines: uncoveredLines,                  // Entire file uncovered
 		RuleResults:    []shared.LineValidationResult{}, // No rule results
 		FileDecision:   shared.ManualReview,             // Require manual review
+	}
+}
+
+func (srm *SectionRuleManager) isDeletedFile(filePath string, changes []gitlab.FileChange) bool {
+	for _, change := range changes {
+		if (change.OldPath == filePath || change.NewPath == filePath) && change.DeletedFile {
+			return true
+		}
+	}
+	return false
+}
+
+func (srm *SectionRuleManager) getDeletionReason(filePath string) string {
+	for _, fileConfig := range srm.config.Files {
+		if !fileConfig.Enabled {
+			continue
+		}
+		fullPattern := fileConfig.Path + fileConfig.Filename
+		if shared.MatchesPattern(filePath, fullPattern) {
+			return fmt.Sprintf("Deletion requires manual review: %s", fileConfig.Name)
+		}
+	}
+	return fmt.Sprintf("Deletion requires manual review: %s", filePath)
+}
+
+func (srm *SectionRuleManager) createDeletionValidation(filePath string, reason string) *shared.FileValidationSummary {
+	return &shared.FileValidationSummary{
+		FilePath:       filePath,
+		TotalLines:     0,
+		CoveredLines:   []shared.LineRange{},
+		UncoveredLines: []shared.LineRange{},
+		RuleResults: []shared.LineValidationResult{
+			{
+				RuleName:     "deletion_check",
+				Decision:     shared.ManualReview,
+				Reason:       reason,
+				WasEvaluated: true,
+			},
+		},
+		FileDecision: shared.ManualReview,
 	}
 }
 
