@@ -1,0 +1,12 @@
+kind: MaskingPolicy
+name: analytics_pii_number_policy
+data_product: analytics
+datatype: number
+mask: 0
+cases:
+  - strategy: UNMASKED
+    consumers:
+      - kind: consumer_group
+        name: dataverse-aggregate-analytics
+      - kind: consumer_group
+        name: dataverse-consumer-analytics-team

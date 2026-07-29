@@ -11,4 +11,4 @@ expected:
   decision: "manual_review"
   approved: false
   comment_contains:
-    - "deletion"
+    - "Deletion requires manual review: tag_files"
