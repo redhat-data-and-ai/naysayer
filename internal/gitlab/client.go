@@ -292,19 +292,66 @@ func (c *Client) ApproveMRWithMessage(projectID, mrIID int, message string) erro
 	switch resp.StatusCode {
 	case 200, 201:
 		return nil
-	case 401:
-		// simplified: GitLab returns 401 when bot re-approves an MR it already approved (known race).
-		// Treat as success — the approval is already in place.
-		return nil
+	case 401, 405:
+		// GitLab returns 401 when the bot tries to re-approve an MR it already approved (async race),
+		// or 405 when the MR cannot be approved. Check if we already approved before giving up.
+		if alreadyApproved, checkErr := c.isBotAlreadyApprover(projectID, mrIID); checkErr == nil && alreadyApproved {
+			logging.Warn("Approval API returned %d for MR %d but bot already approved — treating as success", resp.StatusCode, mrIID)
+			return nil
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("approval failed (status %d): %s", resp.StatusCode, string(body))
 	case 404:
 		return fmt.Errorf("approval failed: MR not found")
-	case 405:
-		// simplified: GitLab returns 405 when MR already approved or cannot be approved; approval is in place.
-		return nil
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("approval failed with status %d: %s", resp.StatusCode, string(body))
 	}
+}
+
+// isBotAlreadyApprover checks the MR's approval list to see if the current bot user has already approved.
+func (c *Client) isBotAlreadyApprover(projectID, mrIID int) (bool, error) {
+	botUsername, err := c.GetCurrentBotUsername()
+	if err != nil {
+		return false, err
+	}
+
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/approvals",
+		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.config.Token)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("approvals check returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		ApprovedBy []struct {
+			User struct {
+				Username string `json:"username"`
+			} `json:"user"`
+		} `json:"approved_by"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false, err
+	}
+
+	for _, a := range result.ApprovedBy {
+		if strings.EqualFold(a.User.Username, botUsername) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // ResetNaysayerApproval revokes naysayer's approval for a merge request

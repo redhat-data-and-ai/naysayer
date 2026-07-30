@@ -342,13 +342,17 @@ func TestHandleApprovalWithComments_ApprovalFallback(t *testing.T) {
 	assert.Equal(t, 2, callCount, "Should have made 2 approval attempts (with message, then fallback)")
 }
 
-func TestHandleApprovalWithComments_401TreatedAsAlreadyApproved(t *testing.T) {
-	// GitLab returns 401 when bot re-approves an already-approved MR.
-	// This should be treated as success, not failure.
+func TestHandleApprovalWithComments_401_BotAlreadyApproved(t *testing.T) {
+	// GitLab returns 401 on re-approval race. If bot is in approved_by list, treat as success.
 	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/approve") {
+		switch {
+		case strings.Contains(r.URL.Path, "/approve"):
 			w.WriteHeader(401)
 			_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
+		case r.URL.Path == "/api/v4/user":
+			_, _ = w.Write([]byte(`{"username": "naysayer-bot"}`))
+		case strings.Contains(r.URL.Path, "/approvals"):
+			_, _ = w.Write([]byte(`{"approved_by": [{"user": {"username": "naysayer-bot"}}]}`))
 		}
 	}))
 	defer gitlabServer.Close()
@@ -391,6 +395,62 @@ func TestHandleApprovalWithComments_401TreatedAsAlreadyApproved(t *testing.T) {
 
 	err := handler.handleApprovalWithComments(result, mrInfo)
 	assert.NoError(t, err)
+}
+
+func TestHandleApprovalWithComments_401_GenuinePermissionFailure(t *testing.T) {
+	// 401 when bot is NOT in approved_by list = real permission error, should fail.
+	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/approve"):
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
+		case r.URL.Path == "/api/v4/user":
+			_, _ = w.Write([]byte(`{"username": "naysayer-bot"}`))
+		case strings.Contains(r.URL.Path, "/approvals"):
+			_, _ = w.Write([]byte(`{"approved_by": []}`))
+		}
+	}))
+	defer gitlabServer.Close()
+
+	cfg := &config.Config{
+		GitLab: config.GitLabConfig{
+			BaseURL: gitlabServer.URL,
+			Token:   "test-token",
+		},
+		Comments: config.CommentsConfig{
+			EnableMRComments: false,
+		},
+	}
+
+	handler := &DataProductConfigMrReviewHandler{
+		gitlabClient: gitlab.NewClientWithConfig(cfg),
+		config:       cfg,
+	}
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.Approve,
+			Reason: "Test approval",
+		},
+		FileValidations: map[string]*shared.FileValidationSummary{},
+		TotalFiles:      0,
+		ApprovedFiles:   0,
+		ReviewFiles:     0,
+		UncoveredFiles:  0,
+		ExecutionTime:   time.Millisecond * 100,
+	}
+
+	mrInfo := &gitlab.MRInfo{
+		ProjectID: 123,
+		MRIID:     456,
+		Author:    "testuser",
+		Title:     "Test MR",
+		State:     "opened",
+	}
+
+	err := handler.handleApprovalWithComments(result, mrInfo)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to approve MR")
 }
 
 func TestWebhookHandler_FullApprovalWorkflow(t *testing.T) {
