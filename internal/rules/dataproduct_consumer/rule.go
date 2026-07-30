@@ -106,13 +106,14 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 		return []shared.LineRange{}
 	}
 
-	// For section-based validation, we return a placeholder range to indicate
-	// this rule wants to participate in validation. The actual section content
-	// (data_product_db) will be provided by the section manager.
+	// Return the full section content range so ValidateLines can analyze
+	// all lines for consumer-only vs mixed changes.
+	lineCount := len(strings.Split(fileContent, "\n"))
 	return []shared.LineRange{
 		{
 			StartLine: 1,
-			EndLine:   1,
+			EndLine:   lineCount,
+			FilePath:  filePath,
 		},
 	}
 }
@@ -351,9 +352,11 @@ func (r *DataProductConsumerRule) areChangesConsumerOnly(lineRanges []shared.Lin
 
 	lines := strings.Split(fileContent, "\n")
 
-	// Section-based validation passes full-file line numbers but section-sliced
-	// content. Detect this and check all section content instead.
-	if len(lineRanges) > 0 && lineRanges[0].StartLine > len(lines) {
+	// When lineRanges cover the full section content (either full-file coordinates
+	// exceeding section length, or section-relative full range), use section-aware
+	// analysis that properly handles structural lines like database:/presentation_schemas:.
+	if len(lineRanges) > 0 && (lineRanges[0].StartLine > len(lines) ||
+		(lineRanges[0].StartLine == 1 && lineRanges[0].EndLine >= len(lines))) {
 		return r.isSectionContentConsumerOnly(lines)
 	}
 

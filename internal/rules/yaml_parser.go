@@ -251,15 +251,6 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 		RuleResults:  make([]shared.LineValidationResult, 0),
 	}
 
-	// Create line ranges for this section
-	lineRanges := []shared.LineRange{
-		{
-			StartLine: section.StartLine,
-			EndLine:   section.EndLine,
-			FilePath:  section.FilePath,
-		},
-	}
-
 	// Step 1: Run any configured rules first
 	hasRules := len(rules) > 0
 	rulesPassed := true
@@ -275,12 +266,12 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 			}
 
 			// Validate using the rule
-			decision, reason := rule.ValidateLines(section.FilePath, section.Content, lineRanges)
+			decision, reason := rule.ValidateLines(section.FilePath, section.Content, coveredLines)
 
 			result.AppliedRules = append(result.AppliedRules, rule.Name())
 			result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
 				RuleName:     rule.Name(),
-				LineRanges:   lineRanges,
+				LineRanges:   coveredLines,
 				Decision:     decision,
 				Reason:       reason,
 				WasEvaluated: true, // Mark that this rule actually executed
