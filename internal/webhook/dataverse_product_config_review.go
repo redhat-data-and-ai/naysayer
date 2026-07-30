@@ -274,6 +274,20 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 
 // handleMergeRequestEvent handles traditional MR events (immediate processing)
 func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx, payload map[string]interface{}) error {
+	// simplified: Only process "open" and "update" actions. Other actions (approved, unapproved,
+	// merge, close) don't change the diff, so re-evaluating is wasteful and causes
+	// approve→unapprove→approve churn when multiple webhooks race.
+	if objectAttrs, ok := payload["object_attributes"].(map[string]interface{}); ok {
+		if action, ok := objectAttrs["action"].(string); ok && action != "open" && action != "update" && action != "reopen" {
+			logging.Info("Skipping MR action '%s' - only processing open/update/reopen", action)
+			return c.JSON(fiber.Map{
+				"webhook_response": "processed",
+				"decision":         "skipped",
+				"reason":           fmt.Sprintf("Action '%s' does not require re-evaluation", action),
+			})
+		}
+	}
+
 	// Extract MR information
 	mrInfo, err := gitlab.ExtractMRInfo(payload)
 	if err != nil {

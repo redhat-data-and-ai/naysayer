@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/redhat-data-and-ai/naysayer/internal/config"
@@ -218,26 +219,47 @@ func TestApproveMRWithMessage_EmptyMessage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestApproveMRWithMessage_UnauthorizedError(t *testing.T) {
+func TestApproveMRWithMessage_401_BotAlreadyApproved(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(401)
-		_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
+		switch {
+		case strings.Contains(r.URL.Path, "/approve"):
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
+		case r.URL.Path == "/api/v4/user":
+			_, _ = w.Write([]byte(`{"username": "naysayer-bot"}`))
+		case strings.Contains(r.URL.Path, "/approvals"):
+			_, _ = w.Write([]byte(`{"approved_by": [{"user": {"username": "naysayer-bot"}}]}`))
+		}
 	}))
 	defer server.Close()
 
-	cfg := &config.Config{
-		GitLab: config.GitLabConfig{
-			BaseURL: server.URL,
-			Token:   "invalid-token",
-		},
-	}
-
+	cfg := &config.Config{GitLab: config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}}
 	client := NewClientWithConfig(cfg)
 
 	err := client.ApproveMRWithMessage(123, 456, "Test approval")
+	assert.NoError(t, err)
+}
 
+func TestApproveMRWithMessage_401_BotNotApproved(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/approve"):
+			w.WriteHeader(401)
+			_, _ = w.Write([]byte(`{"message": "401 Unauthorized"}`))
+		case r.URL.Path == "/api/v4/user":
+			_, _ = w.Write([]byte(`{"username": "naysayer-bot"}`))
+		case strings.Contains(r.URL.Path, "/approvals"):
+			_, _ = w.Write([]byte(`{"approved_by": []}`))
+		}
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{GitLab: config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}}
+	client := NewClientWithConfig(cfg)
+
+	err := client.ApproveMRWithMessage(123, 456, "Test approval")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "approval failed: insufficient permissions")
+	assert.Contains(t, err.Error(), "approval failed (status 401)")
 }
 
 func TestApproveMRWithMessage_NotFoundError(t *testing.T) {
@@ -262,26 +284,25 @@ func TestApproveMRWithMessage_NotFoundError(t *testing.T) {
 	assert.Contains(t, err.Error(), "approval failed: MR not found")
 }
 
-func TestApproveMRWithMessage_AlreadyApprovedError(t *testing.T) {
+func TestApproveMRWithMessage_405_BotAlreadyApproved(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(405)
-		_, _ = w.Write([]byte(`{"message": "Method Not Allowed"}`))
+		switch {
+		case strings.Contains(r.URL.Path, "/approve"):
+			w.WriteHeader(405)
+			_, _ = w.Write([]byte(`{"message": "Method Not Allowed"}`))
+		case r.URL.Path == "/api/v4/user":
+			_, _ = w.Write([]byte(`{"username": "naysayer-bot"}`))
+		case strings.Contains(r.URL.Path, "/approvals"):
+			_, _ = w.Write([]byte(`{"approved_by": [{"user": {"username": "naysayer-bot"}}]}`))
+		}
 	}))
 	defer server.Close()
 
-	cfg := &config.Config{
-		GitLab: config.GitLabConfig{
-			BaseURL: server.URL,
-			Token:   "test-token",
-		},
-	}
-
+	cfg := &config.Config{GitLab: config.GitLabConfig{BaseURL: server.URL, Token: "test-token"}}
 	client := NewClientWithConfig(cfg)
 
 	err := client.ApproveMRWithMessage(123, 456, "Test approval")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "approval failed: MR already approved or cannot be approved")
+	assert.NoError(t, err)
 }
 
 func TestApproveMRWithMessage_GenericError(t *testing.T) {
