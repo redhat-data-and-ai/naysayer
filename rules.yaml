@@ -130,7 +130,7 @@ files:
     path: "dataproducts/**/groups/"
     filename: "*.{yaml,yml}"
     parser_type: yaml
-    enabled: true
+    enabled: false
     sections:
       - name: full_file
         yaml_path: .
