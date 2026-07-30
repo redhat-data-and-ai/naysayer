@@ -284,7 +284,6 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 				rulesPassed = false
 				result.Decision = shared.ManualReview
 				result.Reason = fmt.Sprintf("Rule validation failed: %s", reason)
-				break // Stop on first rule failure
 			}
 		}
 	}
