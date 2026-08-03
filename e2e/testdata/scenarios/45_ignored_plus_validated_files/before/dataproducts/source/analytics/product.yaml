@@ -1,0 +1,6 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+tags:
+  data_product: analytics

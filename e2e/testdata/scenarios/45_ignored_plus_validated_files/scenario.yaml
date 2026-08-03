@@ -1,0 +1,18 @@
+name: "Ignored file plus validated file — ignored file does not block approval"
+description: "When an MR has both an ignored file (group config) and a validated file (product.yaml with metadata change), the ignored file is skipped and the MR can still be auto-approved"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+    - "**Ignored files**"
+    - "consumer-a.yaml"
+
+mr_metadata:
+  title: "Add consumer group and update product metadata"
+  author: "testuser"
+  source_branch: "feature/group-and-metadata"
+  target_branch: "main"

@@ -96,6 +96,9 @@ func (mb *MessageBuilder) buildDetailedSummary(result *shared.RuleEvaluation) st
 	summary.WriteString("**What was checked:**\n")
 	summary.WriteString(mb.buildRulesSummary(result.FileValidations))
 
+	// Ignored files section
+	summary.WriteString(mb.buildIgnoredFilesSummary(result))
+
 	summary.WriteString("\n</details>")
 
 	return summary.String()
@@ -519,6 +522,9 @@ func (mb *MessageBuilder) buildDetailedManualReviewSummary(result *shared.RuleEv
 		}
 	}
 
+	// Ignored files section
+	summary.WriteString(mb.buildIgnoredFilesSummary(result))
+
 	summary.WriteString("\n</details>")
 
 	return summary.String()
@@ -554,5 +560,40 @@ func (mb *MessageBuilder) buildDebugManualReviewSummary(result *shared.RuleEvalu
 	summary.WriteString(fmt.Sprintf("• Total files analyzed: %d\n", result.TotalFiles))
 	summary.WriteString(fmt.Sprintf("• Final decision: %s\n", result.FinalDecision.Type))
 
+	return summary.String()
+}
+
+// BuildCommentOnlyComment creates an informational comment when all files are ignored (no MR decision)
+func (mb *MessageBuilder) BuildCommentOnlyComment(result *shared.RuleEvaluation) string {
+	var comment strings.Builder
+
+	// Hidden identifier for comment tracking
+	comment.WriteString("<!-- naysayer-comment-id: comment-only -->\n")
+
+	// Header
+	comment.WriteString("ℹ️ **All files ignored** — no approval decision made\n\n")
+
+	// List ignored files
+	if len(result.IgnoredFiles) > 0 {
+		comment.WriteString("**Ignored files** (not evaluated):\n")
+		for _, f := range result.IgnoredFiles {
+			comment.WriteString(fmt.Sprintf("• `%s`\n", f))
+		}
+	}
+
+	return comment.String()
+}
+
+// buildIgnoredFilesSummary creates a summary section for ignored files (appended to approval/manual-review comments)
+func (mb *MessageBuilder) buildIgnoredFilesSummary(result *shared.RuleEvaluation) string {
+	if len(result.IgnoredFiles) == 0 {
+		return ""
+	}
+
+	var summary strings.Builder
+	summary.WriteString("\n**Ignored files** (not evaluated):\n")
+	for _, f := range result.IgnoredFiles {
+		summary.WriteString(fmt.Sprintf("• `%s`\n", f))
+	}
 	return summary.String()
 }

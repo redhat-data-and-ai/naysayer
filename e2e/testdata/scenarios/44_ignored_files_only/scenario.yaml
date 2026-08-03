@@ -1,0 +1,18 @@
+name: "All files ignored — comment only, no decision"
+description: "When all changed files match ignore_files patterns, naysayer posts a comment but makes no approval decision"
+
+expected:
+  decision: CommentOnly
+  reason: "All changed files are in the ignore list"
+  approved: false
+
+  comment_contains:
+    - "All files ignored"
+    - "**Ignored files**"
+    - "consumer-a.yaml"
+
+mr_metadata:
+  title: "Add consumer group config"
+  author: "testuser"
+  source_branch: "feature/add-consumer-group"
+  target_branch: "main"

@@ -287,3 +287,100 @@ func TestBuildManualReviewComment_IncludesNonEvaluatedManualReviewReason(t *test
 	assert.Contains(t, comment, "**What was checked:**")
 	assert.Contains(t, comment, fallbackReason)
 }
+
+func TestBuildCommentOnlyComment(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "detailed",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.CommentOnly,
+			Reason: "All changed files are in the ignore list - no decision made",
+		},
+		FileValidations: make(map[string]*shared.FileValidationSummary),
+		IgnoredFiles:    []string{"migration.sql", ".gitlab-ci.yml"},
+		ExecutionTime:   time.Millisecond * 10,
+	}
+
+	comment := builder.BuildCommentOnlyComment(result)
+
+	assert.Contains(t, comment, "<!-- naysayer-comment-id: comment-only -->")
+	assert.Contains(t, comment, "All files ignored")
+	assert.Contains(t, comment, "no approval decision made")
+	assert.Contains(t, comment, "`migration.sql`")
+	assert.Contains(t, comment, "`.gitlab-ci.yml`")
+	assert.Contains(t, comment, "**Ignored files**")
+}
+
+func TestBuildIgnoredFilesSummary_InApprovalComment(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "detailed",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+
+	result := &shared.RuleEvaluation{
+		FinalDecision: shared.Decision{
+			Type:   shared.Approve,
+			Reason: "All files passed validation",
+		},
+		FileValidations: map[string]*shared.FileValidationSummary{
+			"dataproducts/source/product.yaml": {
+				FilePath:     "dataproducts/source/product.yaml",
+				TotalLines:   20,
+				CoveredLines: []shared.LineRange{{StartLine: 1, EndLine: 20}},
+				RuleResults: []shared.LineValidationResult{
+					{
+						RuleName:     "metadata_rule",
+						Decision:     shared.Approve,
+						Reason:       "Metadata validated",
+						LineRanges:   []shared.LineRange{{StartLine: 1, EndLine: 20}},
+						WasEvaluated: true,
+					},
+				},
+				FileDecision: shared.Approve,
+			},
+		},
+		TotalFiles:    1,
+		ApprovedFiles: 1,
+		IgnoredFiles:  []string{"migration.sql"},
+		ExecutionTime: time.Millisecond * 50,
+	}
+
+	mrInfo := &gitlab.MRInfo{
+		ProjectID: 123,
+		MRIID:     456,
+		Author:    "testuser",
+		Title:     "Test with ignored files",
+	}
+
+	comment := builder.BuildApprovalComment(result, mrInfo)
+
+	assert.Contains(t, comment, "✅ **Auto-approved**")
+	assert.Contains(t, comment, "**Ignored files** (not evaluated):")
+	assert.Contains(t, comment, "`migration.sql`")
+}
+
+func TestBuildIgnoredFilesSummary_Empty(t *testing.T) {
+	cfg := &config.Config{
+		Comments: config.CommentsConfig{
+			CommentVerbosity: "detailed",
+		},
+	}
+
+	builder := NewMessageBuilder(cfg)
+
+	result := &shared.RuleEvaluation{
+		IgnoredFiles: nil,
+	}
+
+	summary := builder.buildIgnoredFilesSummary(result)
+	assert.Empty(t, summary)
+}

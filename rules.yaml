@@ -2,6 +2,11 @@
 
 enabled: true
 
+ignore_files:
+  - name: "group_configs"
+    path: "dataproducts/**/groups/"
+    filename: "*.{yaml,yml}"
+
 files:
   # Product configuration files - Critical infrastructure validation
   - name: "product_configs"
@@ -117,20 +122,6 @@ files:
     filename: "developers.yaml"
     parser_type: yaml
     enabled: true
-    sections:
-      - name: full_file
-        yaml_path: .
-        rule_configs:
-          - name: metadata_rule
-            enabled: true
-        auto_approve: true
-
-  # Group configuration files - Low risk, can auto-approve
-  - name: "group_configs"
-    path: "dataproducts/**/groups/"
-    filename: "*.{yaml,yml}"
-    parser_type: yaml
-    enabled: false
     sections:
       - name: full_file
         yaml_path: .
