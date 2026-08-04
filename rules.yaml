@@ -6,6 +6,10 @@ ignore_files:
   - name: "group_configs"
     path: "dataproducts/**/groups/"
     filename: "*.{yaml,yml}"
+  - name: "dataproduct_info"
+    path: "dataproducts/**/"
+    filename: "info.{yaml,yml}"
+
 
 files:
   # Product configuration files - Critical infrastructure validation
