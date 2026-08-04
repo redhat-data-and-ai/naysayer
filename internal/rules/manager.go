@@ -19,6 +19,7 @@ type SectionRuleManager struct {
 	config         *config.GlobalRuleConfig
 	ruleRegistry   map[string]shared.Rule // Rule name -> rule instance
 	gitlabClient   gitlab.GitLabClient    // GitLab client for fetching file content
+	ignorePatterns []string               // Compiled patterns from ignore_files config
 }
 
 // NewSectionRuleManager creates a new section-based rule manager
@@ -67,6 +68,13 @@ func (srm *SectionRuleManager) initializeParsers() {
 			logging.Warn("Unknown parser type %s for file configuration: %s", fileConfig.ParserType, fileConfig.Name)
 		}
 	}
+
+	// Initialize ignore patterns from ignore_files configuration
+	for _, ignoreConfig := range srm.config.IgnoreFiles {
+		pattern := ignoreConfig.Path + ignoreConfig.Filename
+		srm.ignorePatterns = append(srm.ignorePatterns, pattern)
+		logging.Info("Registered ignore pattern: %s (%s)", pattern, ignoreConfig.Name)
+	}
 }
 
 // AddRule registers a rule with the manager
@@ -98,7 +106,7 @@ func (srm *SectionRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.Rule
 	srm.setMRContextForRules(mrCtx)
 
 	// Perform section-based validation
-	fileValidations, overallDecision := srm.validateFilesWithSections(mrCtx)
+	fileValidations, overallDecision, ignoredFiles := srm.validateFilesWithSections(mrCtx)
 
 	// Calculate summary statistics
 	totalFiles := len(fileValidations)
@@ -127,12 +135,14 @@ func (srm *SectionRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.Rule
 		ApprovedFiles:   approvedFiles,
 		ReviewFiles:     reviewFiles,
 		UncoveredFiles:  uncoveredFiles,
+		IgnoredFiles:    ignoredFiles,
 	}
 }
 
 // validateFilesWithSections performs section-based validation for each file
-func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext) (map[string]*shared.FileValidationSummary, shared.Decision) {
+func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext) (map[string]*shared.FileValidationSummary, shared.Decision, []string) {
 	fileValidations := make(map[string]*shared.FileValidationSummary)
+	var ignoredFiles []string
 
 	// Get unique file paths from changes
 	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
@@ -141,6 +151,13 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	sourceProjectID := srm.sourceProjectIDForMR(mrCtx)
 
 	for _, filePath := range filePaths {
+		// Check ignore patterns first (takes precedence over all other classification)
+		if srm.isIgnoredFile(filePath) {
+			logging.Info("File ignored by configuration: %s", filePath)
+			ignoredFiles = append(ignoredFiles, filePath)
+			continue
+		}
+
 		// Check if file was deleted in this MR
 		if srm.isDeletedFile(filePath, mrCtx.Changes) {
 			reason := srm.getDeletionReason(filePath)
@@ -178,8 +195,8 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	}
 
 	// Determine overall decision
-	overallDecision := srm.determineOverallDecision(fileValidations)
-	return fileValidations, overallDecision
+	overallDecision := srm.determineOverallDecision(fileValidations, ignoredFiles)
+	return fileValidations, overallDecision, ignoredFiles
 }
 
 // getChangedLinesForFile extracts changed line ranges for a specific file from MR context
@@ -448,6 +465,16 @@ func (srm *SectionRuleManager) getParserForFile(filePath string) shared.SectionP
 		}
 	}
 	return nil
+}
+
+// isIgnoredFile checks if a file matches any ignore_files pattern
+func (srm *SectionRuleManager) isIgnoredFile(filePath string) bool {
+	for _, pattern := range srm.ignorePatterns {
+		if shared.MatchesPattern(filePath, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // getEnabledRulesForSection returns enabled rules that apply to a specific section
@@ -760,10 +787,18 @@ func (srm *SectionRuleManager) sectionsOverlap(section shared.Section, changedRa
 	return section.StartLine <= changedRange.EndLine && section.EndLine >= changedRange.StartLine
 }
 
-func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary) shared.Decision {
-	// Safety check: if there are no file validations, require manual review
-	// This catches edge cases like net-zero changes that slip through earlier checks
+func (srm *SectionRuleManager) determineOverallDecision(fileValidations map[string]*shared.FileValidationSummary, ignoredFiles []string) shared.Decision {
+	// If there are no file validations, check if all files were ignored
 	if len(fileValidations) == 0 {
+		if len(ignoredFiles) > 0 {
+			logging.Info("All changed files are in the ignore list - posting comment only, no decision")
+			return shared.Decision{
+				Type:    shared.CommentOnly,
+				Reason:  "All changed files are in the ignore list - no decision made",
+				Summary: "ℹ️ All files ignored",
+				Details: fmt.Sprintf("All %d changed file(s) match ignore patterns. No validation performed, no approval decision made.", len(ignoredFiles)),
+			}
+		}
 		logging.Warn("No files to validate - requiring manual review for safety")
 		return shared.Decision{
 			Type:    shared.ManualReview,

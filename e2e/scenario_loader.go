@@ -225,6 +225,8 @@ func parseDecisionType(decision string) shared.DecisionType {
 		return shared.Approve
 	case "manualreview", "manual_review", "manual-review", "manual review":
 		return shared.ManualReview
+	case "commentonly", "comment_only", "comment-only", "comment only":
+		return shared.CommentOnly
 	default:
 		return shared.ManualReview // Default to safe option
 	}

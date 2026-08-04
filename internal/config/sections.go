@@ -37,16 +37,25 @@ type FileRuleConfig struct {
 	Sections      []SectionDefinition `yaml:"sections"`       // Sections within this file type
 }
 
+// IgnoreFileConfig defines a file pattern to be completely skipped from rule evaluation
+type IgnoreFileConfig struct {
+	Name     string `yaml:"name"`
+	Path     string `yaml:"path"`
+	Filename string `yaml:"filename"`
+}
+
 // GlobalRuleConfig holds the complete rule configuration for all file types
 type GlobalRuleConfig struct {
-	Enabled bool             `yaml:"enabled"`
-	Files   []FileRuleConfig `yaml:"files"` // Array of file configurations
+	Enabled     bool               `yaml:"enabled"`
+	Files       []FileRuleConfig   `yaml:"files"`         // Array of file configurations
+	IgnoreFiles []IgnoreFileConfig `yaml:"ignore_files"`  // File patterns to skip from evaluation
 }
 
 // RuleBasedConfig is the external YAML format for rule configuration
 type RuleBasedConfig struct {
-	Enabled bool             `yaml:"enabled"`
-	Files   []FileRuleConfig `yaml:"files"` // Array of file configurations
+	Enabled     bool               `yaml:"enabled"`
+	Files       []FileRuleConfig   `yaml:"files"`        // Array of file configurations
+	IgnoreFiles []IgnoreFileConfig `yaml:"ignore_files"` // File patterns to skip from evaluation
 }
 
 // LoadRuleConfig loads rule-based validation configuration from YAML
@@ -77,8 +86,9 @@ func LoadRuleConfig(configPath string) (*GlobalRuleConfig, error) {
 
 	// Convert YAML config to internal format
 	config := &GlobalRuleConfig{
-		Enabled: yamlConfig.Enabled,
-		Files:   yamlConfig.Files,
+		Enabled:     yamlConfig.Enabled,
+		Files:       yamlConfig.Files,
+		IgnoreFiles: yamlConfig.IgnoreFiles,
 	}
 
 	// Validate the configuration
@@ -93,8 +103,9 @@ func LoadRuleConfig(configPath string) (*GlobalRuleConfig, error) {
 func SaveRuleConfig(config *GlobalRuleConfig, configPath string) error {
 	// Convert internal config to external format
 	externalConfig := RuleBasedConfig{
-		Enabled: config.Enabled,
-		Files:   config.Files,
+		Enabled:     config.Enabled,
+		Files:       config.Files,
+		IgnoreFiles: config.IgnoreFiles,
 	}
 
 	// Marshal to YAML

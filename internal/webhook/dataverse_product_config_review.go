@@ -272,6 +272,35 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	return nil
 }
 
+// handleCommentOnlyWithComments posts an informational comment without approving or requesting review
+func (h *DataProductConfigMrReviewHandler) handleCommentOnlyWithComments(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) error {
+	messageBuilder := NewMessageBuilder(h.config)
+
+	if h.config.Comments.EnableMRComments {
+		comment := messageBuilder.BuildCommentOnlyComment(result)
+
+		logging.MRInfo(mrInfo.MRIID, "Adding/updating comment-only message (no MR decision)")
+
+		if h.config.Comments.UpdateExistingComments {
+			if err := h.gitlabClient.AddOrUpdateMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment, "comment-only"); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add/update comment-only message", err)
+				return err
+			}
+			logging.MRInfo(mrInfo.MRIID, "Added/updated comment-only message")
+		} else {
+			if err := h.gitlabClient.AddMRComment(mrInfo.ProjectID, mrInfo.MRIID, comment); err != nil {
+				logging.MRError(mrInfo.MRIID, "Failed to add comment-only message", err)
+				return err
+			}
+			logging.MRInfo(mrInfo.MRIID, "Added comment-only message")
+		}
+	} else {
+		logging.MRInfo(mrInfo.MRIID, "Skipping comment-only message (comments disabled)")
+	}
+
+	return nil
+}
+
 // handleMergeRequestEvent handles traditional MR events (immediate processing)
 func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx, payload map[string]interface{}) error {
 	// simplified: Only process "open" and "update" actions. Other actions (approved, unapproved,
@@ -352,7 +381,8 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 
 	// Handle approval with comments if decision is to approve
 	approved := false
-	if result.FinalDecision.Type == shared.Approve {
+	switch result.FinalDecision.Type {
+	case shared.Approve:
 		if err := h.handleApprovalWithComments(result, mrInfo); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to approve", err)
 			return c.Status(500).JSON(fiber.Map{
@@ -360,11 +390,15 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 			})
 		}
 		approved = true
-	} else {
+	case shared.CommentOnly:
+		if err := h.handleCommentOnlyWithComments(result, mrInfo); err != nil {
+			logging.MRError(mrInfo.MRIID, "Failed to add comment-only message", err)
+		}
+		logging.MRInfo(mrInfo.MRIID, "Comment only - no MR decision", zap.String("reason", result.FinalDecision.Reason))
+	default:
 		// Handle manual review with informational comments
 		if err := h.handleManualReviewWithComments(result, mrInfo); err != nil {
 			logging.MRError(mrInfo.MRIID, "Failed to add manual review comment", err)
-			// Continue - comment failure shouldn't block the webhook response
 		}
 		logging.MRInfo(mrInfo.MRIID, "Manual review required", zap.String("reason", result.FinalDecision.Reason))
 	}

@@ -14,6 +14,7 @@ type DecisionType string
 const (
 	Approve      DecisionType = "approve"       // Auto-approve the MR
 	ManualReview DecisionType = "manual_review" // Require manual approval
+	CommentOnly  DecisionType = "comment_only"  // Post informational comment, no MR action
 )
 
 // Decision represents a simplified approval decision for a merge request
@@ -113,6 +114,9 @@ type RuleEvaluation struct {
 	ApprovedFiles  int `json:"approved_files"`
 	ReviewFiles    int `json:"review_files"`
 	UncoveredFiles int `json:"uncovered_files"`
+
+	// Files skipped by ignore_files configuration
+	IgnoredFiles []string `json:"ignored_files,omitempty"`
 }
 
 // Common helper functions for rule evaluation

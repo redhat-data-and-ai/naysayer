@@ -249,9 +249,9 @@ func TestSectionRuleManager_DetermineOverallDecision_ZeroFiles(t *testing.T) {
 
 	manager := NewSectionRuleManager(ruleConfig, nil)
 
-	// Test with empty file validations - should require manual review
+	// Test with empty file validations and no ignored files - should require manual review
 	emptyValidations := make(map[string]*shared.FileValidationSummary)
-	decision := manager.determineOverallDecision(emptyValidations)
+	decision := manager.determineOverallDecision(emptyValidations, nil)
 
 	assert.Equal(t, shared.ManualReview, decision.Type)
 	assert.Contains(t, decision.Reason, "no files to validate")
@@ -272,7 +272,7 @@ func TestSectionRuleManager_DetermineOverallDecision_WithFiles(t *testing.T) {
 			FileDecision: shared.Approve,
 		},
 	}
-	decision := manager.determineOverallDecision(approvedValidations)
+	decision := manager.determineOverallDecision(approvedValidations, nil)
 
 	assert.Equal(t, shared.Approve, decision.Type)
 
@@ -283,7 +283,7 @@ func TestSectionRuleManager_DetermineOverallDecision_WithFiles(t *testing.T) {
 			FileDecision: shared.ManualReview,
 		},
 	}
-	decision = manager.determineOverallDecision(reviewValidations)
+	decision = manager.determineOverallDecision(reviewValidations, nil)
 
 	assert.Equal(t, shared.ManualReview, decision.Type)
 }
@@ -678,4 +678,92 @@ func TestParseHunkHeader(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestIsIgnoredFile(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+		IgnoreFiles: []config.IgnoreFileConfig{
+			{Name: "sql_migrations", Path: "**/", Filename: "*.sql"},
+			{Name: "ci_config", Path: "", Filename: ".gitlab-ci.yml"},
+			{Name: "gitkeep", Path: "**/", Filename: ".gitkeep"},
+		},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	tests := []struct {
+		name     string
+		filePath string
+		expected bool
+	}{
+		{"sql file at root", "migration.sql", true},
+		{"sql file nested", "dataproducts/source/analytics/migration.sql", true},
+		{"gitlab-ci at root", ".gitlab-ci.yml", true},
+		{"gitkeep nested", "dataproducts/source/.gitkeep", true},
+		{"gitkeep at root", ".gitkeep", true},
+		{"yaml file not ignored", "dataproducts/source/product.yaml", false},
+		{"markdown not ignored", "README.md", false},
+		{"python not ignored", "scripts/process.py", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := manager.isIgnoredFile(tt.filePath)
+			assert.Equal(t, tt.expected, result, "isIgnoredFile(%q)", tt.filePath)
+		})
+	}
+}
+
+func TestDetermineOverallDecision_AllIgnored(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// When all files are ignored and no file validations exist, decision is CommentOnly
+	emptyValidations := make(map[string]*shared.FileValidationSummary)
+	ignoredFiles := []string{"migration.sql", ".gitlab-ci.yml"}
+	decision := manager.determineOverallDecision(emptyValidations, ignoredFiles)
+
+	assert.Equal(t, shared.CommentOnly, decision.Type)
+	assert.Contains(t, decision.Reason, "ignore list")
+	assert.Contains(t, decision.Summary, "ignored")
+}
+
+func TestDetermineOverallDecision_SomeIgnoredSomeValidated(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	// When some files are validated (approved) and some ignored, decision is based on validated files
+	validations := map[string]*shared.FileValidationSummary{
+		"product.yaml": {
+			FilePath:     "product.yaml",
+			FileDecision: shared.Approve,
+		},
+	}
+	ignoredFiles := []string{"migration.sql"}
+	decision := manager.determineOverallDecision(validations, ignoredFiles)
+
+	assert.Equal(t, shared.Approve, decision.Type)
+}
+
+func TestIgnorePatternInitialization(t *testing.T) {
+	ruleConfig := &config.GlobalRuleConfig{
+		Files: []config.FileRuleConfig{},
+		IgnoreFiles: []config.IgnoreFileConfig{
+			{Name: "sql_migrations", Path: "**/", Filename: "*.sql"},
+			{Name: "ci_config", Path: "", Filename: ".gitlab-ci.yml"},
+		},
+	}
+
+	manager := NewSectionRuleManager(ruleConfig, nil)
+
+	assert.Equal(t, 2, len(manager.ignorePatterns))
+	assert.Contains(t, manager.ignorePatterns, "**/*.sql")
+	assert.Contains(t, manager.ignorePatterns, ".gitlab-ci.yml")
 }
