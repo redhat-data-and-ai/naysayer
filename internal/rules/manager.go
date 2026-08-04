@@ -246,12 +246,15 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 	}
 
 	// Validate all sections (not just affected ones) to show complete rule evaluation
-	for _, section := range sections {
+	for i := range sections {
+		section := &sections[i]
+		section.ChangedLines = getSectionChangedLines(changedLines, section.StartLine, section.EndLine)
+
 		// Get enabled rules for this section
 		sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
 
 		// Validate the section
-		sectionResult := parser.ValidateSection(&section, sectionRules)
+		sectionResult := parser.ValidateSection(section, sectionRules)
 		sectionResults = append(sectionResults, *sectionResult)
 
 		// Add to overall results
@@ -305,6 +308,31 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		RuleResults:    ruleResults,
 		FileDecision:   fileDecision,
 	}
+}
+
+// getSectionChangedLines converts file-level changedLines to section-relative
+// coordinates, filtering to only lines within the section bounds.
+func getSectionChangedLines(changedLines []shared.LineRange, sectionStart, sectionEnd int) []shared.LineRange {
+	var result []shared.LineRange
+	for _, cl := range changedLines {
+		if cl.EndLine < sectionStart || cl.StartLine > sectionEnd {
+			continue
+		}
+		start := cl.StartLine
+		if start < sectionStart {
+			start = sectionStart
+		}
+		end := cl.EndLine
+		if end > sectionEnd {
+			end = sectionEnd
+		}
+		result = append(result, shared.LineRange{
+			StartLine: start - sectionStart + 1,
+			EndLine:   end - sectionStart + 1,
+			FilePath:  cl.FilePath,
+		})
+	}
+	return result
 }
 
 func diffMentionsWarehouses(diffText string) bool {

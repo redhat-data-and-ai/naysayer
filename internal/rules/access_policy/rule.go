@@ -50,6 +50,32 @@ func (r *AccessPolicyRule) GetCoveredLines(filePath string, fileContent string) 
 	return []shared.LineRange{{StartLine: 1, EndLine: 1, FilePath: filePath}}
 }
 
+// GetCoveredLinesForChanges returns access_policy lines only if they fall within changedLines.
+// This prevents false positives when a section is affected by other changes
+// (e.g., consumer additions) but access_policy itself was not modified.
+func (r *AccessPolicyRule) GetCoveredLinesForChanges(filePath string, fileContent string, changedLines []shared.LineRange) []shared.LineRange {
+	if !r.IsProductFile(filePath) {
+		return nil
+	}
+
+	var result []shared.LineRange
+	lines := strings.Split(fileContent, "\n")
+	for _, cl := range changedLines {
+		for lineNum := cl.StartLine; lineNum <= cl.EndLine; lineNum++ {
+			if lineNum > 0 && lineNum <= len(lines) {
+				if strings.Contains(lines[lineNum-1], accessPolicyKey) {
+					result = append(result, shared.LineRange{
+						StartLine: lineNum,
+						EndLine:   lineNum,
+						FilePath:  filePath,
+					})
+				}
+			}
+		}
+	}
+	return result
+}
+
 // ValidateLines returns ManualReview only when modified line ranges contain access_policy.
 func (r *AccessPolicyRule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
 	if !r.IsProductFile(filePath) {

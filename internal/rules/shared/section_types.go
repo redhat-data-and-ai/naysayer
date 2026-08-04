@@ -26,8 +26,9 @@ type Section struct {
 	FilePath    string                 `json:"file_path"`    // Parent file path
 	YAMLPath    string                 `json:"yaml_path"`    // YAML path (e.g., "spec.warehouse")
 	Required    bool                   `json:"required"`     // Is this section required?
-	RuleConfigs []config.RuleConfig    `json:"rule_configs"` // Rules with enable/disable control
-	AutoApprove bool                   `json:"auto_approve"` // Auto-approve this section if rules pass
+	RuleConfigs  []config.RuleConfig    `json:"rule_configs"`  // Rules with enable/disable control
+	AutoApprove  bool                   `json:"auto_approve"`  // Auto-approve this section if rules pass
+	ChangedLines []LineRange            `json:"changed_lines"` // Section-relative changed lines (populated at validation time)
 }
 
 // SectionValidationResult represents validation result for a specific section

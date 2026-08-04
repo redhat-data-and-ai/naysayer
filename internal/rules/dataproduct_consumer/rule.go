@@ -400,7 +400,8 @@ func (r *DataProductConsumerRule) isSectionContentConsumerOnly(lines []string) b
 
 		// Structural lines always present in data_product_db sections
 		if strings.HasPrefix(trimmed, "database:") || strings.HasPrefix(trimmed, "- database:") ||
-			strings.HasPrefix(trimmed, "presentation_schemas:") || strings.HasPrefix(trimmed, "- presentation_schemas:") {
+			strings.HasPrefix(trimmed, "presentation_schemas:") || strings.HasPrefix(trimmed, "- presentation_schemas:") ||
+			strings.HasPrefix(trimmed, "access_policy:") {
 			continue
 		}
 

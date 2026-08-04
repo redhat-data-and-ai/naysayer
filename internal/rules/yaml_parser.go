@@ -10,6 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// changeSensitiveRule is an optional interface for rules that need to know
+// which lines actually changed (not just which lines they cover).
+type changeSensitiveRule interface {
+	GetCoveredLinesForChanges(filePath, fileContent string, changedLines []shared.LineRange) []shared.LineRange
+}
+
 // YAMLSectionParser parses YAML files into logical sections
 type YAMLSectionParser struct {
 	sectionDefinitions map[string]config.SectionDefinition
@@ -263,6 +269,24 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 			coveredLines := rule.GetCoveredLines(section.FilePath, section.Content)
 			if len(coveredLines) == 0 {
 				continue // Rule doesn't apply
+			}
+
+			// For change-sensitive rules, re-derive covered lines using only the changed portions
+			if csr, ok := rule.(changeSensitiveRule); ok && len(section.ChangedLines) > 0 {
+				filteredLines := csr.GetCoveredLinesForChanges(section.FilePath, section.Content, section.ChangedLines)
+				if len(filteredLines) == 0 {
+					decision, reason := rule.ValidateLines(section.FilePath, section.Content, nil)
+					result.AppliedRules = append(result.AppliedRules, rule.Name())
+					result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
+						RuleName:     rule.Name(),
+						LineRanges:   coveredLines,
+						Decision:     decision,
+						Reason:       reason,
+						WasEvaluated: true,
+					})
+					continue
+				}
+				coveredLines = filteredLines
 			}
 
 			// Validate using the rule
