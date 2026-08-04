@@ -272,7 +272,7 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 			}
 
 			// For change-sensitive rules, re-derive covered lines using only the changed portions
-			if csr, ok := rule.(changeSensitiveRule); ok && len(section.ChangedLines) > 0 {
+			if csr, ok := rule.(changeSensitiveRule); ok {
 				filteredLines := csr.GetCoveredLinesForChanges(section.FilePath, section.Content, section.ChangedLines)
 				if len(filteredLines) == 0 {
 					decision, reason := rule.ValidateLines(section.FilePath, section.Content, nil)
