@@ -14,6 +14,7 @@ One or more files require manual review
 • `dataproducts/source/example-product/prod/sourcebinding.yaml` ✅
 
 **What was checked:**
+• ✅ Changes validated across 2 files
 • ✅ Consumer access changes in preprod environment - data product owner approval sufficient (no TOC approval required)
 • ✅ Metadata changes validated across 3 files
 • 🚫 Manual review required: New data product being promoted to prod environment requires TOC (Technical Oversight Committee) approval before deployment

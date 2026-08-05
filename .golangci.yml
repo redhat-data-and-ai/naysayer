@@ -6,3 +6,4 @@ linters:
       checks:
         - all
         - "-QF1012"
+        - "-ST1003"

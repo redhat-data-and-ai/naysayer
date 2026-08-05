@@ -1,0 +1,13 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+data_product_db:
+  presentation_schemas:
+  - name: marts
+    access_policy: rh_internal
+    consumers:
+    - name: existing_consumer
+      kind: data_product
+    - name: reporting
+      kind: data_product

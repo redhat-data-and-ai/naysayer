@@ -1,0 +1,16 @@
+name: "Consumer addition with existing access_policy - no false positive"
+description: "Adding a consumer to a product that has access_policy should auto-approve (access_policy unchanged)"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Grant reporting product access to analytics marts"
+  author: "testuser"
+  source_branch: "feature/add-reporting-consumer"
+  target_branch: "main"

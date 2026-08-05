@@ -10,6 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// changeSensitiveRule is an optional interface for rules that need to know
+// which lines actually changed (not just which lines they cover).
+type changeSensitiveRule interface {
+	GetCoveredLinesForChanges(filePath, fileContent string, changedLines []shared.LineRange) []shared.LineRange
+}
+
 // YAMLSectionParser parses YAML files into logical sections
 type YAMLSectionParser struct {
 	sectionDefinitions map[string]config.SectionDefinition
@@ -251,15 +257,6 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 		RuleResults:  make([]shared.LineValidationResult, 0),
 	}
 
-	// Create line ranges for this section
-	lineRanges := []shared.LineRange{
-		{
-			StartLine: section.StartLine,
-			EndLine:   section.EndLine,
-			FilePath:  section.FilePath,
-		},
-	}
-
 	// Step 1: Run any configured rules first
 	hasRules := len(rules) > 0
 	rulesPassed := true
@@ -274,13 +271,31 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 				continue // Rule doesn't apply
 			}
 
+			// For change-sensitive rules, re-derive covered lines using only the changed portions
+			if csr, ok := rule.(changeSensitiveRule); ok {
+				filteredLines := csr.GetCoveredLinesForChanges(section.FilePath, section.Content, section.ChangedLines)
+				if len(filteredLines) == 0 {
+					decision, reason := rule.ValidateLines(section.FilePath, section.Content, nil)
+					result.AppliedRules = append(result.AppliedRules, rule.Name())
+					result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
+						RuleName:     rule.Name(),
+						LineRanges:   coveredLines,
+						Decision:     decision,
+						Reason:       reason,
+						WasEvaluated: true,
+					})
+					continue
+				}
+				coveredLines = filteredLines
+			}
+
 			// Validate using the rule
-			decision, reason := rule.ValidateLines(section.FilePath, section.Content, lineRanges)
+			decision, reason := rule.ValidateLines(section.FilePath, section.Content, coveredLines)
 
 			result.AppliedRules = append(result.AppliedRules, rule.Name())
 			result.RuleResults = append(result.RuleResults, shared.LineValidationResult{
 				RuleName:     rule.Name(),
-				LineRanges:   lineRanges,
+				LineRanges:   coveredLines,
 				Decision:     decision,
 				Reason:       reason,
 				WasEvaluated: true, // Mark that this rule actually executed
@@ -293,7 +308,6 @@ func (p *YAMLSectionParser) ValidateSection(section *shared.Section, rules []sha
 				rulesPassed = false
 				result.Decision = shared.ManualReview
 				result.Reason = fmt.Sprintf("Rule validation failed: %s", reason)
-				break // Stop on first rule failure
 			}
 		}
 	}

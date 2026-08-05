@@ -350,22 +350,22 @@ data_product_db:
 			expectedCoverageLen: 0,
 		},
 		{
-			name:                "product.yaml with consumers should return placeholder",
+			name:                "product.yaml with consumers should return full content range",
 			filePath:            "dataproducts/analytics/prod/product.yaml",
 			fileContent:         consumerYaml,
 			expectedCoverageLen: 1,
 			expectedStartLine:   1,
-			expectedEndLine:     1,
+			expectedEndLine:     11,
 		},
 		{
-			name:     "product.yaml without consumers should return placeholder",
+			name:     "product.yaml without consumers should return full content range",
 			filePath: "dataproducts/analytics/prod/product.yaml",
 			fileContent: `---
 name: test
 kind: aggregated`,
 			expectedCoverageLen: 1,
 			expectedStartLine:   1,
-			expectedEndLine:     1,
+			expectedEndLine:     3,
 		},
 	}
 

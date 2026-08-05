@@ -6,7 +6,7 @@ Complete guide for local development and building custom validation rules.
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.25.8 or later
 - Git
 - Make (optional, for convenience commands)
 - GitLab token for testing (optional)
