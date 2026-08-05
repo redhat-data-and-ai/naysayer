@@ -1,0 +1,16 @@
+<!-- naysayer-comment-id: manual-review -->
+⚠️ **Manual review required**
+
+**Why manual review is needed:**
+One or more files require manual review
+
+<details>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
+
+**What was checked:**
+• 🚫 access_policy changes require manual review
+• ✅ Consumer access changes in prod environment - data product owner approval sufficient (no TOC approval required)
+• ✅ Auto-approved: Product metadata changes are safe
+• ✅ Existing product.yaml file or not in critical environment - no TOC approval required
+
+</details>

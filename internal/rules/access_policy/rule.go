@@ -18,11 +18,12 @@ type AccessPolicyRule struct {
 // NewAccessPolicyRule creates a new access policy rule instance
 func NewAccessPolicyRule() *AccessPolicyRule {
 	return &AccessPolicyRule{
-		BaseRule:        common.NewBaseRule("access_policy_rule", "Requires manual review for "+accessPolicyKey+" changes"),
+		BaseRule:        common.NewBaseRule("access_policy_rule", "Requires manual review for "+accessPolicy+" changes"),
 		FileTypeMatcher: common.NewFileTypeMatcher(),
 	}
 }
-const accessPolicyKey = "access_policy"
+const accessPolicy = "access_policy"
+const accessPolicyKey = accessPolicy + ":"
 
 // GetCoveredLines returns the actual lines where access_policy appears.
 // Always returns at least a placeholder for product files so the rule participates
@@ -35,7 +36,7 @@ func (r *AccessPolicyRule) GetCoveredLines(filePath string, fileContent string) 
 	var ranges []shared.LineRange
 	lines := strings.Split(fileContent, "\n")
 	for i, line := range lines {
-		if strings.Contains(line, accessPolicyKey) {
+		if strings.HasPrefix(strings.TrimSpace(line), accessPolicyKey) {
 			ranges = append(ranges, shared.LineRange{
 				StartLine: i + 1,
 				EndLine:   i + 1,
@@ -63,7 +64,7 @@ func (r *AccessPolicyRule) GetCoveredLinesForChanges(filePath string, fileConten
 	for _, cl := range changedLines {
 		for lineNum := cl.StartLine; lineNum <= cl.EndLine; lineNum++ {
 			if lineNum > 0 && lineNum <= len(lines) {
-				if strings.Contains(lines[lineNum-1], accessPolicyKey) {
+				if strings.HasPrefix(strings.TrimSpace(lines[lineNum-1]), accessPolicyKey) {
 					result = append(result, shared.LineRange{
 						StartLine: lineNum,
 						EndLine:   lineNum,
@@ -79,21 +80,21 @@ func (r *AccessPolicyRule) GetCoveredLinesForChanges(filePath string, fileConten
 // ValidateLines returns ManualReview only when modified line ranges contain access_policy.
 func (r *AccessPolicyRule) ValidateLines(filePath string, fileContent string, lineRanges []shared.LineRange) (shared.DecisionType, string) {
 	if !r.IsProductFile(filePath) {
-		return shared.Approve, "Not a product file - access_policy rule does not apply"
+		return shared.Approve, "Not a product file - "+accessPolicy+" rule does not apply"
 	}
 	if len(lineRanges) == 0 {
-		return shared.Approve, "No access_policy changes detected"
+		return shared.Approve, "No "+accessPolicy+" changes detected"
 	}
 
 	lines := strings.Split(fileContent, "\n")
 	for _, lr := range lineRanges {
 		for l := lr.StartLine; l <= lr.EndLine; l++ {
 			if l > 0 && l <= len(lines) {
-				if strings.Contains(lines[l-1], accessPolicyKey) {
-					return shared.ManualReview, accessPolicyKey + " changes require manual review"
+				if strings.HasPrefix(strings.TrimSpace(lines[l-1]), accessPolicyKey) {
+					return shared.ManualReview, accessPolicy + " changes require manual review"
 				}
 			}
 		}
 	}
-	return shared.Approve, "No access_policy changes detected"
+	return shared.Approve, "No "+accessPolicy+" changes detected"
 }
