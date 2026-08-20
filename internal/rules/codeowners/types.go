@@ -15,7 +15,7 @@ type GroupYAML struct {
 
 // DataProductInfo contains information about a data product extracted from file paths
 type DataProductInfo struct {
-	Type string // "aggregate", "source", or "platform"
+	Type string // "aggregate", "source", "platform", or "unstructured"
 	Name string // e.g., "bookingsmaster"
 	Path string // Full path e.g., "dataproducts/aggregate/bookingsmaster"
 }

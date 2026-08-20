@@ -148,6 +148,7 @@ func TestCODEOWNERSSyncRule_extractDataProductInfo(t *testing.T) {
 	}{
 		{"dataproducts/aggregate/bookingsmaster/developers.yaml", &DataProductInfo{Type: "aggregate", Name: "bookingsmaster", Path: "dataproducts/aggregate/bookingsmaster"}},
 		{"dataproducts/source/marketo/groups/foo.yaml", &DataProductInfo{Type: "source", Name: "marketo", Path: "dataproducts/source/marketo"}},
+		{"dataproducts/unstructured/aifexample/groups/dataverse-source-aifexample.yaml", &DataProductInfo{Type: "unstructured", Name: "aifexample", Path: "dataproducts/unstructured/aifexample"}},
 		{"other/path/file.yaml", nil},
 		{"dataproducts/invalid/test/file.yaml", nil},
 	}

@@ -166,7 +166,7 @@ func (r *CODEOWNERSSyncRule) extractDataProductInfo(filePath string) *DataProduc
 	}
 
 	dpType := parts[1]
-	if dpType != "aggregate" && dpType != "source" && dpType != "platform" {
+	if dpType != "aggregate" && dpType != "source" && dpType != "platform" && dpType != "unstructured" {
 		return nil
 	}
 
