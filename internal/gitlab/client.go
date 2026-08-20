@@ -91,8 +91,9 @@ func NewClientWithConfig(cfg *config.Config) *Client {
 }
 
 // FetchMRChanges fetches merge request changes from GitLab API
+// access_raw_diffs=true prevents GitLab from collapsing large file diffs
 func (c *Client) FetchMRChanges(projectID, mrIID int) ([]FileChange, error) {
-	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/changes",
+	url := fmt.Sprintf("%s/api/v4/projects/%d/merge_requests/%d/changes?access_raw_diffs=true",
 		strings.TrimRight(c.config.BaseURL, "/"), projectID, mrIID)
 
 	req, err := http.NewRequest("GET", url, nil)

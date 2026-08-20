@@ -237,6 +237,13 @@ func TestBuildDataProductApprovalMessage(t *testing.T) {
 	}
 }
 
+func TestSourceBranchProjectID(t *testing.T) {
+	assert.Equal(t, 0, (*MRContext)(nil).SourceBranchProjectID())
+	assert.Equal(t, 106670, (&MRContext{ProjectID: 106670}).SourceBranchProjectID())
+	assert.Equal(t, 106670, (&MRContext{ProjectID: 106670, SourceProjectID: 106670}).SourceBranchProjectID())
+	assert.Equal(t, 191241, (&MRContext{ProjectID: 106670, SourceProjectID: 191241}).SourceBranchProjectID())
+}
+
 // Test helper functions
 
 // Helper functions for the tests

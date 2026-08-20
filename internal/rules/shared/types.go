@@ -36,13 +36,25 @@ type RuleResult struct {
 
 // MRContext contains all information needed for rule evaluation
 type MRContext struct {
-	ProjectID   int                 `json:"project_id"`
-	MRIID       int                 `json:"mr_iid"`
-	Changes     []gitlab.FileChange `json:"changes"`
-	MRInfo      *gitlab.MRInfo      `json:"mr_info"`
-	Environment string              `json:"environment,omitempty"`
-	Labels      []string            `json:"labels,omitempty"`
-	Metadata    map[string]any      `json:"metadata,omitempty"`
+	ProjectID       int                 `json:"project_id"`
+	SourceProjectID int                 `json:"source_project_id,omitempty"`
+	MRIID           int                 `json:"mr_iid"`
+	Changes         []gitlab.FileChange `json:"changes"`
+	MRInfo          *gitlab.MRInfo      `json:"mr_info"`
+	Environment     string              `json:"environment,omitempty"`
+	Labels          []string            `json:"labels,omitempty"`
+	Metadata        map[string]any      `json:"metadata,omitempty"`
+}
+
+// SourceBranchProjectID returns the GitLab project that holds the MR source branch.
+func (m *MRContext) SourceBranchProjectID() int {
+	if m == nil {
+		return 0
+	}
+	if m.SourceProjectID != 0 {
+		return m.SourceProjectID
+	}
+	return m.ProjectID
 }
 
 // Rule defines a simplified interface for all rules
