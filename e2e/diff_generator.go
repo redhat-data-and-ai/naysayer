@@ -170,9 +170,13 @@ func createFileChange(comp FileComparison) (gitlab.FileChange, error) {
 
 // generateGitDiff generates a unified diff in git format
 func generateGitDiff(oldContent, newContent, filePath string) string {
-	// Use difflib to generate unified diff
+	var aLines []string
+	if oldContent != "" {
+		aLines = difflib.SplitLines(oldContent)
+	}
+
 	diff := difflib.UnifiedDiff{
-		A:        difflib.SplitLines(oldContent),
+		A:        aLines,
 		B:        difflib.SplitLines(newContent),
 		FromFile: "a/" + filePath,
 		ToFile:   "b/" + filePath,

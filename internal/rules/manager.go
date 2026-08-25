@@ -166,17 +166,45 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 			continue
 		}
 
-		// Get file content from source branch
-		fileContent, fetchErr := srm.getFileContent(filePath, mrCtx, sourceProjectID)
-		if fetchErr != nil {
-			logging.Warn("Cannot load source-branch file for validation (requiring manual review): %s: %v", filePath, fetchErr)
-			fileValidations[filePath] = srm.createManualReviewValidation(filePath, 0, fmt.Sprintf("Could not load file from source branch: %v", fetchErr))
+		// Get changed lines for the file
+		addedLines, deletedLines := srm.getChangedLinesForFile(filePath, mrCtx)
+
+		if len(addedLines) == 0 && len(deletedLines) == 0 {
+			logging.Warn("No changed lines for %s - requiring manual review", filePath)
+			fileValidations[filePath] = srm.createManualReviewValidation(
+				filePath, 0, "No added or deleted lines found in the diff; cannot validate this file")
 			continue
 		}
-		totalLines := shared.CountLines(fileContent)
+
+		if mrCtx.MRInfo == nil {
+			logging.Warn("MR info not available for %s - requiring manual review", filePath)
+			fileValidations[filePath] = srm.createManualReviewValidation(
+				filePath, 0, "MR branch info not available; cannot fetch file content")
+			continue
+		}
+
+		// Get file content from source branch
+		var sourceFileContent, targetFileContent string
+		if len(addedLines) > 0 {
+			fileContent, fetchErr := srm.fetchFileFromBranch(sourceProjectID, filePath, mrCtx.MRInfo.SourceBranch)
+			if fetchErr != nil {
+				logging.Warn("Cannot load source-branch file for validation (requiring manual review): %s: %v", filePath, fetchErr)
+				fileValidations[filePath] = srm.createManualReviewValidation(filePath, 0, fmt.Sprintf("Could not load file from source branch: %v", fetchErr))
+				continue
+			}
+			sourceFileContent = fileContent
+		}
+		if len(deletedLines) > 0 {
+			fileContent, fetchErr := srm.fetchFileFromBranch(mrCtx.ProjectID, filePath, mrCtx.MRInfo.TargetBranch)
+			if fetchErr != nil {
+				logging.Warn("Cannot load target-branch file for validation (requiring manual review): %s: %v", filePath, fetchErr)
+				fileValidations[filePath] = srm.createManualReviewValidation(filePath, 0, fmt.Sprintf("Could not load file from target branch: %v", fetchErr))
+				continue
+			}
+			targetFileContent = fileContent
+		}
 
 		// Extract changed lines from the diff for delta validation
-		changedLines := srm.getChangedLinesForFile(filePath, mrCtx)
 		diffText := srm.getDiffForFile(filePath, mrCtx)
 
 		// Check if this file has section-based validation
@@ -184,12 +212,12 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 		if parser != nil {
 			logging.Info("Using section-based validation for file: %s", filePath)
 			// Use section-based validation with delta approach
-			fileValidation := srm.validateFileWithSections(filePath, fileContent, totalLines, parser, changedLines, diffText)
+			fileValidation := srm.validateFileWithSections(filePath, sourceFileContent, targetFileContent, parser, addedLines, deletedLines, diffText)
 			fileValidations[filePath] = fileValidation
 		} else {
 			logging.Info("No parser found for file: %s - requiring manual review", filePath)
 			// No section configuration found - require manual review
-			fileValidation := srm.createManualReviewValidation(filePath, totalLines, "No section-based validation configuration found for this file type")
+			fileValidation := srm.createManualReviewValidation(filePath, shared.CountLines(sourceFileContent), "No section-based validation configuration found for this file type")
 			fileValidations[filePath] = fileValidation
 		}
 	}
@@ -199,19 +227,40 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	return fileValidations, overallDecision, ignoredFiles
 }
 
-// getChangedLinesForFile extracts changed line ranges for a specific file from MR context
-func (srm *SectionRuleManager) getChangedLinesForFile(filePath string, mrCtx *shared.MRContext) []shared.LineRange {
+// getChangedLinesForFile extracts both added and deleted line ranges for a specific file.
+// Returns addedLines (positions in new/source branch file) and deletedLines (positions in old/target branch file).
+func (srm *SectionRuleManager) getChangedLinesForFile(filePath string, mrCtx *shared.MRContext) (addedLines []shared.LineRange, deletedLines []shared.LineRange) {
 	for _, change := range mrCtx.Changes {
 		if change.NewPath == filePath && change.Diff != "" {
-			changedLines := srm.extractChangedLinesFromDiff(change.Diff)
-			// Set file path for each line range
-			for i := range changedLines {
-				changedLines[i].FilePath = filePath
+			added, deleted := srm.extractChangedLinesFromDiff(change.Diff)
+			for i := range added {
+				added[i].FilePath = filePath
 			}
-			return changedLines
+			for i := range deleted {
+				deleted[i].FilePath = filePath
+			}
+			return added, deleted
 		}
 	}
-	return []shared.LineRange{}
+	return []shared.LineRange{}, []shared.LineRange{}
+}
+
+// fetchFileFromBranch fetches file content from a specific project and branch.
+func (srm *SectionRuleManager) fetchFileFromBranch(projectID int, filePath, branch string) (string, error) {
+	if srm.gitlabClient == nil {
+		return "", fmt.Errorf("GitLab client not available")
+	}
+	if branch == "" {
+		return "", fmt.Errorf("branch not specified for file fetch: %s", filePath)
+	}
+	fileContent, err := srm.gitlabClient.FetchFileContent(projectID, filePath, branch)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch %s from project %d branch %s: %w", filePath, projectID, branch, err)
+	}
+	if fileContent == nil {
+		return "", fmt.Errorf("empty response when fetching %s", filePath)
+	}
+	return fileContent.Content, nil
 }
 
 func (srm *SectionRuleManager) getDiffForFile(filePath string, mrCtx *shared.MRContext) string {
@@ -223,29 +272,44 @@ func (srm *SectionRuleManager) getDiffForFile(filePath string, mrCtx *shared.MRC
 	return ""
 }
 
-// validateFileWithSections validates a file using section-based approach with delta validation
-func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent string, totalLines int, parser shared.SectionParser, changedLines []shared.LineRange, diffText string) *shared.FileValidationSummary {
-	// Parse file into sections
-	sections, err := parser.ParseSections(filePath, fileContent)
-	if err != nil {
-		logging.Error("Failed to parse sections for %s: %v", filePath, err)
-		// Section parsing failed - require manual review
-		return srm.createManualReviewValidation(filePath, totalLines, fmt.Sprintf("Failed to parse file sections: %v", err))
-	}
+// validateFileWithSections validates a file using section-based approach with delta validation.
+// addedLines are positions in the new file (source branch), deletedLines are positions in the old file (target branch).
+func (srm *SectionRuleManager) validateFileWithSections(filePath, sourceFileContent, targetFileContent string,
+	parser shared.SectionParser, addedLines, deletedLines []shared.LineRange, diffText string) *shared.FileValidationSummary {
 
-	var allCoveredLines []shared.LineRange
-	var ruleResults []shared.LineValidationResult
-	var sectionResults []shared.SectionValidationResult
-
-	// Validate ALL sections to ensure all rules appear in comments
-	// Track which sections were actually affected for potential future optimizations
+	// Track which sections were affected by additions (new file sections)
 	affectedSections := make(map[string]bool)
-	if len(changedLines) > 0 {
-		affected := srm.getAffectedSections(sections, changedLines)
+	var addedSections []shared.Section
+	var deletedSections []shared.Section
+	var deletedAffected []shared.Section
+
+	if len(addedLines) > 0 && sourceFileContent != "" {
+		var err error
+		addedSections, err = parser.ParseSections(filePath, sourceFileContent)
+		if err != nil {
+			logging.Error("Failed to parse sections for %s: %v", filePath, err)
+			return srm.createManualReviewValidation(filePath, shared.CountLines(sourceFileContent), fmt.Sprintf("Failed to parse file sections: %v", err))
+		}
+		affected := srm.getAffectedSections(addedSections, addedLines)
 		for _, section := range affected {
 			affectedSections[section.Name] = true
 		}
-		logging.Info("Delta validation for %s: %d affected sections out of %d total", filePath, len(affectedSections), len(sections))
+	}
+
+	// Track which sections were affected by deletions (old file sections).
+	// Validate those even when the same section name still exists in the new file
+	// (e.g. access_policy removed while a consumer is added under data_product_db).
+	if len(deletedLines) > 0 && targetFileContent != "" {
+		var err error
+		deletedSections, err = parser.ParseSections(filePath, targetFileContent)
+		if err != nil {
+			logging.Error("Failed to parse old file sections for %s: %v", filePath, err)
+			return srm.createManualReviewValidation(filePath, shared.CountLines(targetFileContent), fmt.Sprintf("Failed to parse old file sections: %v", err))
+		}
+		deletedAffected = srm.getAffectedSections(deletedSections, deletedLines)
+		for _, section := range deletedAffected {
+			affectedSections[section.Name] = true
+		}
 	}
 
 	if len(affectedSections) > 0 {
@@ -254,7 +318,7 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 			names = append(names, name)
 		}
 		sort.Strings(names)
-		logging.Info("Delta validation for %s affected sections: %s", filePath, strings.Join(names, ", "))
+		logging.Info("Delta validation for %s: %d affected sections: %s", filePath, len(affectedSections), strings.Join(names, ", "))
 	}
 
 	if !affectedSections["warehouses"] && diffMentionsWarehouses(diffText) {
@@ -262,34 +326,26 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		logging.Info("Delta validation for %s: warehouses section flagged as affected (diff heuristic)", filePath)
 	}
 
-	// Validate all sections (not just affected ones) to show complete rule evaluation
-	for i := range sections {
-		section := &sections[i]
-		section.ChangedLines = getSectionChangedLines(changedLines, section.StartLine, section.EndLine)
+	var allCoveredLines []shared.LineRange
+	var ruleResults []shared.LineValidationResult
+	var sectionResults []shared.SectionValidationResult
 
-		// Get enabled rules for this section
-		sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
-
-		// Validate the section
-		sectionResult := parser.ValidateSection(section, sectionRules)
-		sectionResults = append(sectionResults, *sectionResult)
-
-		// Add to overall results
-		for _, ruleResult := range sectionResult.RuleResults {
-			ruleResults = append(ruleResults, ruleResult)
-			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
-		}
-	}
+	sectionResults, ruleResults, allCoveredLines = srm.validateSections(parser, addedSections, addedLines, sectionResults, ruleResults, allCoveredLines)
+	sectionResults, ruleResults, allCoveredLines = srm.validateSections(parser, deletedAffected, deletedLines, sectionResults, ruleResults, allCoveredLines)
 
 	// Generic defense-in-depth:
 	// if a changed section expects a rule that did not produce a result,
 	// inject a manual-review fallback without overwriting existing reasons.
-	expectedRules := srm.getExpectedRulesForAffectedSections(sections, affectedSections)
-	ruleResults = srm.appendMissingExpectedRuleFallbacks(ruleResults, expectedRules, changedLines)
+	allSections := append(addedSections, deletedAffected...)
+	expectedRules := srm.getExpectedRulesForAffectedSections(allSections, affectedSections)
+	ruleResults = srm.appendMissingExpectedRuleFallbacks(ruleResults, expectedRules, addedLines)
 
-	// Check for uncovered lines (lines not in any section)
-	// Only consider lines that were actually changed in this MR
-	uncoveredLines := srm.getUncoveredLinesInChanges(totalLines, sections, changedLines)
+	// Check for uncovered lines (lines not in any section).
+	// Added and deleted ranges use their own file coordinates so they are not mixed.
+	uncoveredLines := srm.getUncoveredLinesInChanges(shared.CountLines(sourceFileContent), addedSections, addedLines)
+	if len(deletedLines) > 0 {
+		uncoveredLines = append(uncoveredLines, srm.getUncoveredLinesInChanges(shared.CountLines(targetFileContent), deletedSections, deletedLines)...)
+	}
 
 	// Filter results: only affected sections influence the decision.
 	// Unaffected sections are still validated (for MR comment display) but
@@ -301,7 +357,7 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 		decisionRuleResults = ruleResults
 		decisionSectionResults = sectionResults
 	} else {
-		for i, section := range sections {
+		for i, section := range allSections {
 			if affectedSections[section.Name] {
 				decisionSectionResults = append(decisionSectionResults, sectionResults[i])
 				decisionRuleResults = append(decisionRuleResults, sectionResults[i].RuleResults...)
@@ -319,12 +375,31 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, fileContent st
 
 	return &shared.FileValidationSummary{
 		FilePath:       filePath,
-		TotalLines:     totalLines,
+		TotalLines:     shared.CountLines(sourceFileContent),
 		CoveredLines:   shared.MergeLineRanges(allCoveredLines),
 		UncoveredLines: uncoveredLines,
 		RuleResults:    ruleResults,
 		FileDecision:   fileDecision,
 	}
+}
+
+// validateSections runs configured rules for each section using the given line coordinates
+// (addedLines in new-file space, or deletedLines in old-file space).
+func (srm *SectionRuleManager) validateSections(parser shared.SectionParser, sections []shared.Section, changedLines []shared.LineRange, sectionResults []shared.SectionValidationResult, ruleResults []shared.LineValidationResult, allCoveredLines []shared.LineRange) ([]shared.SectionValidationResult, []shared.LineValidationResult, []shared.LineRange) {
+	for i := range sections {
+		section := &sections[i]
+		section.ChangedLines = getSectionChangedLines(changedLines, section.StartLine, section.EndLine)
+
+		sectionRules := srm.getEnabledRulesForSection(section.RuleConfigs)
+		sectionResult := parser.ValidateSection(section, sectionRules)
+		sectionResults = append(sectionResults, *sectionResult)
+
+		for _, ruleResult := range sectionResult.RuleResults {
+			ruleResults = append(ruleResults, ruleResult)
+			allCoveredLines = append(allCoveredLines, ruleResult.LineRanges...)
+		}
+	}
+	return sectionResults, ruleResults, allCoveredLines
 }
 
 // getSectionChangedLines converts file-level changedLines to section-relative
@@ -673,123 +748,108 @@ func (srm *SectionRuleManager) sourceProjectIDForMR(mrCtx *shared.MRContext) int
 	return projectID
 }
 
-func (srm *SectionRuleManager) getFileContent(filePath string, mrCtx *shared.MRContext, sourceProjectID int) (string, error) {
-	if srm.gitlabClient == nil {
-		logging.Warn("GitLab client not available, cannot fetch file content for: %s", filePath)
-		return "", fmt.Errorf("GitLab client not available")
-	}
-	if mrCtx.MRInfo == nil || mrCtx.MRInfo.SourceBranch == "" {
-		return "", fmt.Errorf("source branch not available in MR context")
-	}
-	sourceBranch := mrCtx.MRInfo.SourceBranch
-	fileContent, err := srm.gitlabClient.FetchFileContent(sourceProjectID, filePath, sourceBranch)
-	if err != nil {
-		logging.Warn("Failed to fetch file content for %s from project %d branch %s: %v", filePath, sourceProjectID, sourceBranch, err)
-		return "", err
-	}
-	if fileContent == nil {
-		return "", fmt.Errorf("empty response when fetching %s", filePath)
-	}
-	return fileContent.Content, nil
-}
-
 // extractChangedLinesFromDiff extracts the line ranges that were modified in a Git diff.
 // Only lines actually added/modified ('+' prefix) are included; context lines are skipped
 // so that sections appearing only as diff context aren't flagged as affected.
-func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) []shared.LineRange {
-	var changedRanges []shared.LineRange
+func (srm *SectionRuleManager) extractChangedLinesFromDiff(diff string) (addedLines []shared.LineRange, deletedLines []shared.LineRange) {
 	lines := strings.Split(diff, "\n")
 
 	newLineNum := 0
-	rangeStart := 0
+	oldLineNum := 0
+	addStart := 0
+	delStart := 0
+
+	flushAdded := func() {
+		if addStart > 0 {
+			addedLines = append(addedLines, shared.LineRange{StartLine: addStart, EndLine: newLineNum - 1})
+			addStart = 0
+		}
+	}
+
+	flushDeleted := func() {
+		if delStart > 0 {
+			deletedLines = append(deletedLines, shared.LineRange{StartLine: delStart, EndLine: oldLineNum - 1})
+			delStart = 0
+		}
+	}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "@@") {
-			// Flush any open range
-			if rangeStart > 0 {
-				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
-				rangeStart = 0
-			}
-			if hdr := srm.parseHunkHeader(line); hdr != nil {
-				newLineNum = hdr.StartLine
-			}
+			flushAdded()
+			flushDeleted()
+			newStart, oldStart := srm.parseHunkHeader(line)
+			newLineNum = newStart
+			oldLineNum = oldStart
 			continue
 		}
 
-		if newLineNum == 0 {
+		if newLineNum == 0 && oldLineNum == 0 {
+			continue
+		}
+
+		// "\ No newline at end of file" is a marker, not file content.
+		if strings.HasPrefix(line, "\\") {
 			continue
 		}
 
 		if strings.HasPrefix(line, "+") {
-			if rangeStart == 0 {
-				rangeStart = newLineNum
+			flushDeleted()
+			if addStart == 0 {
+				addStart = newLineNum
 			}
 			newLineNum++
 		} else if strings.HasPrefix(line, "-") {
-			// Deleted line: doesn't exist in new file, don't advance newLineNum
-			if rangeStart > 0 {
-				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
-				rangeStart = 0
+			flushAdded()
+			if delStart == 0 {
+				delStart = oldLineNum
 			}
+			oldLineNum++
 		} else {
-			// Context line: exists in new file but unchanged
-			if rangeStart > 0 {
-				changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
-				rangeStart = 0
-			}
+			flushAdded()
+			flushDeleted()
 			newLineNum++
+			oldLineNum++
 		}
 	}
 
-	// Flush trailing range
-	if rangeStart > 0 {
-		changedRanges = append(changedRanges, shared.LineRange{StartLine: rangeStart, EndLine: newLineNum - 1})
-	}
-
-	return changedRanges
+	flushAdded()
+	flushDeleted()
+	return addedLines, deletedLines
 }
 
-// parseHunkHeader parses a Git diff hunk header to extract the new file line range
-func (srm *SectionRuleManager) parseHunkHeader(hunkHeader string) *shared.LineRange {
-	// Format: @@ -old_start,old_count +new_start,new_count @@
+// parseHunkHeader extracts both new and old start positions from a hunk header.
+// Returns (newStart, oldStart). Returns (0, 0) if parsing fails.
+func (srm *SectionRuleManager) parseHunkHeader(hunkHeader string) (newStart int, oldStart int) {
 	parts := strings.Fields(hunkHeader)
 	if len(parts) < 3 {
-		return nil
+		return 0, 0
 	}
 
-	newPart := parts[2] // +new_start,new_count
-	if !strings.HasPrefix(newPart, "+") {
-		return nil
-	}
-
-	newInfo := strings.TrimPrefix(newPart, "+")
-	rangeParts := strings.Split(newInfo, ",")
-
-	startLine := 0
-	count := 1
-
-	// Parse start line
-	if len(rangeParts) > 0 {
-		if n, err := fmt.Sscanf(rangeParts[0], "%d", &startLine); n != 1 || err != nil {
-			return nil
+	// Parse old part: -old_start,old_count
+	oldPart := parts[1]
+	if strings.HasPrefix(oldPart, "-") {
+		oldInfo := strings.TrimPrefix(oldPart, "-")
+		oldRangeParts := strings.Split(oldInfo, ",")
+		if len(oldRangeParts) > 0 {
+			if n, err := fmt.Sscanf(oldRangeParts[0], "%d", &oldStart); n != 1 || err != nil {
+				oldStart = 0
+			}
 		}
 	}
 
-	// Parse count if present
-	if len(rangeParts) > 1 {
-		if n, err := fmt.Sscanf(rangeParts[1], "%d", &count); n != 1 || err != nil {
-			count = 1
+	// Parse new part: +new_start,new_count
+	newPart := parts[2]
+	if strings.HasPrefix(newPart, "+") {
+		newInfo := strings.TrimPrefix(newPart, "+")
+		newRangeParts := strings.Split(newInfo, ",")
+		if len(newRangeParts) > 0 {
+			if n, err := fmt.Sscanf(newRangeParts[0], "%d", &newStart); n != 1 || err != nil {
+				newStart = 0
+			}
 		}
 	}
 
-	if startLine <= 0 || count <= 0 {
-		return nil
-	}
-
-	return &shared.LineRange{
-		StartLine: startLine,
-		EndLine:   startLine + count - 1,
-	}
+	return newStart, oldStart
 }
 
 // getAffectedSections returns only the sections that contain changed lines
