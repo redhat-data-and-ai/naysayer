@@ -13,7 +13,9 @@ import (
 
 // mockGitLabClient implements gitlab.GitLabClient for testing consumer group file validation
 type mockGitLabClient struct {
-	existingFiles map[string]map[string]bool // branch -> filePath -> exists
+	existingFiles   map[string]map[string]bool // branch -> filePath -> exists
+	sourceProjectID int
+	sourceBranch    string
 }
 
 func newMockGitLabClient(files map[string]map[string]bool) *mockGitLabClient {
@@ -95,6 +97,11 @@ func (m *mockGitLabClient) FindCommentByPattern(projectID, mrIID int, pattern st
 	return false, nil
 }
 func (m *mockGitLabClient) ListDirectoryFiles(projectID int, dirPath, ref string) ([]gitlab.RepositoryFile, error) {
+	// Fork MRs: source branch exists only on the fork project.
+	if m.sourceProjectID != 0 && m.sourceBranch != "" && ref == m.sourceBranch && projectID != m.sourceProjectID {
+		return nil, fmt.Errorf("file not found: %s", dirPath)
+	}
+
 	var files []gitlab.RepositoryFile
 	if branchFiles, ok := m.existingFiles[ref]; ok {
 		prefix := dirPath + "/"
@@ -841,6 +848,52 @@ data_product_db:
 			assert.Contains(t, reason, tt.expectedReasonContains)
 		})
 	}
+}
+
+// fork MRs must list groups/ on the source project.
+func TestDataProductConsumerRule_ValidateLines_ForkMRListsGroupsFromSourceProject(t *testing.T) {
+	const (
+		targetProjectID = 106670
+		forkProjectID   = 191241
+	)
+
+	consumerGroupYaml := `---
+name: subscriptionwatch
+kind: source-aligned
+data_product_db:
+- database: subscriptionwatch_db
+  presentation_schemas:
+  - name: marts
+    consumers:
+    - name: dataverse-consumer-subscriptionwatch-marts
+      kind: consumer_group`
+
+	mockClient := newMockGitLabClient(map[string]map[string]bool{
+		"feature/add-consumer": {
+			"dataproducts/subscriptionwatch/groups/dataverse-consumer-subscriptionwatch-marts.yaml": true,
+		},
+	})
+	mockClient.sourceProjectID = forkProjectID
+	mockClient.sourceBranch = "feature/add-consumer"
+
+	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, mockClient)
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID:       targetProjectID,
+		SourceProjectID: forkProjectID,
+		MRInfo: &gitlab.MRInfo{
+			SourceBranch: "feature/add-consumer",
+			TargetBranch: "main",
+		},
+	})
+
+	decision, reason := rule.ValidateLines(
+		"dataproducts/subscriptionwatch/prod/product.yaml",
+		consumerGroupYaml,
+		[]shared.LineRange{{StartLine: 8, EndLine: 10, FilePath: "dataproducts/subscriptionwatch/prod/product.yaml"}},
+	)
+
+	assert.Equal(t, shared.Approve, decision, "fork MR should find group YAML on the source project, got: %s", reason)
+	assert.Contains(t, reason, "data product owner approval sufficient")
 }
 
 func TestDataProductConsumerRule_detectSelfConsumer(t *testing.T) {

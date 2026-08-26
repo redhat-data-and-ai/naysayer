@@ -166,7 +166,7 @@ func (r *CODEOWNERSSyncRule) extractDataProductInfo(filePath string) *DataProduc
 	}
 
 	dpType := parts[1]
-	if dpType != "aggregate" && dpType != "source" && dpType != "platform" {
+	if dpType != "aggregate" && dpType != "source" && dpType != "platform" && dpType != "unstructured" {
 		return nil
 	}
 
@@ -183,7 +183,7 @@ func (r *CODEOWNERSSyncRule) fetchOwners(mrCtx *shared.MRContext, filePath strin
 		return nil
 	}
 
-	content, err := r.client.FetchFileContent(mrCtx.ProjectID, filePath, mrCtx.MRInfo.SourceBranch)
+	content, err := r.client.FetchFileContent(mrCtx.SourceBranchProjectID(), filePath, mrCtx.MRInfo.SourceBranch)
 	if err != nil {
 		logging.Warn("Failed to fetch developers.yaml: %v", err)
 		return nil
@@ -203,7 +203,7 @@ func (r *CODEOWNERSSyncRule) fetchGroupInfo(mrCtx *shared.MRContext, filePath st
 		return nil
 	}
 
-	content, err := r.client.FetchFileContent(mrCtx.ProjectID, filePath, mrCtx.MRInfo.SourceBranch)
+	content, err := r.client.FetchFileContent(mrCtx.SourceBranchProjectID(), filePath, mrCtx.MRInfo.SourceBranch)
 	if err != nil {
 		logging.Warn("Failed to fetch group YAML: %v", err)
 		return nil

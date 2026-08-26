@@ -102,6 +102,9 @@ func (srm *SectionRuleManager) EvaluateAll(mrCtx *shared.MRContext) *shared.Rule
 		}
 	}
 
+	// Resolve fork vs same-repo source project once, then share it with rules.
+	mrCtx.SourceProjectID = srm.sourceProjectIDForMR(mrCtx)
+
 	// Set MR context for context-aware rules
 	srm.setMRContextForRules(mrCtx)
 
@@ -148,7 +151,10 @@ func (srm *SectionRuleManager) validateFilesWithSections(mrCtx *shared.MRContext
 	filePaths := srm.getUniqueFilePaths(mrCtx.Changes)
 
 	// Source branch files for fork MRs live on the fork project, not the target (same as warehouse analyzer).
-	sourceProjectID := srm.sourceProjectIDForMR(mrCtx)
+	sourceProjectID := mrCtx.SourceProjectID
+	if sourceProjectID == 0 {
+		sourceProjectID = srm.sourceProjectIDForMR(mrCtx)
+	}
 
 	for _, filePath := range filePaths {
 		// Check ignore patterns first (takes precedence over all other classification)

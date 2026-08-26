@@ -501,7 +501,7 @@ func (r *DataProductConsumerRule) validateConsumerGroupFiles(productFilePath str
 	productDir := filepath.Dir(filepath.Dir(productFilePath))
 	groupsFolderPath := filepath.Join(productDir, "groups")
 
-	sourceGroupFiles := r.listFilesOnBranch(mrCtx.ProjectID, groupsFolderPath, mrCtx.MRInfo.SourceBranch)
+	sourceGroupFiles := r.listFilesOnBranch(mrCtx.SourceBranchProjectID(), groupsFolderPath, mrCtx.MRInfo.SourceBranch)
 	targetGroupFiles := r.listFilesOnBranch(mrCtx.ProjectID, groupsFolderPath, mrCtx.MRInfo.TargetBranch)
 
 	var missingGroups []string

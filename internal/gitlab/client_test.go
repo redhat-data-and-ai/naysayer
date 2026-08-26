@@ -30,6 +30,7 @@ func TestClient_FetchMRChanges_Success(t *testing.T) {
 		// Verify request
 		assert.Equal(t, "GET", r.Method)
 		assert.Contains(t, r.URL.Path, "/api/v4/projects/123/merge_requests/456/changes")
+		assert.Equal(t, "true", r.URL.Query().Get("access_raw_diffs"))
 		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
@@ -222,9 +223,10 @@ func TestClient_FetchMRChanges_URLConstruction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var requestURL string
+			var requestPath, rawDiffs string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requestURL = r.URL.Path
+				requestPath = r.URL.Path
+				rawDiffs = r.URL.Query().Get("access_raw_diffs")
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(MRChanges{Changes: []struct {
 					OldPath     string `json:"old_path"`
@@ -248,7 +250,8 @@ func TestClient_FetchMRChanges_URLConstruction(t *testing.T) {
 			_, err := client.FetchMRChanges(tt.projectID, tt.mrIID)
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedURL, requestURL)
+			assert.Equal(t, tt.expectedURL, requestPath)
+			assert.Equal(t, "true", rawDiffs)
 		})
 	}
 }

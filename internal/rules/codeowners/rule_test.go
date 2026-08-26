@@ -11,7 +11,14 @@ import (
 
 // MockGitLabClient implements gitlab.GitLabClient for testing
 type MockGitLabClient struct {
-	fileContents map[string]*gitlab.FileContent
+	fileContents    map[string]*gitlab.FileContent
+	sourceProjectID int
+	sourceBranch    string
+	fetchCalls      []struct {
+		ProjectID int
+		FilePath  string
+		Ref       string
+	}
 }
 
 func NewMockGitLabClient() *MockGitLabClient {
@@ -19,6 +26,17 @@ func NewMockGitLabClient() *MockGitLabClient {
 }
 
 func (m *MockGitLabClient) FetchFileContent(projectID int, filePath, ref string) (*gitlab.FileContent, error) {
+	m.fetchCalls = append(m.fetchCalls, struct {
+		ProjectID int
+		FilePath  string
+		Ref       string
+	}{projectID, filePath, ref})
+
+	// Fork MRs: source branch exists only on the fork project.
+	if m.sourceProjectID != 0 && m.sourceBranch != "" && ref == m.sourceBranch && projectID != m.sourceProjectID {
+		return nil, fmt.Errorf("file not found: %s", filePath)
+	}
+
 	key := ref + ":" + filePath
 	if content, exists := m.fileContents[key]; exists {
 		return content, nil
@@ -130,6 +148,7 @@ func TestCODEOWNERSSyncRule_extractDataProductInfo(t *testing.T) {
 	}{
 		{"dataproducts/aggregate/bookingsmaster/developers.yaml", &DataProductInfo{Type: "aggregate", Name: "bookingsmaster", Path: "dataproducts/aggregate/bookingsmaster"}},
 		{"dataproducts/source/marketo/groups/foo.yaml", &DataProductInfo{Type: "source", Name: "marketo", Path: "dataproducts/source/marketo"}},
+		{"dataproducts/unstructured/aifexample/groups/dataverse-source-aifexample.yaml", &DataProductInfo{Type: "unstructured", Name: "aifexample", Path: "dataproducts/unstructured/aifexample"}},
 		{"other/path/file.yaml", nil},
 		{"dataproducts/invalid/test/file.yaml", nil},
 	}
@@ -404,6 +423,45 @@ func TestCODEOWNERSSyncRule_ValidateLines_NewConsumerGroupWithProductChanges(t *
 	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
 	assert.Equal(t, shared.Approve, decision, "expected auto-approve for matching group YAML + CODEOWNERS, got: %s", reason)
 	assert.Contains(t, reason, "Auto-approved")
+}
+
+// fork MRs must fetch developers.yaml / group YAML from the source project.
+func TestCODEOWNERSSyncRule_ValidateLines_ForkMRFetchesYAMLFromSourceProject(t *testing.T) {
+	const (
+		targetProjectID = 106670
+		forkProjectID   = 191241
+	)
+
+	mock := NewMockGitLabClient()
+	mock.sourceProjectID = forkProjectID
+	mock.sourceBranch = "feature"
+	mock.SetFileContent("feature", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners:\n    - alice\n    - bob")
+	mock.SetFileContent("main", "dataproducts/aggregate/dp/developers.yaml", "group:\n  owners: [alice]")
+
+	rule := NewCODEOWNERSSyncRule(mock)
+	rule.SetMRContext(&shared.MRContext{
+		ProjectID:       targetProjectID,
+		SourceProjectID: forkProjectID,
+		MRIID:           15364,
+		Changes: []gitlab.FileChange{
+			{NewPath: "CODEOWNERS", Diff: "+/dataproducts/aggregate/dp/ @alice @bob"},
+			{NewPath: "dataproducts/aggregate/dp/developers.yaml", NewFile: false},
+		},
+		MRInfo: &gitlab.MRInfo{SourceBranch: "feature", TargetBranch: "main"},
+	})
+
+	decision, reason := rule.ValidateLines("CODEOWNERS", "", nil)
+	assert.Equal(t, shared.Approve, decision, "fork MR should auto-approve matching YAML+CODEOWNERS, got: %s", reason)
+	assert.Contains(t, reason, "Auto-approved")
+
+	fetchedFromFork := false
+	for _, call := range mock.fetchCalls {
+		if call.FilePath == "dataproducts/aggregate/dp/developers.yaml" && call.Ref == "feature" {
+			assert.Equal(t, forkProjectID, call.ProjectID, "source-branch YAML must be fetched from the fork project")
+			fetchedFromFork = true
+		}
+	}
+	assert.True(t, fetchedFromFork, "expected a source-branch developers.yaml fetch")
 }
 
 func TestCODEOWNERSSyncRule_GetCoveredLines(t *testing.T) {
