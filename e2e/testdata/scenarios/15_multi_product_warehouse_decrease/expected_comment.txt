@@ -8,7 +8,6 @@ One or more files require manual review
 <summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
 
 **What was checked:**
-• ✅ Metadata changes validated across 2 files
 • ✅ TOC approval validated across 2 files
 • 🚫 Warehouse size decrease detected: service_account warehouse: MEDIUM → SMALL, user warehouse: LARGE → MEDIUM
 
