@@ -353,9 +353,9 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, sourceFileCont
 		uncoveredLines = append(uncoveredLines, srm.getUncoveredLinesInChanges(shared.CountLines(targetFileContent), deletedSections, deletedLines)...)
 	}
 
-	// Filter results: only affected sections influence the decision.
-	// Unaffected sections are still validated (for MR comment display) but
-	// their outcomes must not block auto-approval.
+	// Filter results: only affected sections influence both the decision
+	// and the MR comment. Unaffected section outcomes are excluded so
+	// they don't produce misleading messages in the comment.
 	var decisionRuleResults []shared.LineValidationResult
 	var decisionSectionResults []shared.SectionValidationResult
 
@@ -384,7 +384,7 @@ func (srm *SectionRuleManager) validateFileWithSections(filePath, sourceFileCont
 		TotalLines:     shared.CountLines(sourceFileContent),
 		CoveredLines:   shared.MergeLineRanges(allCoveredLines),
 		UncoveredLines: uncoveredLines,
-		RuleResults:    ruleResults,
+		RuleResults:    decisionRuleResults,
 		FileDecision:   fileDecision,
 	}
 }

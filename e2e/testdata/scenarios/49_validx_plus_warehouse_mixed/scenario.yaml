@@ -1,0 +1,16 @@
+name: "ValidX plus warehouse decrease - manual review required"
+description: "ValidX addition auto-approves but warehouse decrease blocks overall approval - mixed MR requires manual review"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Warehouse size decrease detected"
+    - "Manual review required"
+
+mr_metadata:
+  title: "Enable ValidX and scale down warehouse"
+  author: "testuser"
+  source_branch: "feature/validx-and-warehouse-resize"
+  target_branch: "main"
