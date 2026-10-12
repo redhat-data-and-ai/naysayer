@@ -58,6 +58,18 @@ func (r *MetadataRule) GetCoveredLines(filePath string, fileContent string) []sh
 		}
 	}
 
+	// For section-based validation, return a placeholder to indicate participation
+	if r.isValidXMetadataSection(filePath, fileContent) {
+		// This will be handled by section-based validation
+		return []shared.LineRange{
+			{
+				StartLine: 1,
+				EndLine:   1,
+				FilePath:  filePath,
+			},
+		}
+	}
+
 	// For section-based validation where this rule is configured to handle
 	// specific YAML sections (e.g., product metadata sections in product.yaml)
 	return []shared.LineRange{
@@ -109,6 +121,19 @@ func (r *MetadataRule) isDBTMetadataSection(filePath string, fileContent string)
 	lowerContent := strings.ToLower(fileContent)
 	return strings.Contains(lowerContent, "service_account") &&
 		strings.Contains(lowerContent, "dbt")
+}
+
+// isDBTMetadataSection checks if this is DBT metadata configuration
+func (r *MetadataRule) isValidXMetadataSection(filePath string, fileContent string) bool {
+	// This is for section-based validation of DBT metadata in product.yaml files
+	if !r.IsProductFile(filePath) {
+		return false
+	}
+
+	// Check if content contains DBT-related metadata
+	lowerContent := strings.ToLower(fileContent)
+	return strings.Contains(lowerContent, "service_account") &&
+		strings.Contains(lowerContent, "validx")
 }
 
 // getApprovalReason returns a specific approval reason based on file type

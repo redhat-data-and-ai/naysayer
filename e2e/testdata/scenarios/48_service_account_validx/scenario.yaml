@@ -1,0 +1,17 @@
+name: "service_account.validx changes across multiple products - auto-approve"
+description: "Changes to service_account.validx (add, modify, delete) across 3 products should auto-approve via metadata_rule"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Metadata changes validated"
+
+mr_metadata:
+  title: "Update service_account validx across products"
+  author: "testuser"
+  source_branch: "feature/validx-updates"
+  target_branch: "main"

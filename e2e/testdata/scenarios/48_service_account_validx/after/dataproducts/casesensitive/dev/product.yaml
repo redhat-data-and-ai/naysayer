@@ -1,0 +1,13 @@
+---
+name: casesensitive
+kind: source
+rover_group: dataverse-source-casesensitive
+warehouses:
+- type: user
+  size: XSMALL
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+tags:
+  data_product: casesensitive

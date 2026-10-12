@@ -1,0 +1,16 @@
+<!-- naysayer-comment-id: approval -->
+✅ **Auto-approved**
+
+<details>
+<summary>📋 <strong>Analysis Details</strong> (click to expand)</summary>
+
+**Files in this MR:**
+• `dataproducts/casesensitive/dev/product.yaml` ✅
+• `dataproducts/casesensitive/preprod/product.yaml` ✅
+• `dataproducts/helloaggregate/dev/product.yaml` ✅
+
+**What was checked:**
+• ✅ Metadata changes validated across 3 files
+• ✅ TOC approval validated across 3 files
+
+</details>

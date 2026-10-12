@@ -1,0 +1,19 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+warehouses:
+- type: user
+  size: SMALL
+- type: service_account
+  size: XSMALL
+service_account:
+  dbt: true
+  validx: true
+tags:
+  data_product: analytics
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    consumers: []
