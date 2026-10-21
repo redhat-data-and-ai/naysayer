@@ -1,0 +1,17 @@
+name: "ai_status added without dbt service_account - auto-approve"
+description: "Adding ai_status to a product without service_account/dbt should auto-approve via metadata_rule"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Product metadata changes are safe"
+
+mr_metadata:
+  title: "Add ai_status to product without dbt"
+  author: "testuser"
+  source_branch: "feature/ai-status-no-dbt"
+  target_branch: "main"

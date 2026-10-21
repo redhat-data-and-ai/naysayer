@@ -144,6 +144,104 @@ warehouses:
 	}
 }
 
+func TestMetadataRule_ValidateLines_AIStatusSection(t *testing.T) {
+	rule := NewMetadataRule()
+
+	tests := []struct {
+		name                   string
+		filePath               string
+		fileContent            string
+		expectedDecision       shared.DecisionType
+		expectedReasonContains string
+	}{
+		{
+			name:     "Add ai_status to presentation_schemas",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: ready
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "Modify ai_status value ready to experimental",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: experimental
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "Modify ai_status value to excluded",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: excluded
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "Delete ai_status from presentation_schemas",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "ai_status only - no dbt or service_account",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: ready`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "Multiple presentation_schema fields changed - ai_status and access_policy",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: ready
+  access_policy: rh_internal
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+		{
+			name:     "ai_status added and access_policy removed",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `name: analytics
+presentation_schemas:
+- name: marts
+  ai_status: experimental
+  consumers: []`,
+			expectedDecision:       shared.Approve,
+			expectedReasonContains: "Product metadata changes are safe",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decision, reason := rule.ValidateLines(tt.filePath, tt.fileContent, []shared.LineRange{})
+
+			assert.Equal(t, tt.expectedDecision, decision)
+			assert.Contains(t, reason, tt.expectedReasonContains)
+		})
+	}
+}
+
 func TestMetadataRule_ValidateLines_NonMetadataFiles(t *testing.T) {
 	rule := NewMetadataRule()
 
@@ -201,6 +299,22 @@ func TestMetadataRule_GetCoveredLines(t *testing.T) {
 			name:                 "DBT metadata gets placeholder coverage",
 			filePath:             "product.yaml",
 			fileContent:          "service_account:\n  dbt: true",
+			expectedCoverageType: "placeholder",
+		},
+		{
+			name:     "ai_status metadata gets placeholder coverage",
+			filePath: "product.yaml",
+			fileContent: `presentation_schemas:
+- name: marts
+  ai_status: ready`,
+			expectedCoverageType: "placeholder",
+		},
+		{
+			name:     "validx metadata gets placeholder coverage",
+			filePath: "product.yaml",
+			fileContent: `service_account:
+  dbt: true
+  validx: true`,
 			expectedCoverageType: "placeholder",
 		},
 		{
@@ -273,6 +387,100 @@ func TestMetadataRule_IsMetadataFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := rule.isMetadataFile(tt.filePath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMetadataRule_IsAIStatusSection(t *testing.T) {
+	rule := NewMetadataRule()
+
+	tests := []struct {
+		name        string
+		filePath    string
+		fileContent string
+		expected    bool
+	}{
+		{
+			name:     "Product file with ai_status",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `presentation_schemas:
+- name: marts
+  ai_status: ready`,
+			expected: true,
+		},
+		{
+			name:     "Product file without ai_status",
+			filePath: "dataproducts/analytics/product.yaml",
+			fileContent: `presentation_schemas:
+- name: marts
+  consumers: []`,
+			expected: false,
+		},
+		{
+			name:     "Non-product file with ai_status",
+			filePath: "src/config.yaml",
+			fileContent: `ai_status: active`,
+			expected: false,
+		},
+		{
+			name:        "Product file with empty content",
+			filePath:    "dataproducts/analytics/product.yaml",
+			fileContent: "",
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := rule.isAIStatusSection(tt.filePath, tt.fileContent)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMetadataRule_IsValidXMetadataSection(t *testing.T) {
+	rule := NewMetadataRule()
+
+	tests := []struct {
+		name        string
+		filePath    string
+		fileContent string
+		expected    bool
+	}{
+		{
+			name:     "Product file with service_account and validx",
+			filePath: "dataproducts/casesensitive/preprod/product.yaml",
+			fileContent: `service_account:
+  dbt: true
+  validx: true`,
+			expected: true,
+		},
+		{
+			name:     "Product file without validx",
+			filePath: "dataproducts/casesensitive/preprod/product.yaml",
+			fileContent: `service_account:
+  dbt: true`,
+			expected: false,
+		},
+		{
+			name:     "Product file with validx but no service_account",
+			filePath: "dataproducts/casesensitive/preprod/product.yaml",
+			fileContent: `validx: true`,
+			expected: false,
+		},
+		{
+			name:     "Non-product file with service_account and validx",
+			filePath: "src/config.yaml",
+			fileContent: `service_account:
+  validx: true`,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := rule.isValidXMetadataSection(tt.filePath, tt.fileContent)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

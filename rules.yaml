@@ -48,20 +48,27 @@ files:
             enabled: true
         auto_approve: false
 
+      - name: presentation_schema_ai_status
+        yaml_path: presentation_schemas
+        rule_configs:
+          - name: metadata_rule
+            enabled: true
+        auto_approve: true
+
       - name: service_account
         yaml_path: service_account
         rule_configs:
           - name: metadata_rule
             enabled: true
         auto_approve: false
-      
+
       - name: service_account_validx
         yaml_path: service_account.validx
         rule_configs:
           - name: metadata_rule
             enabled: true
         auto_approve: true
-      
+
       - name: name
         yaml_path: name
         rule_configs:

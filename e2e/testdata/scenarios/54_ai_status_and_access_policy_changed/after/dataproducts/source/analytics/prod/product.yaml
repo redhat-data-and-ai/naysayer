@@ -1,0 +1,11 @@
+---
+name: analytics
+kind: source-aligned
+rover_group: example-analytics
+presentation_schemas:
+- name: marts
+  ai_status: excluded
+  access_policy: rh_public
+  consumers:
+  - name: existing_consumer
+    kind: data_product

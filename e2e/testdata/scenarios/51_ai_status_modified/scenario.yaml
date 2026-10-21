@@ -1,0 +1,17 @@
+name: "ai_status modified in presentation_schemas - auto-approve"
+description: "Modifying ai_status value from ready to excluded should auto-approve via metadata_rule"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Product metadata changes are safe"
+
+mr_metadata:
+  title: "Update ai_status to excluded for analytics marts"
+  author: "testuser"
+  source_branch: "feature/modify-ai-status"
+  target_branch: "main"

@@ -1,0 +1,17 @@
+name: "ai_status added and access_policy removed in presentation_schemas - auto-approve"
+description: "Adding ai_status while removing access_policy within presentation_schemas should auto-approve via metadata_rule"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "Product metadata changes are safe"
+
+mr_metadata:
+  title: "Add ai_status and remove access_policy for analytics marts"
+  author: "testuser"
+  source_branch: "feature/add-ai-status-remove-access-policy"
+  target_branch: "main"
