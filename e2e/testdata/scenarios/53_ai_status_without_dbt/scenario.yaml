@@ -1,5 +1,5 @@
 name: "ai_status added without dbt service_account - auto-approve"
-description: "Adding ai_status to a product without service_account/dbt should auto-approve via metadata_rule"
+description: "Adding ai_status to a product without service_account/dbt should auto-approve via ai_status_rule"
 
 expected:
   decision: Approve
@@ -8,7 +8,7 @@ expected:
 
   comment_contains:
     - "Auto-approved"
-    - "Product metadata changes are safe"
+    - "ai_status changes detected"
 
 mr_metadata:
   title: "Add ai_status to product without dbt"

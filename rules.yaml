@@ -46,14 +46,9 @@ files:
             enabled: true
           - name: access_policy_rule
             enabled: true
-        auto_approve: false
-
-      - name: presentation_schema_ai_status
-        yaml_path: presentation_schemas
-        rule_configs:
-          - name: metadata_rule
+          - name: ai_status_rule
             enabled: true
-        auto_approve: true
+        auto_approve: false
 
       - name: service_account
         yaml_path: service_account

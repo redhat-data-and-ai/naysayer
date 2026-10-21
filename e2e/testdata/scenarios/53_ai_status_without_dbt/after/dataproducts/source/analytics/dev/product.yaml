@@ -2,9 +2,11 @@
 name: analytics
 kind: source-aligned
 rover_group: example-analytics
-presentation_schemas:
-- name: marts
-  ai_status: experimental
-  consumers:
-  - name: existing_consumer
-    kind: data_product
+data_product_db:
+- database: analytics_db
+  presentation_schemas:
+  - name: marts
+    ai_status: experimental
+    consumers:
+    - name: existing_consumer
+      kind: data_product
