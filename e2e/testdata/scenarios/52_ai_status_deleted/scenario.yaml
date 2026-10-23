@@ -1,0 +1,17 @@
+name: "ai_status deleted from presentation_schemas - auto-approve"
+description: "Removing ai_status from presentation_schemas should auto-approve via ai_status_rule"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "ai_status changes detected"
+
+mr_metadata:
+  title: "Remove ai_status from analytics marts"
+  author: "testuser"
+  source_branch: "feature/delete-ai-status"
+  target_branch: "main"
