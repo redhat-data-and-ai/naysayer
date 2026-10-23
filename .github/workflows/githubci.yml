@@ -21,7 +21,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
         cache: true
 
     - name: Cache Go modules
@@ -87,7 +87,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
 
     - name: Run Gosec Security Scanner
       run: |
@@ -120,7 +120,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
         cache: true
 
     - name: Cache Go modules
@@ -166,7 +166,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
 
     - name: Log in to GitHub Container Registry
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
