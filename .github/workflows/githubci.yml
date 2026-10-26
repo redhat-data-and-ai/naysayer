@@ -16,16 +16,16 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
         cache: true
 
     - name: Cache Go modules
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cache/go-build
@@ -67,7 +67,7 @@ jobs:
         echo "✅ Built naysayer binary"
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v7
       with:
         files: ./coverage/coverage.out
         flags: unittests
@@ -82,12 +82,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
 
     - name: Run Gosec Security Scanner
       run: |
@@ -95,7 +95,7 @@ jobs:
         gosec -fmt sarif -out gosec-results.sarif ./...
 
     - name: Upload Gosec results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: gosec-results
         path: gosec-results.sarif
@@ -115,16 +115,16 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
         cache: true
 
     - name: Cache Go modules
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: |
           ~/.cache/go-build
@@ -140,7 +140,7 @@ jobs:
       run: make test-e2e
 
     - name: Upload E2E test artifacts on failure
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: failure()
       with:
         name: e2e-test-results
@@ -159,14 +159,14 @@ jobs:
       packages: write
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     - name: Set up Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v7
       with:
-        go-version: '1.25.8'
+        go-version: '1.26.10'
 
     - name: Log in to GitHub Container Registry
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
