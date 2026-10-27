@@ -7,6 +7,7 @@ import (
 	"github.com/redhat-data-and-ai/naysayer/internal/gitlab"
 	"github.com/redhat-data-and-ai/naysayer/internal/logging"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/access_policy"
+	"github.com/redhat-data-and-ai/naysayer/internal/rules/ai_status"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/codeowners"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/common"
 	"github.com/redhat-data-and-ai/naysayer/internal/rules/dataproduct_consumer"
@@ -162,6 +163,16 @@ func (r *RuleRegistry) registerBuiltInRules() {
 		Category: "access_policy",
 	})
 
+	_ = r.RegisterRule(&RuleInfo{
+		Name:        "ai_status_rule",
+		Description: "Auto approval for ai_status changes",
+		Version:     "1.0.0",
+		Factory: func(client gitlab.GitLabClient) shared.Rule {
+			return ai_status.NewAiStatusRule()
+		},
+		Enabled:  true,
+		Category: "ai_status",
+	})
 }
 
 // RegisterRule registers a new rule in the registry

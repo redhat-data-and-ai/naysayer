@@ -84,6 +84,10 @@ func (r *DataProductConsumerRule) ValidateLines(filePath string, fileContent str
 		return r.CreateApprovalResult("Consumer access changes - data product owner approval sufficient (no TOC approval required)")
 	}
 
+	if context.IsSafeMetadataOnly {
+		return r.CreateApprovalResult("No consumer changes detected")
+	}
+
 	// Non-consumer changes in data_product_db require manual review
 	// The rule can only vouch for consumer-only modifications
 	if context.HasConsumers && !context.IsConsumerOnly {
@@ -122,24 +126,24 @@ func (r *DataProductConsumerRule) GetCoveredLines(filePath string, fileContent s
 // yamlContent is the pre-parsed YAML; fileContent is the raw text needed for line-based checks.
 func (r *DataProductConsumerRule) analyzeFile(filePath string, yamlContent interface{}, fileContent string, lineRanges []shared.LineRange) *ConsumerContext {
 	context := &ConsumerContext{
-		FilePath:         filePath,
-		Environment:      r.extractEnvironmentFromPath(filePath),
-		HasConsumers:     false,
-		IsConsumerOnly:   false,
-		IsSelfConsumer:   false,
-		SelfConsumerName: "",
+		FilePath:           filePath,
+		Environment:        r.extractEnvironmentFromPath(filePath),
+		HasConsumers:       false,
+		IsConsumerOnly:     false,
+		IsSelfConsumer:     false,
+		IsSafeMetadataOnly: false,
+		SelfConsumerName:   "",
 	}
 
-	// Parse YAML once and reuse the parsed content for all helper functions
-	parsedContent := r.parseYAMLContent(fileContent)
-
 	// Check for self-consumer configuration FIRST (independent of HasConsumers)
-	isSelfConsumer, selfConsumerName := r.detectSelfConsumer(filePath, parsedContent)
+	isSelfConsumer, selfConsumerName := r.detectSelfConsumer(filePath, yamlContent)
 	context.IsSelfConsumer = isSelfConsumer
 	context.SelfConsumerName = selfConsumerName
 
 	context.HasConsumers = r.containsConsumersKey(yamlContent)
+
 	if !context.HasConsumers {
+		context.IsSafeMetadataOnly = r.areChangesOnlyForSafeFields(lineRanges, fileContent)
 		return context
 	}
 
@@ -168,15 +172,6 @@ func (r *DataProductConsumerRule) containsConsumersKey(data interface{}) bool {
 		}
 	}
 	return false
-}
-
-// parseYAMLContent parses YAML content into an interface{} for flexible handling
-func (r *DataProductConsumerRule) parseYAMLContent(fileContent string) interface{} {
-	var parsed interface{}
-	if err := yaml.Unmarshal([]byte(fileContent), &parsed); err != nil {
-		return nil
-	}
-	return parsed
 }
 
 // fileContainsConsumersSection checks if the file has a consumers section
@@ -342,6 +337,42 @@ func (r *DataProductConsumerRule) extractConsumersFromDBMap(dbMap map[string]int
 	return allConsumers
 }
 
+func (r *DataProductConsumerRule) areChangesOnlyForSafeFields(lineRanges []shared.LineRange, fileContent string) bool {
+	if len(lineRanges) == 0 {
+		return false
+	}
+	lines := strings.Split(fileContent, "\n")
+
+	offset := 0
+	if lineRanges[0].StartLine > len(lines) {
+		offset = lineRanges[0].StartLine - 1
+	}
+
+	fullScan := lineRanges[0].StartLine-offset == 1 && lineRanges[0].EndLine-offset >= len(lines)
+
+	found := false
+	for _, lr := range lineRanges {
+		for lineNum := lr.StartLine - offset; lineNum <= lr.EndLine-offset && lineNum <= len(lines); lineNum++ {
+			if lineNum < 1 {
+				continue
+			}
+			line := strings.TrimSpace(lines[lineNum-1])
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			if r.isSafeMetadataLine(line) {
+				found = true
+				continue
+			}
+			if fullScan && (r.isConsumerRelatedLine(line) || r.isStructuralLine(line)) {
+				continue
+			}
+			return false
+		}
+	}
+	return found
+}
+
 // areChangesConsumerOnly checks if only consumer-related lines are being modified.
 // Returns true only if at least one consumer-related line was found and no
 // non-consumer lines exist in the range.
@@ -399,9 +430,7 @@ func (r *DataProductConsumerRule) isSectionContentConsumerOnly(lines []string) b
 		}
 
 		// Structural lines always present in data_product_db sections
-		if strings.HasPrefix(trimmed, "database:") || strings.HasPrefix(trimmed, "- database:") ||
-			strings.HasPrefix(trimmed, "presentation_schemas:") || strings.HasPrefix(trimmed, "- presentation_schemas:") ||
-			strings.HasPrefix(trimmed, "access_policy:") {
+		if r.isConsumerRelatedLine(trimmed) || r.isStructuralLine(trimmed) || r.isSafeMetadataLine(trimmed) {
 			continue
 		}
 
@@ -415,6 +444,18 @@ func (r *DataProductConsumerRule) isSectionContentConsumerOnly(lines []string) b
 	}
 
 	return foundConsumerLine
+}
+
+func (r *DataProductConsumerRule) isStructuralLine(line string) bool {
+	return strings.HasPrefix(line, "database:") || strings.HasPrefix(line, "- database:") ||
+		strings.HasPrefix(line, "presentation_schemas:") || strings.HasPrefix(line, "- presentation_schemas:") ||
+		strings.HasPrefix(line, "- name:") || strings.HasPrefix(line, "name:") ||
+		(strings.HasPrefix(line, "- ") && !strings.Contains(line, ":"))
+}
+
+func (r *DataProductConsumerRule) isSafeMetadataLine(line string) bool {
+	return strings.HasPrefix(line, "access_policy:") || strings.HasPrefix(line, "- access_policy:") ||
+		strings.HasPrefix(line, "ai_status:") || strings.HasPrefix(line, "- ai_status:")
 }
 
 // isConsumerRelatedLine checks if a line is related to consumer configuration

@@ -6,6 +6,7 @@
 
 **What was checked:**
 • ✅ No access_policy changes detected
+• ✅ No ai_status changes detected
 • ✅ Consumer access changes in prod environment - data product owner approval sufficient (no TOC approval required)
 • ✅ Existing product.yaml file or not in critical environment - no TOC approval required
 

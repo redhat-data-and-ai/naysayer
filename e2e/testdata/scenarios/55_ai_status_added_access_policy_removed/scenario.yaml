@@ -1,0 +1,17 @@
+name: "ai_status added and access_policy removed - manual review required"
+description: "Adding ai_status while removing access_policy within data_product_db requires manual review because access_policy changes are not auto-approved"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "access_policy changes require manual review"
+    - "ai_status changes detected"
+
+mr_metadata:
+  title: "Add ai_status and remove access_policy for analytics marts"
+  author: "testuser"
+  source_branch: "feature/add-ai-status-remove-access-policy"
+  target_branch: "main"

@@ -1,0 +1,17 @@
+name: "ai_status and access_policy both changed - manual review required"
+description: "Modifying both ai_status and access_policy within data_product_db requires manual review because access_policy changes are not auto-approved"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "access_policy changes require manual review"
+    - "ai_status changes detected"
+
+mr_metadata:
+  title: "Update ai_status and access_policy for analytics marts"
+  author: "testuser"
+  source_branch: "feature/update-ai-status-access-policy"
+  target_branch: "main"
