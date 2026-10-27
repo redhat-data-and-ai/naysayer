@@ -1,0 +1,16 @@
+name: "access_policy added with existing ai_status - requires manual review"
+description: "Adding access_policy to a presentation_schema that already has ai_status should require manual review - access_policy changes are not auto-approved"
+
+expected:
+  decision: ManualReview
+  approved: false
+
+  comment_contains:
+    - "Manual review required"
+    - "access_policy changes require manual review"
+
+mr_metadata:
+  title: "Add access_policy to casesensitive caseescalation_marts"
+  author: "testuser"
+  source_branch: "feature/add-access-policy-existing-ai-status"
+  target_branch: "main"

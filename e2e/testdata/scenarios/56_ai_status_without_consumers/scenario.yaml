@@ -1,0 +1,17 @@
+name: "ai_status added with existing access_policy - auto-approve"
+description: "Adding ai_status to a presentation_schema that already has access_policy should auto-approve - only ai_status was changed"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation - all changes covered by approved rules"
+  approved: true
+
+  comment_contains:
+    - "Auto-approved"
+    - "ai_status changes detected"
+
+mr_metadata:
+  title: "Add ai_status to casesensitive caseescalation_marts"
+  author: "testuser"
+  source_branch: "feature/add-ai-status-existing-access-policy"
+  target_branch: "main"

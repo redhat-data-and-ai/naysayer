@@ -1,0 +1,10 @@
+---
+name: casesensitive
+kind: source
+rover_group: dataverse-source-casesensitive
+data_product_db:
+- database: casesensitive_db
+  presentation_schemas:
+  - name: caseescalation_marts
+    access_policy: rh_internal
+    ai_status: ready

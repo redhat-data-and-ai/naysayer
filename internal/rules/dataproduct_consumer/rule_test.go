@@ -11,6 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func readYamlForTest(content string) interface{} {
+	parsed, _ := readYaml(content)
+	return parsed
+}
+
 // mockGitLabClient implements gitlab.GitLabClient for testing consumer group file validation
 type mockGitLabClient struct {
 	existingFiles   map[string]map[string]bool // branch -> filePath -> exists
@@ -591,7 +596,7 @@ data_product_db:
 			rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 			// Pre-parse the YAML content to match the new function signature
-			parsedContent := rule.parseYAMLContent(tt.fileContent)
+			parsedContent := readYamlForTest(tt.fileContent)
 			result := rule.fileContainsConsumersSection(parsedContent)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -1073,7 +1078,7 @@ data_product_db:
 			rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
 
 			// Pre-parse the YAML content to match the new function signature
-			parsedContent := rule.parseYAMLContent(tt.fileContent)
+			parsedContent := readYamlForTest(tt.fileContent)
 			isSelfConsumer, name := rule.detectSelfConsumer(tt.filePath, parsedContent)
 
 			assert.Equal(t, tt.expectedSelfConsumer, isSelfConsumer)
@@ -1224,9 +1229,7 @@ data_product_db:
 	}
 }
 
-func TestDataProductConsumerRule_parseYAMLContent_EdgeCases(t *testing.T) {
-	rule := NewDataProductConsumerRule([]string{"preprod", "prod"}, nil)
-
+func TestDataProductConsumerRule_readYaml_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name      string
 		content   string
@@ -1251,7 +1254,7 @@ func TestDataProductConsumerRule_parseYAMLContent_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := rule.parseYAMLContent(tt.content)
+			result := readYamlForTest(tt.content)
 			if tt.expectNil {
 				assert.Nil(t, result)
 			} else {
@@ -1312,7 +1315,7 @@ func TestDataProductConsumerRule_fileContainsConsumersSection_EdgeCases(t *testi
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parsedContent := rule.parseYAMLContent(tt.content)
+			parsedContent := readYamlForTest(tt.content)
 			result := rule.fileContainsConsumersSection(parsedContent)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -1380,7 +1383,7 @@ data_product_db:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parsedContent := rule.parseYAMLContent(tt.content)
+			parsedContent := readYamlForTest(tt.content)
 			isSelfConsumer, name := rule.detectSelfConsumer(tt.filePath, parsedContent)
 			assert.Equal(t, tt.expectedSelfConsumer, isSelfConsumer)
 			assert.Equal(t, tt.expectedName, name)
@@ -1413,7 +1416,7 @@ func TestDataProductConsumerRule_extractConsumersFromContent_EdgeCases(t *testin
     consumers:
     - name: consumer1
       kind: data_product`
-		parsedContent := rule.parseYAMLContent(content)
+		parsedContent := readYamlForTest(content)
 		result := rule.extractConsumersFromContent(parsedContent)
 		assert.NotNil(t, result)
 		assert.Len(t, result, 1)
@@ -1431,7 +1434,7 @@ func TestDataProductConsumerRule_extractConsumersFromMap_EdgeCases(t *testing.T)
     consumers:
     - name: consumer1
       kind: data_product`
-		parsedContent := rule.parseYAMLContent(content)
+		parsedContent := readYamlForTest(content)
 		result := rule.extractConsumersFromContent(parsedContent)
 		assert.NotNil(t, result)
 		assert.Len(t, result, 1)
@@ -1444,7 +1447,7 @@ presentation_schemas:
   consumers:
   - name: consumer1
     kind: data_product`
-		parsedContent := rule.parseYAMLContent(content)
+		parsedContent := readYamlForTest(content)
 		result := rule.extractConsumersFromContent(parsedContent)
 		assert.NotNil(t, result)
 		assert.Len(t, result, 1)
@@ -1456,7 +1459,7 @@ presentation_schemas:
   consumers:
   - name: consumer1
     kind: data_product`
-		parsedContent := rule.parseYAMLContent(content)
+		parsedContent := readYamlForTest(content)
 		result := rule.extractConsumersFromContent(parsedContent)
 		assert.NotNil(t, result)
 		assert.Len(t, result, 1)
