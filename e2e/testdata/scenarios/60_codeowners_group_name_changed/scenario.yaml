@@ -1,0 +1,15 @@
+name: "CODEOWNERS sync - group_name changed with same approvers - manual review"
+description: "When group_name changes but approvers stay the same, the file is not skipped from CODEOWNERS validation. Manual review is required because the access-requests path changed."
+
+expected:
+  decision: ManualReview
+  approved: false
+  comment_contains:
+    - "Manual review required"
+    - "Missing CODEOWNERS entry"
+
+mr_metadata:
+  title: "Rename consumer group for testproduct"
+  author: "testuser"
+  source_branch: "feature/rename-consumer-group"
+  target_branch: "main"

@@ -1,0 +1,9 @@
+group_name: dataverse-consumer-testproduct-analytics
+approvers:
+- alice
+- bob
+members:
+  users:
+  - alice
+  - bob
+backends: []

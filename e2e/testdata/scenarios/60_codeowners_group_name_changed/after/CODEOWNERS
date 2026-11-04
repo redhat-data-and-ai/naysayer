@@ -1,0 +1,5 @@
+# Data Product Owners
+[Aggregate Data Products]
+/dataproducts/aggregate/testproduct/ @alice @bob
+/dataproducts/aggregate/testproduct/groups/dataverse-consumer-testproduct-marts.yaml @alice @bob
+/dataproducts/aggregate/testproduct/access-requests/groups/dataverse-consumer-testproduct-analytics/ @alice @bob

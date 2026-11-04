@@ -148,11 +148,15 @@ func (r *CODEOWNERSSyncRule) parseGroupYAML(mrCtx *shared.MRContext, change gitl
 		return nil
 	}
 
-	// Only include if approvers actually changed — members-only changes
-	// don't require CODEOWNERS updates.
-	if !change.NewFile {
+	// Only skip if approvers AND group_name are unchanged and the file
+	// wasn't renamed — members-only changes don't require CODEOWNERS updates.
+	// A group_name change alters the access-requests path in CODEOWNERS,
+	// and a file rename alters the group-file path.
+	if !change.NewFile && !change.RenamedFile && change.OldPath == change.NewPath {
 		oldGroupInfo := r.fetchGroupInfoFromTarget(mrCtx, change.NewPath)
-		if oldGroupInfo != nil && r.approversEqual(groupInfo.Approvers, oldGroupInfo.Approvers) {
+		if oldGroupInfo != nil &&
+			groupInfo.GroupName == oldGroupInfo.GroupName &&
+			r.approversEqual(groupInfo.Approvers, oldGroupInfo.Approvers) {
 			return nil
 		}
 	}
