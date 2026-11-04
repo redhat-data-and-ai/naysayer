@@ -148,6 +148,15 @@ func (r *CODEOWNERSSyncRule) parseGroupYAML(mrCtx *shared.MRContext, change gitl
 		return nil
 	}
 
+	// Only include if approvers actually changed — members-only changes
+	// don't require CODEOWNERS updates.
+	if !change.NewFile {
+		oldGroupInfo := r.fetchGroupInfoFromTarget(mrCtx, change.NewPath)
+		if oldGroupInfo != nil && r.approversEqual(groupInfo.Approvers, oldGroupInfo.Approvers) {
+			return nil
+		}
+	}
+
 	return &YAMLChangeInfo{
 		FilePath:        change.NewPath,
 		FileType:        "group",
@@ -215,6 +224,42 @@ func (r *CODEOWNERSSyncRule) fetchGroupInfo(mrCtx *shared.MRContext, filePath st
 		return nil
 	}
 	return &data
+}
+
+// fetchGroupInfoFromTarget fetches group info from the target (base) branch
+func (r *CODEOWNERSSyncRule) fetchGroupInfoFromTarget(mrCtx *shared.MRContext, filePath string) *GroupYAML {
+	if r.client == nil || mrCtx.MRInfo == nil {
+		return nil
+	}
+
+	content, err := r.client.FetchFileContent(mrCtx.ProjectID, filePath, mrCtx.MRInfo.TargetBranch)
+	if err != nil {
+		return nil
+	}
+
+	var data GroupYAML
+	if err := yaml.Unmarshal([]byte(content.Content), &data); err != nil {
+		return nil
+	}
+	return &data
+}
+
+func (r *CODEOWNERSSyncRule) approversEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	aSorted := make([]string, len(a))
+	bSorted := make([]string, len(b))
+	copy(aSorted, a)
+	copy(bSorted, b)
+	sort.Strings(aSorted)
+	sort.Strings(bSorted)
+	for i := range aSorted {
+		if aSorted[i] != bSorted[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // dataProductExists checks if data product exists in base branch

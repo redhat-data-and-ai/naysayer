@@ -1,0 +1,15 @@
+name: "CODEOWNERS sync - group members changed but approvers unchanged"
+description: "Auto-approve CODEOWNERS when consumer group approvers change but role group files only change members (not approvers). Role group changes should not require CODEOWNERS updates."
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Update group members and consumer approvers"
+  author: "testuser"
+  source_branch: "feature/update-group-members"
+  target_branch: "main"

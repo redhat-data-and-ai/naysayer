@@ -1,0 +1,7 @@
+group:
+  owners:
+  - alice
+  - bob
+  members:
+  - newuser1
+  - newuser2

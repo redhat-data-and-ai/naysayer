@@ -1,0 +1,15 @@
+name: "developers.yaml members-only change - auto-approve"
+description: "Auto-approve when only members change in developers.yaml without any group file or CODEOWNERS changes"
+
+expected:
+  decision: Approve
+  reason: "All files passed validation"
+  approved: true
+  comment_contains:
+    - "✅ **Auto-approved**"
+
+mr_metadata:
+  title: "Update developer members for testproduct"
+  author: "testuser"
+  source_branch: "feature/update-developers-members"
+  target_branch: "main"

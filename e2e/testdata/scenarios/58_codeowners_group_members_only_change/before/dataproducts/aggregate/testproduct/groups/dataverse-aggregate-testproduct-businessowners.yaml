@@ -1,0 +1,8 @@
+group_name: dataverse-aggregate-testproduct-businessowners
+approvers:
+- alice
+- bob
+members:
+  users:
+  - olduser
+backends: []

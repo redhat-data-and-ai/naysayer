@@ -1,0 +1,10 @@
+group_name: dataverse-consumer-testproduct-marts
+approvers:
+- alice
+- bob
+- newapprover
+members:
+  users:
+  - alice
+  - bob
+backends: []

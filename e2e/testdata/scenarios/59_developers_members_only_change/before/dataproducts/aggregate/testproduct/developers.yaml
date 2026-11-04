@@ -1,0 +1,7 @@
+group:
+  owners:
+  - alice
+  - bob
+  members:
+  - olduser1
+  - olduser2
