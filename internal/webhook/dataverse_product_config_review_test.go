@@ -665,7 +665,9 @@ func TestHandleMergeRequestEventExcludedAuthors(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() {
+				assert.NoError(t, resp.Body.Close())
+			}()
 			assert.Equal(t, 200, resp.StatusCode)
 			var response map[string]interface{}
 			assert.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
