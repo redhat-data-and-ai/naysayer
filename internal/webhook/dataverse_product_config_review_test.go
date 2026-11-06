@@ -630,3 +630,52 @@ func TestEvaluateRules_NetZeroChanges(t *testing.T) {
 	assert.Contains(t, result.FinalDecision.Reason, "no substantive changes")
 	assert.Equal(t, "Net-zero changes", result.FinalDecision.Summary)
 }
+
+func TestHandleMergeRequestEventExcludedAuthors(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		excluded string
+		author   string
+		wantSkip bool
+	}{
+		{"matching author", "testuser", "testuser", true},
+		{"list with whitespace", "other, testuser , ,bot", "testuser", true},
+		{"empty list", "", "testuser", false},
+		{"different author", "other", "testuser", false},
+		{"no substring matching", "testuser-bot", "testuser", false},
+		{"case sensitive", "TestUser", "testuser", false},
+		{"empty author", " , ,", "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("NAYSAYER_EXCLUDE_AUTHORS", tt.excluded)
+			// Nil clients ensure these skipped events perform no external operations.
+			handler := &DataProductConfigMrReviewHandler{config: config.Load()}
+			payload := map[string]interface{}{
+				"object_attributes": map[string]interface{}{
+					"iid": 123, "state": "opened", "action": "open", "title": "Draft: update",
+				},
+				"project": map[string]interface{}{"id": 456},
+				"user":    map[string]interface{}{"username": tt.author},
+			}
+			app := createTestApp()
+			app.Post("/webhook", func(c *fiber.Ctx) error {
+				return handler.handleMergeRequestEvent(c, payload)
+			})
+			resp, err := app.Test(httptest.NewRequest("POST", "/webhook", nil))
+			if !assert.NoError(t, err) {
+				return
+			}
+			defer resp.Body.Close()
+			assert.Equal(t, 200, resp.StatusCode)
+			var response map[string]interface{}
+			assert.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
+			assert.Equal(t, "skipped", response["decision"])
+			assert.Equal(t, false, response["mr_approved"])
+			if tt.wantSkip {
+				assert.Equal(t, "MR author is excluded by NAYSAYER_EXCLUDE_AUTHORS", response["reason"])
+			} else {
+				assert.Equal(t, "Draft MR - skipped processing to avoid bypassing validation rules", response["reason"])
+			}
+		})
+	}
+}
