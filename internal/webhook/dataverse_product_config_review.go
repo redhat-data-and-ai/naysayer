@@ -337,6 +337,7 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 	if mrInfo.Author != "" && slices.Contains(h.config.ExcludeAuthors, mrInfo.Author) {
 		logging.MRInfo(mrInfo.MRIID, "Skipping review for excluded author",
 			zap.String("author", mrInfo.Author))
+
 		return c.JSON(fiber.Map{
 			"webhook_response": "processed",
 			"event_type":       "merge_request",

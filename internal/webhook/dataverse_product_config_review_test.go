@@ -648,31 +648,46 @@ func TestHandleMergeRequestEventExcludedAuthors(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("NAYSAYER_EXCLUDE_AUTHORS", tt.excluded)
+
 			// Nil clients ensure these skipped events perform no external operations.
 			handler := &DataProductConfigMrReviewHandler{config: config.Load()}
+
 			payload := map[string]interface{}{
 				"object_attributes": map[string]interface{}{
-					"iid": 123, "state": "opened", "action": "open", "title": "Draft: update",
+					"iid":    123,
+					"state":  "opened",
+					"action": "open",
+					"title":  "Draft: update",
 				},
-				"project": map[string]interface{}{"id": 456},
-				"user":    map[string]interface{}{"username": tt.author},
+				"project": map[string]interface{}{
+					"id": 456,
+				},
+				"user": map[string]interface{}{
+					"username": tt.author,
+				},
 			}
+
 			app := createTestApp()
 			app.Post("/webhook", func(c *fiber.Ctx) error {
 				return handler.handleMergeRequestEvent(c, payload)
 			})
+
 			resp, err := app.Test(httptest.NewRequest("POST", "/webhook", nil))
 			if !assert.NoError(t, err) {
 				return
 			}
+
 			defer func() {
 				assert.NoError(t, resp.Body.Close())
 			}()
+
 			assert.Equal(t, 200, resp.StatusCode)
+
 			var response map[string]interface{}
 			assert.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
 			assert.Equal(t, "skipped", response["decision"])
 			assert.Equal(t, false, response["mr_approved"])
+
 			if tt.wantSkip {
 				assert.Equal(t, "MR author is excluded by NAYSAYER_EXCLUDE_AUTHORS", response["reason"])
 			} else {
