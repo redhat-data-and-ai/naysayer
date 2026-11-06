@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	fiber "github.com/gofiber/fiber/v2"
@@ -330,6 +331,23 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		zap.Int("project_id", mrInfo.ProjectID),
 		zap.String("author", mrInfo.Author),
 		zap.String("state", mrInfo.State))
+
+	// if mrInfo.Author is in a list of values in NAYSAYER_EXCLUDE_AUTHORS
+	// then skip review for those MRs
+	if mrInfo.Author != "" && slices.Contains(h.config.ExcludeAuthors, mrInfo.Author) {
+		logging.MRInfo(mrInfo.MRIID, "Skipping review for excluded author",
+			zap.String("author", mrInfo.Author))
+
+		return c.JSON(fiber.Map{
+			"webhook_response": "processed",
+			"event_type":       "merge_request",
+			"decision":         "skipped",
+			"reason":           "MR author is excluded by NAYSAYER_EXCLUDE_AUTHORS",
+			"mr_approved":      false,
+			"project_id":       mrInfo.ProjectID,
+			"mr_iid":           mrInfo.MRIID,
+		})
+	}
 
 	// Skip rule evaluation if MR is not open
 	if mrInfo.State != utils.MRStateOpened {

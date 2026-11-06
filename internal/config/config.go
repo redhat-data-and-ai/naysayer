@@ -9,14 +9,15 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	GitLab     GitLabConfig
-	Server     ServerConfig
-	Webhook    WebhookConfig
-	Comments   CommentsConfig
-	Rules      RulesConfig
-	Approval   ApprovalConfig
-	AutoRebase AutoRebaseConfig
-	StaleMR    StaleMRConfig
+	ExcludeAuthors []string // MR authors excluded from review
+	GitLab         GitLabConfig
+	Server         ServerConfig
+	Webhook        WebhookConfig
+	Comments       CommentsConfig
+	Rules          RulesConfig
+	Approval       ApprovalConfig
+	AutoRebase     AutoRebaseConfig
+	StaleMR        StaleMRConfig
 }
 
 // GitLabConfig holds GitLab API configuration
@@ -121,6 +122,7 @@ type StaleMRConfig struct {
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
+		ExcludeAuthors: parseStringList(getEnv("NAYSAYER_EXCLUDE_AUTHORS", "")),
 		GitLab: GitLabConfig{
 			BaseURL:                       getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
 			Token:                         getEnv("GITLAB_TOKEN", ""),
