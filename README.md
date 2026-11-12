@@ -131,6 +131,11 @@ PORT=3000
 WAREHOUSE_RULE_ENABLED=true
 ```
 
+Set `DISABLE_MR_COMMENTS_AUTHORS=bot-user,another-user` to suppress review comments
+and approval messages for selected authors (comma-separated, case-sensitive usernames).
+These MRs are still evaluated and approved when eligible; decisions requiring manual
+review remove any previous bot approval. This setting no longer skips review.
+
 > **📖 Complete Configuration**: See [Development Setup Guide](docs/DEVELOPMENT_SETUP.md) for all rule-specific settings.
 
 ## 🎯 Auto-Approval Logic

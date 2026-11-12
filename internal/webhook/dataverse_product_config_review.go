@@ -181,12 +181,21 @@ func (h *DataProductConfigMrReviewHandler) evaluateRules(projectID, mrID int, mr
 	return result, nil
 }
 
+// commentsDisabledForAuthor suppresses comments without bypassing rule evaluation.
+func (h *DataProductConfigMrReviewHandler) commentsDisabledForAuthor(mrInfo *gitlab.MRInfo) bool {
+	return mrInfo.Author != "" && slices.Contains(h.config.Comments.DisableMRCommentsAuthors, mrInfo.Author)
+}
+
+func (h *DataProductConfigMrReviewHandler) shouldPostComments(mrInfo *gitlab.MRInfo) bool {
+	return h.config.Comments.EnableMRComments && !h.commentsDisabledForAuthor(mrInfo)
+}
+
 // handleApprovalWithComments handles the approval process with meaningful comments and messages
 func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) error {
 	messageBuilder := NewMessageBuilder(h.config)
 
 	// Add detailed comment to MR if enabled
-	if h.config.Comments.EnableMRComments {
+	if h.shouldPostComments(mrInfo) {
 		comment := messageBuilder.BuildApprovalComment(result, mrInfo)
 
 		logging.MRInfo(mrInfo.MRIID, "Adding/updating approval comment")
@@ -209,7 +218,12 @@ func (h *DataProductConfigMrReviewHandler) handleApprovalWithComments(result *sh
 			}
 		}
 	} else {
-		logging.MRInfo(mrInfo.MRIID, "Skipping comment (comments disabled)")
+		logging.MRInfo(mrInfo.MRIID, "Skipping comment (comments disabled or comments disabled for author)")
+	}
+
+	// Authors on the no-comment list receive a plain approval, without a note.
+	if h.commentsDisabledForAuthor(mrInfo) {
+		return h.gitlabClient.ApproveMR(mrInfo.ProjectID, mrInfo.MRIID)
 	}
 
 	// Approve the MR with message
@@ -244,7 +258,7 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 	}
 
 	// Add informational comment to MR if enabled
-	if h.config.Comments.EnableMRComments {
+	if h.shouldPostComments(mrInfo) {
 		comment := messageBuilder.BuildManualReviewComment(result, mrInfo)
 
 		logging.MRInfo(mrInfo.MRIID, "Adding/updating manual review comment")
@@ -267,7 +281,7 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 			}
 		}
 	} else {
-		logging.MRInfo(mrInfo.MRIID, "Skipping manual review comment (comments disabled)")
+		logging.MRInfo(mrInfo.MRIID, "Skipping manual review comment (comments disabled or comments disabled for author)")
 	}
 
 	return nil
@@ -277,7 +291,7 @@ func (h *DataProductConfigMrReviewHandler) handleManualReviewWithComments(result
 func (h *DataProductConfigMrReviewHandler) handleCommentOnlyWithComments(result *shared.RuleEvaluation, mrInfo *gitlab.MRInfo) error {
 	messageBuilder := NewMessageBuilder(h.config)
 
-	if h.config.Comments.EnableMRComments {
+	if h.shouldPostComments(mrInfo) {
 		comment := messageBuilder.BuildCommentOnlyComment(result)
 
 		logging.MRInfo(mrInfo.MRIID, "Adding/updating comment-only message (no MR decision)")
@@ -296,7 +310,7 @@ func (h *DataProductConfigMrReviewHandler) handleCommentOnlyWithComments(result 
 			logging.MRInfo(mrInfo.MRIID, "Added comment-only message")
 		}
 	} else {
-		logging.MRInfo(mrInfo.MRIID, "Skipping comment-only message (comments disabled)")
+		logging.MRInfo(mrInfo.MRIID, "Skipping comment-only message (comments disabled or comments disabled for author)")
 	}
 
 	return nil
@@ -331,23 +345,6 @@ func (h *DataProductConfigMrReviewHandler) handleMergeRequestEvent(c *fiber.Ctx,
 		zap.Int("project_id", mrInfo.ProjectID),
 		zap.String("author", mrInfo.Author),
 		zap.String("state", mrInfo.State))
-
-	// if mrInfo.Author is in a list of values in NAYSAYER_EXCLUDE_AUTHORS
-	// then skip review for those MRs
-	if mrInfo.Author != "" && slices.Contains(h.config.ExcludeAuthors, mrInfo.Author) {
-		logging.MRInfo(mrInfo.MRIID, "Skipping review for excluded author",
-			zap.String("author", mrInfo.Author))
-
-		return c.JSON(fiber.Map{
-			"webhook_response": "processed",
-			"event_type":       "merge_request",
-			"decision":         "skipped",
-			"reason":           "MR author is excluded by NAYSAYER_EXCLUDE_AUTHORS",
-			"mr_approved":      false,
-			"project_id":       mrInfo.ProjectID,
-			"mr_iid":           mrInfo.MRIID,
-		})
-	}
 
 	// Skip rule evaluation if MR is not open
 	if mrInfo.State != utils.MRStateOpened {

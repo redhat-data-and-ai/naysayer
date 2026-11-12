@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -631,68 +632,111 @@ func TestEvaluateRules_NetZeroChanges(t *testing.T) {
 	assert.Equal(t, "Net-zero changes", result.FinalDecision.Summary)
 }
 
-func TestHandleMergeRequestEventExcludedAuthors(t *testing.T) {
-	for _, tt := range []struct {
-		name     string
-		excluded string
-		author   string
-		wantSkip bool
-	}{
-		{"matching author", "testuser", "testuser", true},
-		{"list with whitespace", "other, testuser , ,bot", "testuser", true},
-		{"empty list", "", "testuser", false},
-		{"different author", "other", "testuser", false},
-		{"no substring matching", "testuser-bot", "testuser", false},
-		{"case sensitive", "TestUser", "testuser", false},
-		{"empty author", " , ,", "", false},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("NAYSAYER_EXCLUDE_AUTHORS", tt.excluded)
+// Track side effects separately so quiet reviews cannot accidentally post a note.
+type commentTrackingClient struct {
+	MockGitLabClient
+	comments, approvals, approvalMessages, resets int
+}
 
-			// Nil clients ensure these skipped events perform no external operations.
-			handler := &DataProductConfigMrReviewHandler{config: config.Load()}
+func (m *commentTrackingClient) AddMRComment(_, _ int, _ string) error {
+	m.comments++
+	return nil
+}
 
-			payload := map[string]interface{}{
-				"object_attributes": map[string]interface{}{
-					"iid":    123,
-					"state":  "opened",
-					"action": "open",
-					"title":  "Draft: update",
-				},
-				"project": map[string]interface{}{
-					"id": 456,
-				},
-				"user": map[string]interface{}{
-					"username": tt.author,
-				},
+func (m *commentTrackingClient) AddOrUpdateMRComment(_, _ int, _, _ string) error {
+	m.comments++
+	return nil
+}
+
+func (m *commentTrackingClient) ApproveMR(_, _ int) error {
+	m.approvals++
+	return nil
+}
+
+func (m *commentTrackingClient) ApproveMRWithMessage(_, _ int, _ string) error {
+	m.approvalMessages++
+	return nil
+}
+
+func (m *commentTrackingClient) ResetNaysayerApproval(_, _ int) error {
+	m.resets++
+	return nil
+}
+
+func TestHandleMergeRequestEventDisabledCommentsAuthors(t *testing.T) {
+	for _, decision := range []shared.DecisionType{shared.Approve, shared.ManualReview, shared.CommentOnly} {
+		for _, updateExisting := range []bool{false, true} {
+			for _, tt := range []struct {
+				name                    string
+				disabledCommentsAuthors string
+				author                  string
+				quiet                   bool
+			}{
+				{"matching author", "testuser", "testuser", true},
+				{"list with whitespace", "other, testuser , ,bot", "testuser", true},
+				{"empty list", "", "testuser", false},
+				{"different author", "other", "testuser", false},
+				{"no substring matching", "testuser-bot", "testuser", false},
+				{"case sensitive", "TestUser", "testuser", false},
+				{"empty author", " , ,", "", false},
+			} {
+				t.Run(string(decision)+"/"+tt.name+"/update="+strconv.FormatBool(updateExisting), func(t *testing.T) {
+					t.Setenv("DISABLE_MR_COMMENTS_AUTHORS", tt.disabledCommentsAuthors)
+					cfg := config.Load()
+					cfg.Comments.EnableMRComments = true
+					cfg.Comments.UpdateExistingComments = updateExisting
+					client := &commentTrackingClient{MockGitLabClient: MockGitLabClient{
+						changes: []gitlab.FileChange{{NewPath: "product.yaml", Diff: "+change"}},
+					}}
+					evaluated := false
+					handler := &DataProductConfigMrReviewHandler{
+						config:       cfg,
+						gitlabClient: client,
+						ruleManager: &MockRuleManager{evaluateFunc: func(ctx *shared.MRContext) *shared.RuleEvaluation {
+							evaluated = true
+							return &shared.RuleEvaluation{FinalDecision: shared.Decision{Type: decision}}
+						}},
+					}
+					payload := map[string]interface{}{
+						"object_attributes": map[string]interface{}{
+							"iid": 123, "state": "opened", "action": "open", "title": "update",
+						},
+						"project": map[string]interface{}{"id": 456},
+						"user":    map[string]interface{}{"username": tt.author},
+					}
+					app := createTestApp()
+					app.Post("/webhook", func(c *fiber.Ctx) error {
+						return handler.handleMergeRequestEvent(c, payload)
+					})
+					resp, err := app.Test(httptest.NewRequest("POST", "/webhook", nil))
+					if !assert.NoError(t, err) {
+						return
+					}
+					defer func() { assert.NoError(t, resp.Body.Close()) }()
+					assert.Equal(t, 200, resp.StatusCode)
+					var response map[string]interface{}
+					assert.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
+					assert.True(t, evaluated, "authors with comments disabled must still be evaluated")
+					assert.Equal(t, decision == shared.Approve, response["mr_approved"])
+					if tt.quiet {
+						assert.Zero(t, client.comments)
+						assert.Zero(t, client.approvalMessages)
+					} else {
+						assert.Equal(t, 1, client.comments)
+					}
+					if decision == shared.Approve {
+						assert.Equal(t, 1, client.approvals+client.approvalMessages)
+						assert.Zero(t, client.resets)
+					} else {
+						assert.Zero(t, client.approvals+client.approvalMessages)
+						if decision == shared.ManualReview {
+							assert.Equal(t, 1, client.resets)
+						} else {
+							assert.Zero(t, client.resets)
+						}
+					}
+				})
 			}
-
-			app := createTestApp()
-			app.Post("/webhook", func(c *fiber.Ctx) error {
-				return handler.handleMergeRequestEvent(c, payload)
-			})
-
-			resp, err := app.Test(httptest.NewRequest("POST", "/webhook", nil))
-			if !assert.NoError(t, err) {
-				return
-			}
-
-			defer func() {
-				assert.NoError(t, resp.Body.Close())
-			}()
-
-			assert.Equal(t, 200, resp.StatusCode)
-
-			var response map[string]interface{}
-			assert.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
-			assert.Equal(t, "skipped", response["decision"])
-			assert.Equal(t, false, response["mr_approved"])
-
-			if tt.wantSkip {
-				assert.Equal(t, "MR author is excluded by NAYSAYER_EXCLUDE_AUTHORS", response["reason"])
-			} else {
-				assert.Equal(t, "Draft MR - skipped processing to avoid bypassing validation rules", response["reason"])
-			}
-		})
+		}
 	}
 }

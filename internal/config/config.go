@@ -9,15 +9,14 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	ExcludeAuthors []string // MR authors excluded from review
-	GitLab         GitLabConfig
-	Server         ServerConfig
-	Webhook        WebhookConfig
-	Comments       CommentsConfig
-	Rules          RulesConfig
-	Approval       ApprovalConfig
-	AutoRebase     AutoRebaseConfig
-	StaleMR        StaleMRConfig
+	GitLab     GitLabConfig
+	Server     ServerConfig
+	Webhook    WebhookConfig
+	Comments   CommentsConfig
+	Rules      RulesConfig
+	Approval   ApprovalConfig
+	AutoRebase AutoRebaseConfig
+	StaleMR    StaleMRConfig
 }
 
 // GitLabConfig holds GitLab API configuration
@@ -43,9 +42,10 @@ type WebhookConfig struct {
 
 // CommentsConfig holds MR comments and messages configuration
 type CommentsConfig struct {
-	EnableMRComments       bool   // Enable/disable MR commenting
-	CommentVerbosity       string // Comment verbosity level (basic, detailed, debug)
-	UpdateExistingComments bool   // Update existing comments instead of creating new ones
+	DisableMRCommentsAuthors []string // MR authors with comments disabled; reviews and approvals still run
+	EnableMRComments         bool     // Enable/disable MR commenting
+	CommentVerbosity         string   // Comment verbosity level (basic, detailed, debug)
+	UpdateExistingComments   bool     // Update existing comments instead of creating new ones
 }
 
 // RulesConfig holds rule-specific configuration
@@ -122,7 +122,6 @@ type StaleMRConfig struct {
 // Load loads configuration from environment variables
 func Load() *Config {
 	return &Config{
-		ExcludeAuthors: parseStringList(getEnv("NAYSAYER_EXCLUDE_AUTHORS", "")),
 		GitLab: GitLabConfig{
 			BaseURL:                       getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
 			Token:                         getEnv("GITLAB_TOKEN", ""),
@@ -139,9 +138,10 @@ func Load() *Config {
 			AllowedIPs: parseIPList(getEnv("WEBHOOK_ALLOWED_IPS", "")),
 		},
 		Comments: CommentsConfig{
-			EnableMRComments:       getEnv("ENABLE_MR_COMMENTS", "true") == "true",
-			CommentVerbosity:       getEnv("COMMENT_VERBOSITY", "detailed"),
-			UpdateExistingComments: getEnv("UPDATE_EXISTING_COMMENTS", "true") == "true",
+			DisableMRCommentsAuthors: parseStringList(getEnv("DISABLE_MR_COMMENTS_AUTHORS", "")),
+			EnableMRComments:         getEnv("ENABLE_MR_COMMENTS", "true") == "true",
+			CommentVerbosity:         getEnv("COMMENT_VERBOSITY", "detailed"),
+			UpdateExistingComments:   getEnv("UPDATE_EXISTING_COMMENTS", "true") == "true",
 		},
 		Rules: RulesConfig{
 			EnabledRules:  parseStringList(getEnv("ENABLED_RULES", "")),
